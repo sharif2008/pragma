@@ -2,12 +2,15 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
 from app.schemas.kb import (
+    KBFuseHitsMMRRequest,
+    KBLLMShapRetrievalRequest,
+    KBLLMShapRetrievalResponse,
     KBMultiQueryRequest,
     KBMultiQueryResponse,
     KBQueryHit,
@@ -20,8 +23,7 @@ from app.schemas.kb import (
     RAGLLMResponse,
     RAGTemplateItem,
 )
-from app.services import kb_service
-from app.services import llm_service
+from app.services import kb_service, llm_service
 
 router = APIRouter(prefix="/kb", tags=["knowledge-base"])
 
@@ -87,6 +89,28 @@ def kb_rag_templates_latest_prediction(
         summary=data.get("summary"),
         templates=templates,
         message=data.get("message"),
+        row_index=data.get("row_index"),
+        row_context=data.get("row_context"),
+    )
+
+
+@router.get("/rag-templates/prediction-job/{public_id}", response_model=KBRAGLatestPredictionResponse)
+def kb_rag_templates_prediction_job(
+    public_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    row_index: int | None = Query(default=None, ge=0, description="Optional row in results_json for SHAP-aware templates."),
+) -> KBRAGLatestPredictionResponse:
+    """RAG + LLM templates for a selected completed prediction job (optional per-row SHAP context)."""
+    data = kb_service.prediction_job_rag_context(db, settings, public_id, row_index=row_index)
+    templates = [RAGTemplateItem.model_validate(t) for t in data.get("templates") or []]
+    return KBRAGLatestPredictionResponse(
+        prediction_job_public_id=data.get("prediction_job_public_id"),
+        summary=data.get("summary"),
+        templates=templates,
+        message=data.get("message"),
+        row_index=data.get("row_index"),
+        row_context=data.get("row_context"),
     )
 
 
@@ -105,6 +129,7 @@ def kb_query_multi(
         per_query_k=body.per_query_k,
         mmr_lambda=body.mmr_lambda,
         kb_public_ids=body.kb_public_ids,
+        use_mmr=body.use_mmr,
     )
     hits = [
         KBQueryHit(
@@ -118,6 +143,59 @@ def kb_query_multi(
         for h in raw_hits
     ]
     return KBMultiQueryResponse(hits=hits, meta=meta)
+
+
+@router.post("/fuse-hits-mmr", response_model=KBMultiQueryResponse)
+def kb_fuse_hits_mmr(
+    body: KBFuseHitsMMRRequest,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> KBMultiQueryResponse:
+    """
+    After one POST /kb/query per retrieval string, send all hit lists here to dedupe (chunk key),
+    fusion-rerank (RRF + max score), then MMR — same scoring as /kb/query-multi.
+    """
+    groups = [[h.model_dump() for h in grp] for grp in body.per_query_hits]
+    raw_hits, meta = kb_service.fuse_per_query_hit_groups_mmr(
+        db,
+        settings,
+        body.queries,
+        groups,
+        final_k=body.final_k,
+        mmr_lambda=body.mmr_lambda,
+        kb_public_ids=body.kb_public_ids,
+        use_mmr=body.use_mmr,
+    )
+    hits = [
+        KBQueryHit(
+            score=h["score"],
+            text=h["text"],
+            source=h.get("source"),
+            kb_public_id=h.get("kb_public_id"),
+            rerank_score=h.get("rerank_score"),
+            mmr_margin=h.get("mmr_margin"),
+        )
+        for h in raw_hits
+    ]
+    return KBMultiQueryResponse(hits=hits, meta=meta)
+
+
+@router.post("/llm-shap-retrieval-query", response_model=KBLLMShapRetrievalResponse)
+async def kb_llm_shap_retrieval_query(
+    body: KBLLMShapRetrievalRequest,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> KBLLMShapRetrievalResponse:
+    """
+    Refine the SHAP track's human-readable draft (template + row data) into one dense query for /kb/query.
+
+    When OpenAI is not configured, returns the normalized draft with used_llm=false.
+    """
+    q, used = await llm_service.refine_shap_rag_retrieval_query(
+        settings,
+        draft_queries_text=body.draft_queries_text,
+        analyst_synthesis_prompt=body.analyst_synthesis_prompt,
+    )
+    return KBLLMShapRetrievalResponse(retrieval_query=q, used_llm=used)
 
 
 @router.post("/rag-llm", response_model=RAGLLMResponse)

@@ -52,6 +52,7 @@ def train_from_csv(
     *,
     vfl_agent_definitions_path: str | None = None,
     repo_root: Path | None = None,
+    storage_root: Path | None = None,
 ) -> dict[str, Any]:
     if algorithm == "vfl":
         from app.services import ml_vfl
@@ -64,6 +65,7 @@ def train_from_csv(
             artifact_path,
             agent_definitions_path=vfl_agent_definitions_path,
             repo_root=repo_root,
+            storage_root=storage_root,
         )
 
     df = pd.read_csv(csv_path)

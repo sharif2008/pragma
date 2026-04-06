@@ -93,7 +93,7 @@ def main() -> None:
         pj_id = pj["public_id"]
 
         for _ in range(60):
-            r = client.get(f"{base}/predictions/{pj_id}")
+            r = client.get(f"{base}/predictions/{pj_id}", params={"include_results": "true"})
             r.raise_for_status()
             st = r.json()
             if st["status"] in ("completed", "failed"):

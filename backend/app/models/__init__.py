@@ -1,6 +1,7 @@
 """ORM models."""
 
 from app.models.domain import (
+    AgenticJob,
     AgenticReport,
     KnowledgeBaseFile,
     ManagedFile,
@@ -15,5 +16,6 @@ __all__ = [
     "ModelVersion",
     "PredictionJob",
     "KnowledgeBaseFile",
+    "AgenticJob",
     "AgenticReport",
 ]

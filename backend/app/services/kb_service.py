@@ -19,6 +19,7 @@ from app.rag.chunking import chunk_text, load_document_text
 from app.rag.vector_store import FaissKnowledgeIndex, _normalize
 from app.services import file_service, prediction_service
 from app.services.rag_templates_from_predictions import build_rag_templates_from_summary
+from app.services.rag_templates_row_context import build_row_agent_templates
 from app.utils.file_utils import remove_path
 
 logger = logging.getLogger(__name__)
@@ -124,54 +125,22 @@ def _norm_list(vals: list[float]) -> list[float]:
     return [(v - mn) / (mx - mn) for v in vals]
 
 
-def query_kb_multi_mmr(
-    db: Session,
+def _finalize_fused_pool_mmr(
+    fused: dict[str, dict[str, Any]],
+    rows: list[KnowledgeBaseFile],
     settings: Settings,
     queries: list[str],
     *,
     final_k: int,
-    per_query_k: int,
     mmr_lambda: float,
-    kb_public_ids: list[str] | None,
-    pool_multiplier: int = 4,
+    use_mmr: bool,
+    pool_multiplier: int,
+    meta: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
-    Multi-query retrieval: per-query FAISS hits, RRF + max-score fusion rerank, then MMR on the pool.
-    All pooled texts are embedded with the first KB index's model (indices should share the same embedding space).
+    Deduped fusion map → fusion rerank → pool → MMR (or top-k by rerank) → hit dicts.
     """
-    q = select(KnowledgeBaseFile)
-    if kb_public_ids:
-        q = q.where(KnowledgeBaseFile.public_id.in_(kb_public_ids))
-    rows = list(db.scalars(q).all())
-    meta: dict[str, Any] = {
-        "queries_used": queries,
-        "per_query_k": per_query_k,
-        "final_k": final_k,
-        "mmr_lambda": mmr_lambda,
-        "fusion": "rrf_plus_max_score_then_mmr",
-    }
-    if not rows or not queries:
-        return [], meta
-
-    # fusion_key -> { chunk, kb_id, max_score, rrf }
-    fused: dict[str, dict[str, Any]] = {}
-    for q_idx, query in enumerate(queries):
-        for kb in rows:
-            store = _open_store(settings, kb)
-            raw = store.search(query.strip(), per_query_k)
-            for rank, (score, chunk) in enumerate(raw, start=1):
-                text = chunk.get("text") or ""
-                if not text.strip():
-                    continue
-                fk = _chunk_fusion_key(kb.public_id, text)
-                rrf_part = 1.0 / (_RRF_K + rank)
-                if fk not in fused:
-                    fused[fk] = {"chunk": chunk, "kb_id": kb.public_id, "max_score": float(score), "rrf": rrf_part}
-                else:
-                    fused[fk]["max_score"] = max(fused[fk]["max_score"], float(score))
-                    fused[fk]["rrf"] += rrf_part
-
-    if not fused:
+    if not fused or not rows:
         return [], meta
 
     items = list(fused.values())
@@ -197,33 +166,39 @@ def query_kb_multi_mmr(
     q_centroid = _normalize(np.mean(q_vecs, axis=0, keepdims=True))
     sim_q = (emb @ q_centroid.T).flatten()
 
-    lam = max(0.0, min(1.0, mmr_lambda))
     selected: list[int] = []
-    remaining = set(range(len(pool)))
-    mmr_margins: list[float] = []
+    mmr_margins: list[float | None] = []
 
-    while len(selected) < final_k and remaining:
-        best_i: int | None = None
-        best_mmr = -1e18
-        for i in remaining:
-            rel = float(sim_q[i])
-            if not selected:
-                mmr = rel
-            else:
-                div = max(float(np.dot(emb[i], emb[j])) for j in selected)
-                mmr = lam * rel - (1.0 - lam) * div
-            if mmr > best_mmr:
-                best_mmr = mmr
-                best_i = i
-        assert best_i is not None
-        selected.append(best_i)
-        mmr_margins.append(best_mmr)
-        remaining.remove(best_i)
+    if use_mmr:
+        lam = max(0.0, min(1.0, mmr_lambda))
+        remaining = set(range(len(pool)))
+        while len(selected) < final_k and remaining:
+            best_i: int | None = None
+            best_mmr = -1e18
+            for i in remaining:
+                rel = float(sim_q[i])
+                if not selected:
+                    mmr = rel
+                else:
+                    div = max(float(np.dot(emb[i], emb[j])) for j in selected)
+                    mmr = lam * rel - (1.0 - lam) * div
+                if mmr > best_mmr:
+                    best_mmr = mmr
+                    best_i = i
+            assert best_i is not None
+            selected.append(best_i)
+            mmr_margins.append(best_mmr)
+            remaining.remove(best_i)
+    else:
+        k = min(final_k, len(pool))
+        selected = list(range(k))
+        mmr_margins = [None] * k
 
     hits: list[dict[str, Any]] = []
     for idx, i in enumerate(selected):
         p = pool[i]
         ch = p["chunk"]
+        mmr_val = mmr_margins[idx]
         hits.append(
             {
                 "score": float(sim_q[i]),
@@ -231,12 +206,200 @@ def query_kb_multi_mmr(
                 "source": ch.get("source"),
                 "kb_public_id": p["kb_id"],
                 "rerank_score": float(p["fusion_rerank"]),
-                "mmr_margin": float(mmr_margins[idx]),
+                "mmr_margin": float(mmr_val) if mmr_val is not None else None,
             }
         )
     meta["pool_size"] = pool_n
     meta["candidates_fused"] = len(fused)
     return hits, meta
+
+
+def query_kb_multi_mmr(
+    db: Session,
+    settings: Settings,
+    queries: list[str],
+    *,
+    final_k: int,
+    per_query_k: int,
+    mmr_lambda: float,
+    kb_public_ids: list[str] | None,
+    pool_multiplier: int = 4,
+    use_mmr: bool = True,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """
+    Multi-query retrieval: per-query FAISS hits, RRF + max-score fusion rerank, then MMR on the pool.
+    All pooled texts are embedded with the first KB index's model (indices should share the same embedding space).
+    """
+    q = select(KnowledgeBaseFile)
+    if kb_public_ids:
+        q = q.where(KnowledgeBaseFile.public_id.in_(kb_public_ids))
+    rows = list(db.scalars(q).all())
+    meta: dict[str, Any] = {
+        "queries_used": queries,
+        "per_query_k": per_query_k,
+        "final_k": final_k,
+        "mmr_lambda": mmr_lambda,
+        "fusion": "rrf_plus_max_score_then_mmr" if use_mmr else "rrf_plus_max_score_topk",
+        "use_mmr": use_mmr,
+        "pipeline": "single_request_per_query_faiss_then_fuse_mmr",
+    }
+    if not rows or not queries:
+        return [], meta
+
+    # fusion_key -> { chunk, kb_id, max_score, rrf }
+    fused: dict[str, dict[str, Any]] = {}
+    for q_idx, query in enumerate(queries):
+        for kb in rows:
+            store = _open_store(settings, kb)
+            raw = store.search(query.strip(), per_query_k)
+            for rank, (score, chunk) in enumerate(raw, start=1):
+                text = chunk.get("text") or ""
+                if not text.strip():
+                    continue
+                fk = _chunk_fusion_key(kb.public_id, text)
+                rrf_part = 1.0 / (_RRF_K + rank)
+                if fk not in fused:
+                    fused[fk] = {"chunk": chunk, "kb_id": kb.public_id, "max_score": float(score), "rrf": rrf_part}
+                else:
+                    fused[fk]["max_score"] = max(fused[fk]["max_score"], float(score))
+                    fused[fk]["rrf"] += rrf_part
+
+    return _finalize_fused_pool_mmr(
+        fused,
+        rows,
+        settings,
+        queries,
+        final_k=final_k,
+        mmr_lambda=mmr_lambda,
+        use_mmr=use_mmr,
+        pool_multiplier=pool_multiplier,
+        meta=meta,
+    )
+
+
+def fuse_per_query_hit_groups_mmr(
+    db: Session,
+    settings: Settings,
+    queries: list[str],
+    per_query_hits: list[list[dict[str, Any]]],
+    *,
+    final_k: int,
+    mmr_lambda: float,
+    kb_public_ids: list[str] | None,
+    pool_multiplier: int = 4,
+    use_mmr: bool = True,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """
+    Each query was retrieved separately (e.g. repeated POST /kb/query). Merge hit lists with the same
+    dedupe + RRF/max fusion + rerank + MMR as query_kb_multi_mmr. Rank in each list is 1-based list order.
+    """
+    q = select(KnowledgeBaseFile)
+    if kb_public_ids:
+        q = q.where(KnowledgeBaseFile.public_id.in_(kb_public_ids))
+    rows = list(db.scalars(q).all())
+    meta: dict[str, Any] = {
+        "queries_used": queries,
+        "final_k": final_k,
+        "mmr_lambda": mmr_lambda,
+        "fusion": "rrf_plus_max_score_then_mmr" if use_mmr else "rrf_plus_max_score_topk",
+        "use_mmr": use_mmr,
+        "pipeline": "sequential_kb_query_then_fuse_rerank_mmr",
+        "per_query_hits_received": [len(g) for g in per_query_hits],
+    }
+    if not rows or not queries:
+        return [], meta
+
+    fused: dict[str, dict[str, Any]] = {}
+    for q_idx, hits in enumerate(per_query_hits):
+        if q_idx >= len(queries):
+            break
+        for rank, h in enumerate(hits, start=1):
+            text = str(h.get("text") or "").strip()
+            if not text:
+                continue
+            kb_id = str(h.get("kb_public_id") or "")
+            fk = _chunk_fusion_key(kb_id, text)
+            score = float(h.get("score") or 0.0)
+            chunk = {"text": text, "source": h.get("source")}
+            rrf_part = 1.0 / (_RRF_K + rank)
+            if fk not in fused:
+                fused[fk] = {"chunk": chunk, "kb_id": kb_id, "max_score": score, "rrf": rrf_part}
+            else:
+                fused[fk]["max_score"] = max(fused[fk]["max_score"], score)
+                fused[fk]["rrf"] += rrf_part
+
+    return _finalize_fused_pool_mmr(
+        fused,
+        rows,
+        settings,
+        queries,
+        final_k=final_k,
+        mmr_lambda=mmr_lambda,
+        use_mmr=use_mmr,
+        pool_multiplier=pool_multiplier,
+        meta=meta,
+    )
+
+
+def prediction_job_rag_context(
+    db: Session,
+    settings: Settings,
+    prediction_job_public_id: str,
+    *,
+    row_index: int | None = None,
+) -> dict[str, Any]:
+    """Templates for a chosen completed job; optional row-level SHAP-aware queries."""
+    job = prediction_service.get_prediction_job(db, prediction_job_public_id)
+    if job.status != JobStatus.completed:
+        return {
+            "prediction_job_public_id": job.public_id,
+            "summary": None,
+            "templates": [],
+            "message": "Prediction job must be completed to build RAG templates.",
+            "row_index": row_index,
+            "row_context": None,
+        }
+    summary = prediction_service.load_prediction_summary(settings, job)
+    templates = build_rag_templates_from_summary(summary)
+    row_context: dict[str, Any] | None = None
+    rj = job.results_json
+    if row_index is not None:
+        if not isinstance(rj, dict):
+            return {
+                "prediction_job_public_id": job.public_id,
+                "summary": summary,
+                "templates": [],
+                "message": "Load prediction with include_results=true (or re-run prediction) to attach row-level results_json.",
+                "row_index": row_index,
+                "row_context": None,
+            }
+        rows = rj.get("rows")
+        if not isinstance(rows, list) or not (0 <= row_index < len(rows)) or not isinstance(rows[row_index], dict):
+            return {
+                "prediction_job_public_id": job.public_id,
+                "summary": summary,
+                "templates": [],
+                "message": f"Invalid row_index={row_index} for this job (rows={len(rows) if isinstance(rows, list) else 0}).",
+                "row_index": row_index,
+                "row_context": None,
+            }
+        row = rows[row_index]
+        base = f"{summary.get('rows_flagged')} flagged / {summary.get('rows_total')} total"
+        extra, row_context = build_row_agent_templates(
+            job_public_id=job.public_id,
+            row=row,
+            base_summary_line=str(base),
+        )
+        templates = extra + templates
+
+    return {
+        "prediction_job_public_id": job.public_id,
+        "summary": summary,
+        "templates": templates,
+        "message": None,
+        "row_index": row_index,
+        "row_context": row_context,
+    }
 
 
 def latest_prediction_rag_context(db: Session, settings: Settings) -> dict[str, Any]:
@@ -249,6 +412,8 @@ def latest_prediction_rag_context(db: Session, settings: Settings) -> dict[str, 
             "summary": None,
             "templates": [],
             "message": "No completed prediction job found. Run a batch prediction first.",
+            "row_index": None,
+            "row_context": None,
         }
     summary = prediction_service.load_prediction_summary(settings, job)
     templates = build_rag_templates_from_summary(summary)
@@ -257,4 +422,6 @@ def latest_prediction_rag_context(db: Session, settings: Settings) -> dict[str, 
         "summary": summary,
         "templates": templates,
         "message": None,
+        "row_index": None,
+        "row_context": None,
     }

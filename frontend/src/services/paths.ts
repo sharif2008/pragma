@@ -27,9 +27,12 @@ export const paths = {
 
   models: {
     list: '/models',
+    byPublicId: (publicId: string) => `/models/${encodeURIComponent(publicId)}`,
   },
 
   predictions: {
+    list: '/predictions',
+    pendingDelete: '/predictions/pending',
     uploadInput: '/predictions/upload-input',
     inputs: '/predictions/inputs',
     start: '/predictions/start',
@@ -38,6 +41,8 @@ export const paths = {
 
   agent: {
     decide: '/agent/decide',
+    decidePromptPreview: '/agent/decide/prompt-preview',
+    jobs: '/agent/jobs',
     reports: '/agent/reports',
     reportByPublicId: (publicId: string) => `/agent/reports/${encodeURIComponent(publicId)}`,
   },
@@ -48,7 +53,11 @@ export const paths = {
     byPublicId: (publicId: string) => `/kb/${encodeURIComponent(publicId)}`,
     query: '/kb/query',
     queryMulti: '/kb/query-multi',
+    fuseHitsMmr: '/kb/fuse-hits-mmr',
     ragTemplatesLatestPrediction: '/kb/rag-templates/latest-prediction',
+    ragTemplatesPredictionJob: (publicId: string) =>
+      `/kb/rag-templates/prediction-job/${encodeURIComponent(publicId)}`,
     ragLlm: '/kb/rag-llm',
+    llmShapRetrievalQuery: '/kb/llm-shap-retrieval-query',
   },
 } as const;

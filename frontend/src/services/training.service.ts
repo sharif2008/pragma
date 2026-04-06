@@ -7,7 +7,7 @@ import type {
 } from 'src/api/types';
 
 import { paths } from './paths';
-import { requestJson } from './http-client';
+import { requestJson, requestVoid } from './http-client';
 
 export async function listTrainingJobs(limit = 100, offset = 0): Promise<TrainingJobOut[]> {
   const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
@@ -38,6 +38,14 @@ export async function getTrainingJob(publicId: string): Promise<TrainingJobOut> 
   return requestJson<TrainingJobOut>(paths.training.byPublicId(publicId));
 }
 
+export async function deleteTrainingJob(publicId: string): Promise<void> {
+  return requestVoid(paths.training.byPublicId(publicId), { method: 'DELETE' });
+}
+
 export async function listModels(): Promise<ModelVersionOut[]> {
   return requestJson<ModelVersionOut[]>(paths.models.list);
+}
+
+export async function deleteModel(publicId: string): Promise<void> {
+  return requestVoid(paths.models.byPublicId(publicId), { method: 'DELETE' });
 }

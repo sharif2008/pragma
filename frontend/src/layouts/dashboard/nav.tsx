@@ -5,9 +5,13 @@ import { varAlpha } from 'minimal-shared/utils';
 
 import Box from '@mui/material/Box';
 import ListItem from '@mui/material/ListItem';
+import Tooltip from '@mui/material/Tooltip';
+import IconButton from '@mui/material/IconButton';
 import { useTheme } from '@mui/material/styles';
 import ListItemButton from '@mui/material/ListItemButton';
 import Drawer, { drawerClasses } from '@mui/material/Drawer';
+
+import { Iconify } from 'src/components/iconify';
 
 import { usePathname } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
@@ -38,14 +42,20 @@ export function NavDesktop({
   slots,
   workspaces,
   layoutQuery,
-}: NavContentProps & { layoutQuery: Breakpoint }) {
+  collapsed = false,
+  onToggleCollapsed,
+}: NavContentProps & {
+  layoutQuery: Breakpoint;
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
+}) {
   const theme = useTheme();
 
   return (
     <Box
       sx={{
         pt: 2.5,
-        px: 2.5,
+        px: collapsed ? 1 : 2.5,
         top: 0,
         left: 0,
         height: 1,
@@ -54,14 +64,25 @@ export function NavDesktop({
         flexDirection: 'column',
         zIndex: 'var(--layout-nav-zIndex)',
         width: 'var(--layout-nav-vertical-width)',
+        overflow: 'hidden',
         borderRight: `1px solid ${varAlpha(theme.vars.palette.grey['500Channel'], 0.12)}`,
+        transition: theme.transitions.create(['width', 'padding'], {
+          easing: 'var(--layout-transition-easing)',
+          duration: 'var(--layout-transition-duration)',
+        }),
         [theme.breakpoints.up(layoutQuery)]: {
           display: 'flex',
         },
         ...sx,
       }}
     >
-      <NavContent data={data} slots={slots} workspaces={workspaces} />
+      <NavContent
+        data={data}
+        slots={slots}
+        workspaces={workspaces}
+        collapsed={collapsed}
+        onToggleCollapsed={onToggleCollapsed}
+      />
     </Box>
   );
 }
@@ -106,16 +127,34 @@ export function NavMobile({
 
 // ----------------------------------------------------------------------
 
-export function NavContent({ data, slots, workspaces, sx }: NavContentProps) {
+export function NavContent({
+  data,
+  slots,
+  workspaces,
+  sx,
+  collapsed = false,
+  onToggleCollapsed,
+}: NavContentProps & {
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
+}) {
   const pathname = usePathname();
 
   return (
     <>
-      <Logo />
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          width: 1,
+        }}
+      >
+        <Logo />
+      </Box>
 
       {slots?.topArea}
 
-      <WorkspacesPopover data={workspaces} sx={{ my: 2 }} />
+      <WorkspacesPopover data={workspaces} collapsed={collapsed} sx={{ my: 2 }} />
 
       <Scrollbar fillContent>
         <Box
@@ -140,50 +179,85 @@ export function NavContent({ data, slots, workspaces, sx }: NavContentProps) {
             {data.map((item) => {
               const isActived = item.path === pathname;
 
+              const button = (
+                <ListItemButton
+                  disableGutters
+                  component={RouterLink}
+                  href={item.path}
+                  aria-label={collapsed ? item.title : undefined}
+                  sx={[
+                    (theme) => ({
+                      pl: collapsed ? 1 : 2,
+                      py: 1,
+                      gap: collapsed ? 0 : 2,
+                      pr: collapsed ? 1 : 1.5,
+                      borderRadius: 0.75,
+                      typography: 'body2',
+                      fontWeight: 'fontWeightMedium',
+                      color: theme.vars.palette.text.secondary,
+                      minHeight: 44,
+                      justifyContent: collapsed ? 'center' : 'flex-start',
+                      ...(isActived && {
+                        fontWeight: 'fontWeightSemiBold',
+                        color: theme.vars.palette.primary.main,
+                        bgcolor: varAlpha(theme.vars.palette.primary.mainChannel, 0.08),
+                        '&:hover': {
+                          bgcolor: varAlpha(theme.vars.palette.primary.mainChannel, 0.16),
+                        },
+                      }),
+                    }),
+                  ]}
+                >
+                  <Box component="span" sx={{ width: 24, height: 24, flexShrink: 0 }}>
+                    {item.icon}
+                  </Box>
+
+                  {!collapsed && (
+                    <>
+                      <Box component="span" sx={{ flexGrow: 1 }}>
+                        {item.title}
+                      </Box>
+
+                      {item.info && item.info}
+                    </>
+                  )}
+                </ListItemButton>
+              );
+
               return (
                 <ListItem disableGutters disablePadding key={item.title}>
-                  <ListItemButton
-                    disableGutters
-                    component={RouterLink}
-                    href={item.path}
-                    sx={[
-                      (theme) => ({
-                        pl: 2,
-                        py: 1,
-                        gap: 2,
-                        pr: 1.5,
-                        borderRadius: 0.75,
-                        typography: 'body2',
-                        fontWeight: 'fontWeightMedium',
-                        color: theme.vars.palette.text.secondary,
-                        minHeight: 44,
-                        ...(isActived && {
-                          fontWeight: 'fontWeightSemiBold',
-                          color: theme.vars.palette.primary.main,
-                          bgcolor: varAlpha(theme.vars.palette.primary.mainChannel, 0.08),
-                          '&:hover': {
-                            bgcolor: varAlpha(theme.vars.palette.primary.mainChannel, 0.16),
-                          },
-                        }),
-                      }),
-                    ]}
-                  >
-                    <Box component="span" sx={{ width: 24, height: 24 }}>
-                      {item.icon}
-                    </Box>
-
-                    <Box component="span" sx={{ flexGrow: 1 }}>
-                      {item.title}
-                    </Box>
-
-                    {item.info && item.info}
-                  </ListItemButton>
+                  {collapsed ? (
+                    <Tooltip title={item.title} placement="right">
+                      {button}
+                    </Tooltip>
+                  ) : (
+                    button
+                  )}
                 </ListItem>
               );
             })}
           </Box>
         </Box>
       </Scrollbar>
+
+      {onToggleCollapsed && (
+        <Box sx={{ display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end', pt: 1, pb: 0.5 }}>
+          <Tooltip title={collapsed ? 'Expand sidebar' : 'Minimize sidebar'} placement="right">
+            <IconButton
+              size="small"
+              onClick={onToggleCollapsed}
+              aria-label={collapsed ? 'Expand sidebar' : 'Minimize sidebar'}
+              sx={{ color: 'text.secondary' }}
+            >
+              <Iconify
+                width={20}
+                icon="eva:arrow-ios-forward-fill"
+                sx={!collapsed ? { transform: 'scaleX(-1)' } : undefined}
+              />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )}
 
       {slots?.bottomArea}
     </>

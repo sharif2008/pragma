@@ -92,11 +92,34 @@ export type TrainingRebuildRequest = {
   from_job_public_id: string;
 };
 
+export type PendingPredictionPurgeOut = {
+  deleted: number;
+};
+
 export type PredictionStartRequest = {
   model_version_public_id: string;
   input_file_public_id: string;
   anomaly_probability_threshold?: number | null;
   attack_label_values?: string[] | null;
+  /** If false, skip TreeExplainer SHAP in API (sklearn trees only; VFL never computes SHAP here). */
+  compute_shap?: boolean | null;
+};
+
+/** Stored on the prediction job after a successful run: per-row labels, probabilities, SHAP (when computed). */
+export type PredictionResultsJson = {
+  schema_version?: number;
+  model_kind?: string;
+  target_column?: string;
+  feature_columns?: string[];
+  shap?: { status?: string; detail?: string | null };
+  rows?: Array<{
+    row_index: number;
+    predicted_label: string;
+    max_class_probability: number;
+    flagged_attack_or_anomaly: boolean;
+    class_probabilities: Record<string, number> | null;
+    shap: Record<string, unknown>;
+  }>;
 };
 
 export type PredictionJobOut = {
@@ -112,6 +135,9 @@ export type PredictionJobOut = {
   error_message: string | null;
   created_at: IsoDateString;
   updated_at: IsoDateString;
+  /** Set from results_json.model_kind after run (list/detail include it without full results). */
+  results_model_kind?: string | null;
+  results_json?: PredictionResultsJson | null;
 };
 
 export type KnowledgeFileOut = {
@@ -151,10 +177,39 @@ export type AgenticActionPreset = 'standard' | 'containment_focus' | 'fp_review'
 export type AgenticDecideRequest = {
   prediction_job_public_id: string;
   use_rag?: boolean;
+  /** Same row as RAG prep when prep job matches selected job (label + SHAP match analyst view). */
+  results_row_index?: number | null;
+  /** agentic_jobs.public_id from the dropdown; must match prediction batch + results_row_index on the server. */
+  agentic_job_public_id?: string | null;
   feature_notes?: string | null;
   extra_context?: Record<string, unknown> | null;
   kb_citations?: KBQueryHit[] | null;
   agent_action_preset?: AgenticActionPreset | null;
+  /** When true, API writes a demo SHA-256 commitment into the saved report JSON (trust / attestation demo). */
+  anchor_trust_chain?: boolean | null;
+};
+
+export type AgenticPromptPreviewOut = {
+  prompt: string;
+};
+
+export type AgenticJobCreateRequest = {
+  prediction_job_public_id: string;
+  results_row_index?: number | null;
+  label?: string | null;
+};
+
+export type AgenticJobOut = {
+  public_id: string;
+  prediction_job_public_id: string;
+  results_row_index: number | null;
+  label: string | null;
+  prediction_status: JobStatus;
+  rows_total: number | null;
+  rows_flagged: number | null;
+  results_model_kind?: string | null;
+  created_at: IsoDateString;
+  updated_at: IsoDateString;
 };
 
 export type AgenticReportOut = {
@@ -162,12 +217,19 @@ export type AgenticReportOut = {
   public_id: string;
   prediction_job_id: number;
   prediction_job_public_id?: string | null;
+  /** Row index from POST /agent/decide; omit or null on legacy saved reports. */
+  results_row_index?: number | null;
+  /** agentic_jobs.public_id when the run was linked to a registered handoff. */
+  agentic_job_public_id?: string | null;
   summary: string;
   recommended_action: string;
   raw_llm_response: string | null;
   rag_context_used: string | null;
   report_path: string | null;
   created_at: IsoDateString;
+  /** Set on POST /agent/decide response when anchor_trust_chain was true. */
+  trust_commitment?: string | null;
+  trust_chain_mode?: string | null;
 };
 
 export type KBQueryResponse = {
@@ -192,11 +254,23 @@ export type KBMultiQueryRequest = {
   per_query_k?: number;
   mmr_lambda?: number;
   kb_public_ids?: string[] | null;
+  /** Default true. If false, fusion rerank only (no MMR diversification). */
+  use_mmr?: boolean | null;
 };
 
 export type KBMultiQueryResponse = {
   hits: KBQueryHit[];
   meta: Record<string, unknown>;
+};
+
+/** One /kb/query response per query, then POST /kb/fuse-hits-mmr for dedupe + rerank + MMR. */
+export type KBFuseHitsMMRRequest = {
+  queries: string[];
+  per_query_hits: KBQueryHit[][];
+  final_k?: number;
+  mmr_lambda?: number;
+  kb_public_ids?: string[] | null;
+  use_mmr?: boolean | null;
 };
 
 export type RAGTemplateItem = {
@@ -212,6 +286,18 @@ export type KBRAGLatestPredictionResponse = {
   summary?: Record<string, unknown> | null;
   templates: RAGTemplateItem[];
   message?: string | null;
+  row_index?: number | null;
+  row_context?: Record<string, unknown> | null;
+};
+
+export type KBLLMShapRetrievalRequest = {
+  draft_queries_text: string;
+  analyst_synthesis_prompt?: string | null;
+};
+
+export type KBLLMShapRetrievalResponse = {
+  retrieval_query: string;
+  used_llm: boolean;
 };
 
 export type HealthResponse = {

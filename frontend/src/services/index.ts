@@ -10,36 +10,41 @@ export * from './predictions.service';
 export { getApiBaseUrl, DEFAULT_API_BASE_URL } from './api-base';
 export { ApiError, requestJson, requestVoid, postMultipart, type RequestInitSubset } from './http-client';
 
-import { agentDecide, listAgentReports, getAgentReport } from './agent.service';
 import { listFiles, deleteFile, uploadFile } from './files.service';
 import { getHealth, getApiList, getRootMeta } from './health.service';
+import { agentDecide, getAgentReport, listAgentReports } from './agent.service';
+import { listDatasets, deleteDataset, uploadDataset, getDatasetPreview } from './datasets.service';
 import {
   kbList,
   kbQuery,
-  kbQueryMulti,
   kbDelete,
   kbRagLlm,
-  kbRagTemplatesLatestPrediction,
   kbUpload,
   kbListFiles,
+  kbFuseHitsMmr,
+  kbRagTemplatesLatestPrediction,
+  kbLlmShapRetrievalQuery,
 } from './kb.service';
-import { listDatasets, deleteDataset, uploadDataset, getDatasetPreview } from './datasets.service';
-import {
-  getPrediction,
-  startPrediction,
-  getPredictionJob,
-  uploadPredictionCsv,
-  uploadPredictionInput,
-  listPredictionInputs,
-} from './predictions.service';
 import {
   listModels,
+  deleteModel,
   getTraining,
   startTraining,
   getTrainingJob,
   rebuildTraining,
   listTrainingJobs,
+  deleteTrainingJob,
 } from './training.service';
+import {
+  getPrediction,
+  startPrediction,
+  getPredictionJob,
+  deletePredictionJob,
+  deleteAllPendingPredictionJobs,
+  uploadPredictionCsv,
+  listPredictionInputs,
+  uploadPredictionInput,
+} from './predictions.service';
 
 /** Namespace import: `import { api } from 'src/services'` */
 export const api = {
@@ -58,13 +63,17 @@ export const api = {
   rebuildTraining,
   getTraining,
   getTrainingJob,
+  deleteTrainingJob,
   listModels,
+  deleteModel,
   uploadPredictionInput,
   listPredictionInputs,
   uploadPredictionCsv,
   startPrediction,
   getPrediction,
   getPredictionJob,
+  deletePredictionJob,
+  deleteAllPendingPredictionJobs,
   agentDecide,
   listAgentReports,
   getAgentReport,
@@ -73,7 +82,8 @@ export const api = {
   kbList,
   kbDelete,
   kbQuery,
-  kbQueryMulti,
+  kbFuseHitsMmr,
   kbRagTemplatesLatestPrediction,
   kbRagLlm,
+  kbLlmShapRetrievalQuery,
 };

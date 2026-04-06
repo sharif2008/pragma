@@ -10,9 +10,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.db.session import SessionLocal
-from app.models.domain import FileKind, JobStatus, ManagedFile, ModelVersion, TrainingJob
+from app.models.domain import FileKind, JobStatus, ManagedFile, ModelVersion, PredictionJob, TrainingJob
 from app.services import file_service
 from app.services.ml_training import train_from_csv
+from app.utils.file_utils import remove_path
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,18 @@ def get_training_job(db: Session, public_id: str) -> TrainingJob:
 
         raise HTTPException(404, "Training job not found")
     return job
+
+
+def delete_training_job(db: Session, public_id: str) -> None:
+    """Remove a training job row. Blocked while status is running. Does not delete the model artifact."""
+    from fastapi import HTTPException
+
+    job = get_training_job(db, public_id)
+    if job.status == JobStatus.running:
+        raise HTTPException(409, "Cannot delete a training job while it is running.")
+    db.delete(job)
+    db.commit()
+    logger.info("Deleted training_job public_id=%s", public_id)
 
 
 def list_training_jobs(db: Session, *, limit: int = 100, offset: int = 0) -> list[TrainingJob]:
@@ -112,6 +125,29 @@ def list_models(db: Session) -> list[ModelVersion]:
     return list(db.scalars(select(ModelVersion).order_by(ModelVersion.created_at.desc())).all())
 
 
+def delete_model_version(db: Session, settings: Settings, public_id: str) -> None:
+    """Remove a model row and its artifact file. Fails if prediction jobs still reference this version."""
+    from fastapi import HTTPException
+
+    mv = db.scalar(select(ModelVersion).where(ModelVersion.public_id == public_id))
+    if not mv:
+        raise HTTPException(404, "Model version not found")
+    pred_count = db.scalar(
+        select(func.count()).select_from(PredictionJob).where(PredictionJob.model_version_id == mv.id)
+    )
+    if pred_count:
+        raise HTTPException(
+            409,
+            f"Cannot delete model: {int(pred_count)} prediction job(s) reference it. "
+            "Remove those jobs or use another workflow before deleting this model.",
+        )
+    artifact_abs = settings.storage_root / mv.artifact_path
+    db.delete(mv)
+    db.commit()
+    remove_path(artifact_abs)
+    logger.info("Deleted model_version public_id=%s", public_id)
+
+
 def _next_model_version_number(db: Session) -> int:
     m = db.scalar(select(func.max(ModelVersion.version_number)))
     return int(m or 0) + 1
@@ -142,7 +178,9 @@ def run_training_job_sync(job_db_id: int) -> None:
         random_state = int(cfg.get("random_state", 42))
         xgb_params = cfg.get("xgboost_params")
         vfl_defs = cfg.get("vfl_agent_definitions_path")
-        repo_root = settings.storage_root.parent.parent
+        # Resolve paths like storage/agentic_features.json against the backend dir (storage_root.parent),
+        # not the workspace root (storage_root.parent.parent), so files under backend/storage are found.
+        repo_root = settings.storage_root.parent
 
         artifact_name = f"model_{job.public_id}.joblib"
         artifact_abs = settings.storage_root / "models" / artifact_name
@@ -158,6 +196,7 @@ def run_training_job_sync(job_db_id: int) -> None:
                 artifact_path=artifact_abs,
                 vfl_agent_definitions_path=vfl_defs,
                 repo_root=repo_root,
+                storage_root=settings.storage_root,
             )
         except Exception as e:
             logger.exception("Training failed job=%s", job.public_id)
