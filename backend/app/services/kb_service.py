@@ -1,0 +1,260 @@
+"""Knowledge base indexing and retrieval."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+from fastapi import HTTPException, UploadFile
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.config import Settings
+from app.models.domain import FileKind, JobStatus, KnowledgeBaseFile, ManagedFile
+from app.rag.chunking import chunk_text, load_document_text
+from app.rag.vector_store import FaissKnowledgeIndex, _normalize
+from app.services import file_service, prediction_service
+from app.services.rag_templates_from_predictions import build_rag_templates_from_summary
+from app.utils.file_utils import remove_path
+
+logger = logging.getLogger(__name__)
+
+_RRF_K = 60
+
+
+async def ingest_kb_document(
+    db: Session,
+    settings: Settings,
+    upload: UploadFile,
+) -> KnowledgeBaseFile:
+    mf = await file_service.upload_file(db, settings, upload, FileKind.knowledge_doc, replace_public_id=None)
+
+    src = file_service.resolved_path(settings, mf)
+    text = load_document_text(src)
+    chunks_raw = chunk_text(text, settings.rag_chunk_size, settings.rag_chunk_overlap)
+    chunks = [{"text": t, "source": mf.original_name, "managed_file_public_id": mf.public_id} for t in chunks_raw]
+
+    index_dir = settings.storage_root / "vector_db" / mf.public_id
+    remove_path(index_dir)
+    index_dir.mkdir(parents=True, exist_ok=True)
+    store = FaissKnowledgeIndex(index_dir, settings.embedding_model)
+    store.build_from_texts(chunks)
+
+    kb = KnowledgeBaseFile(
+        managed_file_id=mf.id,
+        vector_index_dir=str(index_dir.relative_to(settings.storage_root)),
+        chunk_count=len(chunks_raw),
+        embedding_model=settings.embedding_model,
+    )
+    db.add(kb)
+    db.commit()
+    db.refresh(kb)
+    logger.info("KB indexed public_id=%s chunks=%s", kb.public_id, kb.chunk_count)
+    return kb
+
+
+def list_kb_files(db: Session) -> list[KnowledgeBaseFile]:
+    return list(db.scalars(select(KnowledgeBaseFile).order_by(KnowledgeBaseFile.created_at.desc())).all())
+
+
+def get_kb(db: Session, public_id: str) -> KnowledgeBaseFile:
+    row = db.scalar(select(KnowledgeBaseFile).where(KnowledgeBaseFile.public_id == public_id))
+    if not row:
+        raise HTTPException(404, "Knowledge base entry not found")
+    return row
+
+
+def delete_kb(db: Session, settings: Settings, public_id: str) -> None:
+    row = get_kb(db, public_id)
+    vdir = settings.storage_root / row.vector_index_dir
+    remove_path(vdir)
+    mf = db.get(ManagedFile, row.managed_file_id)
+    if mf:
+        remove_path(file_service.resolved_path(settings, mf))
+        db.delete(mf)
+    db.delete(row)
+    db.commit()
+
+
+def _open_store(settings: Settings, kb: KnowledgeBaseFile) -> FaissKnowledgeIndex:
+    path = settings.storage_root / kb.vector_index_dir
+    store = FaissKnowledgeIndex(path, kb.embedding_model)
+    store.load()
+    return store
+
+
+def query_kb(
+    db: Session,
+    settings: Settings,
+    query: str,
+    top_k: int,
+    kb_public_ids: list[str] | None,
+) -> list[tuple[float, dict, str]]:
+    q = select(KnowledgeBaseFile)
+    if kb_public_ids:
+        q = q.where(KnowledgeBaseFile.public_id.in_(kb_public_ids))
+    rows = list(db.scalars(q).all())
+    if not rows:
+        return []
+
+    hits: list[tuple[float, dict, str]] = []
+    for kb in rows:
+        store = _open_store(settings, kb)
+        for score, chunk in store.search(query, top_k):
+            hits.append((score, chunk, kb.public_id))
+    hits.sort(key=lambda x: x[0], reverse=True)
+    return hits[:top_k]
+
+
+def _chunk_fusion_key(kb_id: str, text: str) -> str:
+    h = hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()[:24]
+    return f"{kb_id}:{h}"
+
+
+def _norm_list(vals: list[float]) -> list[float]:
+    if not vals:
+        return []
+    mn, mx = min(vals), max(vals)
+    if mx <= mn:
+        return [1.0] * len(vals)
+    return [(v - mn) / (mx - mn) for v in vals]
+
+
+def query_kb_multi_mmr(
+    db: Session,
+    settings: Settings,
+    queries: list[str],
+    *,
+    final_k: int,
+    per_query_k: int,
+    mmr_lambda: float,
+    kb_public_ids: list[str] | None,
+    pool_multiplier: int = 4,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """
+    Multi-query retrieval: per-query FAISS hits, RRF + max-score fusion rerank, then MMR on the pool.
+    All pooled texts are embedded with the first KB index's model (indices should share the same embedding space).
+    """
+    q = select(KnowledgeBaseFile)
+    if kb_public_ids:
+        q = q.where(KnowledgeBaseFile.public_id.in_(kb_public_ids))
+    rows = list(db.scalars(q).all())
+    meta: dict[str, Any] = {
+        "queries_used": queries,
+        "per_query_k": per_query_k,
+        "final_k": final_k,
+        "mmr_lambda": mmr_lambda,
+        "fusion": "rrf_plus_max_score_then_mmr",
+    }
+    if not rows or not queries:
+        return [], meta
+
+    # fusion_key -> { chunk, kb_id, max_score, rrf }
+    fused: dict[str, dict[str, Any]] = {}
+    for q_idx, query in enumerate(queries):
+        for kb in rows:
+            store = _open_store(settings, kb)
+            raw = store.search(query.strip(), per_query_k)
+            for rank, (score, chunk) in enumerate(raw, start=1):
+                text = chunk.get("text") or ""
+                if not text.strip():
+                    continue
+                fk = _chunk_fusion_key(kb.public_id, text)
+                rrf_part = 1.0 / (_RRF_K + rank)
+                if fk not in fused:
+                    fused[fk] = {"chunk": chunk, "kb_id": kb.public_id, "max_score": float(score), "rrf": rrf_part}
+                else:
+                    fused[fk]["max_score"] = max(fused[fk]["max_score"], float(score))
+                    fused[fk]["rrf"] += rrf_part
+
+    if not fused:
+        return [], meta
+
+    items = list(fused.values())
+    max_scores = [x["max_score"] for x in items]
+    rrfs = [x["rrf"] for x in items]
+    n_max = _norm_list(max_scores)
+    n_rrf = _norm_list(rrfs)
+    for i, it in enumerate(items):
+        it["fusion_rerank"] = 0.55 * n_max[i] + 0.45 * n_rrf[i]
+
+    items.sort(key=lambda x: x["fusion_rerank"], reverse=True)
+    pool_n = min(max(final_k * pool_multiplier, final_k + 3), 80, len(items))
+    pool = items[:pool_n]
+
+    store0 = _open_store(settings, rows[0])
+    model = store0.model
+    texts = [p["chunk"].get("text") or "" for p in pool]
+    emb = model.encode(texts, convert_to_numpy=True, show_progress_bar=False).astype("float32")
+    emb = _normalize(emb)
+
+    q_vecs = model.encode([q.strip() for q in queries], convert_to_numpy=True, show_progress_bar=False).astype("float32")
+    q_vecs = _normalize(q_vecs)
+    q_centroid = _normalize(np.mean(q_vecs, axis=0, keepdims=True))
+    sim_q = (emb @ q_centroid.T).flatten()
+
+    lam = max(0.0, min(1.0, mmr_lambda))
+    selected: list[int] = []
+    remaining = set(range(len(pool)))
+    mmr_margins: list[float] = []
+
+    while len(selected) < final_k and remaining:
+        best_i: int | None = None
+        best_mmr = -1e18
+        for i in remaining:
+            rel = float(sim_q[i])
+            if not selected:
+                mmr = rel
+            else:
+                div = max(float(np.dot(emb[i], emb[j])) for j in selected)
+                mmr = lam * rel - (1.0 - lam) * div
+            if mmr > best_mmr:
+                best_mmr = mmr
+                best_i = i
+        assert best_i is not None
+        selected.append(best_i)
+        mmr_margins.append(best_mmr)
+        remaining.remove(best_i)
+
+    hits: list[dict[str, Any]] = []
+    for idx, i in enumerate(selected):
+        p = pool[i]
+        ch = p["chunk"]
+        hits.append(
+            {
+                "score": float(sim_q[i]),
+                "text": ch.get("text", ""),
+                "source": ch.get("source"),
+                "kb_public_id": p["kb_id"],
+                "rerank_score": float(p["fusion_rerank"]),
+                "mmr_margin": float(mmr_margins[idx]),
+            }
+        )
+    meta["pool_size"] = pool_n
+    meta["candidates_fused"] = len(fused)
+    return hits, meta
+
+
+def latest_prediction_rag_context(db: Session, settings: Settings) -> dict[str, Any]:
+    """Latest completed prediction job + generated templates (empty if none)."""
+    jobs = prediction_service.list_prediction_jobs(db, limit=40, offset=0)
+    job = next((j for j in jobs if j.status == JobStatus.completed), None)
+    if not job:
+        return {
+            "prediction_job_public_id": None,
+            "summary": None,
+            "templates": [],
+            "message": "No completed prediction job found. Run a batch prediction first.",
+        }
+    summary = prediction_service.load_prediction_summary(settings, job)
+    templates = build_rag_templates_from_summary(summary)
+    return {
+        "prediction_job_public_id": job.public_id,
+        "summary": summary,
+        "templates": templates,
+        "message": None,
+    }

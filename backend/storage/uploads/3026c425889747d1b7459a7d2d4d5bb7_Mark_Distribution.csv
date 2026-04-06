@@ -1,0 +1,14 @@
+Task,Criteria,Marks
+Task 1: 30 Marks,Identifying and correcting all syntax errors,10
+,Compiling the corrected program without errors,10
+,Producing the correct output for sample input,5
+,Providing proper comments explaining corrections,5
+Task 2: 35 Marks,Declaring variables correctly,10
+,Displaying formatted output as specified,10
+,Using appropriate string formatting techniques,10
+,Testing and submitting the output screenshot,5
+Task 3: 35 Marks,Input handling for the item price,10
+,"Correctly calculating subtotal, discount, taxable amount, GST, PST, and Total",10
+,Displaying formatted output with appropriate labels,10
+,Providing comments explaining calculation steps,5
+Total Marks,,100

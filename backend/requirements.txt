@@ -1,0 +1,25 @@
+# Backend API — install: pip install -r backend/requirements.txt (from repo root) or cd backend && pip install -r requirements.txt
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+sqlalchemy>=2.0.0
+pymysql>=1.1.0
+cryptography>=42.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-multipart>=0.0.9
+python-dotenv>=1.0.0
+
+numpy>=1.23.0
+pandas>=1.5.0
+scikit-learn>=1.2.0
+joblib>=1.2.0
+xgboost>=2.0.0
+torch>=2.0.0
+
+faiss-cpu>=1.7.4
+sentence-transformers>=2.2.0
+pypdf>=3.0.0
+openai>=1.0.0
+httpx>=0.27.0
+
+# Optional: Jupyter for backend/notebooks/*.ipynb (pip install notebook ipykernel)
