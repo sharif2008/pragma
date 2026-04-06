@@ -68,7 +68,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **Health**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 
-On first startup the app creates **`storage/`** subfolders and applies SQLAlchemy **`create_all`** to your MySQL schema (for production, prefer migrations such as Alembic).
+On first startup the app creates **`storage/`** subfolders and applies SQLAlchemy **`create_all`** to your MySQL schema (for production, prefer migrations such as Alembic). If an older DB is missing **`prediction_jobs.results_json`**, startup runs a one-time **`ALTER TABLE`** to add it (or run `scripts/alter_prediction_jobs_add_results_json.sql` manually).
 
 **Tracking / history:** `GET /predictions?limit=100&offset=0` lists inference jobs; `GET /agent/reports` and `GET /agent/reports/{public_id}` list agentic action records. Knowledge base entries: `GET /kb/files`.
 

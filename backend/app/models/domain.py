@@ -1,4 +1,4 @@
-"""Database tables: managed_files, training_jobs, model_versions, prediction_jobs, knowledge_base_files, agentic_reports."""
+"""Database tables: managed_files, training_jobs, model_versions, prediction_jobs, knowledge_base_files, agentic_jobs, agentic_reports."""
 
 from __future__ import annotations
 
@@ -144,6 +144,8 @@ class PredictionJob(Base):
     rows_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rows_flagged: Mapped[int | None] = mapped_column(Integer, nullable=True)
     config_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    #: Per-row predictions, class probabilities, and optional SHAP (TreeExplainer for sklearn trees; VFL stores a placeholder).
+    results_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -157,6 +159,33 @@ class PredictionJob(Base):
 
     model_version = relationship("ModelVersion")
     input_file = relationship("ManagedFile")
+
+
+class AgenticJob(Base):
+    """Registered agentic session: ties a prediction batch + optional results row to the Agentic actions UI (persisted)."""
+
+    __tablename__ = "agentic_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    public_id: Mapped[str] = mapped_column(
+        CHAR(36), unique=True, default=lambda: str(uuid.uuid4()), nullable=False
+    )
+    prediction_job_id: Mapped[int] = mapped_column(
+        ForeignKey("prediction_jobs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    results_row_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    label: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    prediction_job = relationship("PredictionJob")
 
 
 class KnowledgeBaseFile(Base):
@@ -189,6 +218,12 @@ class AgenticReport(Base):
     prediction_job_id: Mapped[int] = mapped_column(
         ForeignKey("prediction_jobs.id", ondelete="CASCADE"), nullable=False
     )
+    #: Same semantics as POST /agent/decide ``results_row_index``; null = batch-default row selection.
+    results_row_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: Optional link to ``agentic_jobs`` when the analyst ran the agent from a registered handoff row.
+    agentic_job_id: Mapped[int | None] = mapped_column(
+        ForeignKey("agentic_jobs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     recommended_action: Mapped[str] = mapped_column(String(512), nullable=False)
     raw_llm_response: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -199,3 +234,4 @@ class AgenticReport(Base):
     )
 
     prediction_job = relationship("PredictionJob")
+    agentic_job = relationship("AgenticJob")

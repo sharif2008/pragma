@@ -64,9 +64,21 @@ def _split_feature_columns(
     *,
     agent_definitions_path: Path | None,
     repo_root: Path,
+    storage_root: Path | None = None,
 ) -> tuple[list[str], list[str], list[str]]:
     if agent_definitions_path is not None:
-        path = agent_definitions_path if agent_definitions_path.is_absolute() else repo_root / agent_definitions_path
+        rel = agent_definitions_path
+        path = rel if rel.is_absolute() else repo_root / rel
+        if not path.is_file() and storage_root is not None:
+            # e.g. storage/agentic_features.json → <storage_root>/agentic_features.json
+            if len(rel.parts) >= 2 and rel.parts[0] == "storage":
+                alt = storage_root.joinpath(*rel.parts[1:])
+                if alt.is_file():
+                    path = alt
+            if not path.is_file():
+                alt2 = storage_root / rel.name
+                if alt2.is_file():
+                    path = alt2
         if not path.is_file():
             raise FileNotFoundError(f"VFL agent definitions not found: {path}")
         defs = load_agent_definitions(path)
@@ -97,6 +109,7 @@ def train_vfl_from_csv(
     *,
     agent_definitions_path: str | Path | None = None,
     repo_root: Path | None = None,
+    storage_root: Path | None = None,
 ) -> dict[str, Any]:
     repo = repo_root or csv_path.resolve().parent
     ad_path = Path(agent_definitions_path) if agent_definitions_path else None
@@ -125,7 +138,12 @@ def train_vfl_from_csv(
     if num_classes < 2:
         raise ValueError("VFL requires at least 2 classes")
 
-    p1, p2, p3 = _split_feature_columns(list(X.columns), agent_definitions_path=ad_path, repo_root=repo)
+    p1, p2, p3 = _split_feature_columns(
+        list(X.columns),
+        agent_definitions_path=ad_path,
+        repo_root=repo,
+        storage_root=storage_root,
+    )
 
     X_train, X_test, y_train, y_test = train_test_split(
         X.values,
@@ -237,8 +255,10 @@ def train_vfl_from_csv(
     }
 
 
-def predict_vfl_batch(bundle: dict[str, Any], X_df: pd.DataFrame) -> tuple[np.ndarray, np.ndarray | None]:
-    """Return predicted class indices and max softmax probability per row."""
+def predict_vfl_batch(
+    bundle: dict[str, Any], X_df: pd.DataFrame, *, return_probs: bool = False
+) -> tuple[np.ndarray, np.ndarray | None, np.ndarray | None]:
+    """Return predicted class indices, max softmax probability per row, and optionally the full probability matrix."""
     input_dims: list[int] = bundle["input_dims"]
     party_cols: list[list[str]] = bundle["party_columns"]
     scalers: list = bundle["scalers"]
@@ -274,4 +294,78 @@ def predict_vfl_batch(bundle: dict[str, Any], X_df: pd.DataFrame) -> tuple[np.nd
 
     pred_idx = probs_out.argmax(axis=1)
     max_p = probs_out.max(axis=1)
-    return pred_idx, max_p
+    probs_extra = probs_out if return_probs else None
+    return pred_idx, max_p, probs_extra
+
+
+def vfl_gradient_x_input_attribution_rows(
+    bundle: dict[str, Any],
+    X_df: pd.DataFrame,
+    pred_class_indices: np.ndarray,
+) -> list[dict[str, Any] | None]:
+    """
+    Per-row input attribution for VFL: gradient of the **predicted class** logit w.r.t. scaled party
+    inputs, multiplied by input (integrated-gradient local linearization). Same ``per_feature`` shape
+    as TreeExplainer rows so RAG / agent templates can group by agent bucket.
+    """
+    input_dims: list[int] = bundle["input_dims"]
+    party_cols: list[list[str]] = bundle["party_columns"]
+    scalers: list = bundle["scalers"]
+    num_classes: int = bundle["num_classes"]
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = VFLModel(input_dims, embed_dim=VFL_EMBED_DIM, num_classes=num_classes, hidden_dim=VFL_HIDDEN_DIM)
+    model.load_state_dict(bundle["model_state_dict"])
+    model.to(device)
+    model.eval()
+
+    parts: list[np.ndarray] = []
+    for i in range(3):
+        cols = party_cols[i]
+        block = pd.DataFrame({c: X_df[c] if c in X_df.columns else np.nan for c in cols})
+        block = block.apply(pd.to_numeric, errors="coerce").fillna(0.0).values.astype(np.float64)
+        parts.append(scalers[i].transform(block))
+
+    n = len(X_df)
+    out: list[dict[str, Any] | None] = []
+
+    for row_i in range(n):
+        try:
+            x_tensors: list[torch.Tensor] = []
+            for p in range(3):
+                row_vec = parts[p][row_i : row_i + 1].astype(np.float32)
+                t = torch.tensor(row_vec, device=device, requires_grad=True)
+                x_tensors.append(t)
+
+            logits = model(x_tensors)
+            cls = int(pred_class_indices[row_i])
+            if cls < 0 or cls >= num_classes:
+                cls = int(torch.argmax(logits[0]).item())
+
+            model.zero_grad(set_to_none=True)
+            logits[0, cls].backward()
+
+            per_feature: dict[str, float] = {}
+            for p in range(3):
+                g = x_tensors[p].grad
+                if g is None:
+                    continue
+                g_np = g[0].detach().cpu().numpy()
+                x_np = x_tensors[p].detach().cpu().numpy()[0]
+                for j, cname in enumerate(party_cols[p]):
+                    if j < len(g_np) and j < len(x_np):
+                        per_feature[str(cname)] = float(g_np[j] * x_np[j])
+
+            out.append(
+                {
+                    "method": "gradient_x_input",
+                    "per_feature": per_feature,
+                    "expected_value": None,
+                    "attribution_class_index": cls,
+                }
+            )
+        except Exception:
+            logger.exception("VFL attribution failed row=%s", row_i)
+            out.append(None)
+
+    return out

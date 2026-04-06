@@ -7,7 +7,10 @@ import type {
   KnowledgeFileOut,
   KBMultiQueryRequest,
   KBMultiQueryResponse,
+  KBFuseHitsMMRRequest,
   KBRAGLatestPredictionResponse,
+  KBLLMShapRetrievalRequest,
+  KBLLMShapRetrievalResponse,
 } from 'src/api/types';
 
 import { paths } from './paths';
@@ -39,6 +42,20 @@ export async function kbRagTemplatesLatestPrediction(): Promise<KBRAGLatestPredi
   return requestJson<KBRAGLatestPredictionResponse>(paths.kb.ragTemplatesLatestPrediction);
 }
 
+export async function kbRagTemplatesPredictionJob(
+  predictionJobPublicId: string,
+  opts?: { rowIndex?: number | null }
+): Promise<KBRAGLatestPredictionResponse> {
+  const q = new URLSearchParams();
+  if (opts?.rowIndex != null && opts.rowIndex >= 0) {
+    q.set('row_index', String(opts.rowIndex));
+  }
+  const suffix = q.toString() ? `?${q}` : '';
+  return requestJson<KBRAGLatestPredictionResponse>(
+    `${paths.kb.ragTemplatesPredictionJob(predictionJobPublicId)}${suffix}`
+  );
+}
+
 export async function kbQueryMulti(body: KBMultiQueryRequest): Promise<KBMultiQueryResponse> {
   return requestJson<KBMultiQueryResponse>(paths.kb.queryMulti, {
     method: 'POST',
@@ -47,8 +64,26 @@ export async function kbQueryMulti(body: KBMultiQueryRequest): Promise<KBMultiQu
   });
 }
 
+export async function kbFuseHitsMmr(body: KBFuseHitsMMRRequest): Promise<KBMultiQueryResponse> {
+  return requestJson<KBMultiQueryResponse>(paths.kb.fuseHitsMmr, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 export async function kbRagLlm(body: RAGLLMRequest): Promise<RAGLLMResponse> {
   return requestJson<RAGLLMResponse>(paths.kb.ragLlm, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function kbLlmShapRetrievalQuery(
+  body: KBLLMShapRetrievalRequest
+): Promise<KBLLMShapRetrievalResponse> {
+  return requestJson<KBLLMShapRetrievalResponse>(paths.kb.llmShapRetrievalQuery, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

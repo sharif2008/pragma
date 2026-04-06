@@ -81,9 +81,28 @@ def get_training(
     return training_service.job_to_out(db, job)
 
 
+@router.delete("/{public_id}", status_code=204)
+def delete_training(
+    public_id: str,
+    db: Annotated[Session, Depends(get_db)],
+) -> None:
+    """Delete a training job record. The registered model (if any) is kept; its link to this job is cleared."""
+    training_service.delete_training_job(db, public_id)
+
+
 models_router = APIRouter(prefix="/models", tags=["models"])
 
 
 @models_router.get("", response_model=list[ModelVersionOut])
 def list_models(db: Annotated[Session, Depends(get_db)]) -> list[ModelVersionOut]:
     return training_service.list_models(db)
+
+
+@models_router.delete("/{public_id}", status_code=204)
+def delete_model(
+    public_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> None:
+    """Delete a registered model and its on-disk artifact. Blocked while prediction jobs reference this version."""
+    training_service.delete_model_version(db, settings, public_id)

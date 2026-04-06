@@ -81,5 +81,41 @@ def build_rag_templates_from_summary(summary: dict[str, Any]) -> list[dict[str, 
                 "What investigative questions and evidence should analysts prioritize?"
             ),
         },
+        {
+            "id": "mobile_5g_6g_ran_edge_core",
+            "label": "5G / 6G mobile network (RAN · Edge · Core)",
+            "description": (
+                "Telecom-oriented retrieval for 5G NR / 5G-Advanced and 6G research themes: radio access, MEC edge, "
+                "and packet core—aligned with batch scoring context."
+            ),
+            "retrieval_queries": [
+                (
+                    f"5G NR and O-RAN security: gNB DU/CU, near-RT RIC, A1/A2/E2 interfaces; anomaly or attack indicators "
+                    f"when batch scoring shows {ctx}"
+                ),
+                (
+                    "Multi-access edge computing MEC and 5G UPF user plane: threat detection, lateral movement, and lawful "
+                    "intercept considerations at the edge for mobile backhaul and N6 routing"
+                ),
+                (
+                    "5G Core 5GC architecture: AMF, SMF, UPF, NSSF, network slicing and exposure (NEF/NRF); security "
+                    "operations when classifier outputs suggest core- or slice-level risk"
+                ),
+                (
+                    f"6G vision and IMT-2030: integrated sensing and communication, AI-native RAN, sub-networks, NTN; "
+                    f"policy and research guidance relevant to SOC review when labels include {label_hint}"
+                ),
+                (
+                    "RAN–Edge–Core coordination: cross-domain incident response when radio metrics, edge telemetry, and "
+                    "core signaling disagreements appear in multi-party (VFL-style) feature splits"
+                ),
+            ],
+            "llm_prompt": (
+                f"Batch job {job_id}: {ctx} "
+                "You are briefing SOC analysts in a 5G/6G mobile operator context. Using only retrieved passages, "
+                "map findings to RAN vs Edge (MEC) vs Core responsibilities, cite slice or plane where relevant, "
+                "and list concrete verification steps (e.g. SIEM fields, RIC counters, core NF logs)."
+            ),
+        },
     ]
     return templates

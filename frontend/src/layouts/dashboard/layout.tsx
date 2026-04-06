@@ -1,5 +1,6 @@
 import type { Breakpoint } from '@mui/material/styles';
 
+import { useCallback, useEffect, useState } from 'react';
 import { merge } from 'es-toolkit';
 import { useBoolean } from 'minimal-shared/hooks';
 
@@ -10,7 +11,11 @@ import { useTheme } from '@mui/material/styles';
 import { NavMobile, NavDesktop } from './nav';
 import { layoutClasses } from '../core/classes';
 import { _account } from '../nav-config-account';
-import { dashboardLayoutVars } from './css-vars';
+import {
+  dashboardLayoutVars,
+  DASHBOARD_NAV_WIDTH_COLLAPSED,
+  DASHBOARD_NAV_WIDTH_EXPANDED,
+} from './css-vars';
 import { navData } from '../nav-config-dashboard';
 import { MainSection } from '../core/main-section';
 import { _workspaces } from '../nav-config-workspace';
@@ -24,6 +29,16 @@ import type { HeaderSectionProps } from '../core/header-section';
 import type { LayoutSectionProps } from '../core/layout-section';
 
 // ----------------------------------------------------------------------
+
+const NAV_COLLAPSED_STORAGE_KEY = 'chainagent-dashboard-nav-collapsed';
+
+function readNavCollapsed(): boolean {
+  try {
+    return localStorage.getItem(NAV_COLLAPSED_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 type LayoutBaseProps = Pick<LayoutSectionProps, 'sx' | 'children' | 'cssVars'>;
 
@@ -45,6 +60,20 @@ export function DashboardLayout({
   const theme = useTheme();
 
   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
+
+  const [navCollapsed, setNavCollapsed] = useState(readNavCollapsed);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(NAV_COLLAPSED_STORAGE_KEY, navCollapsed ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  }, [navCollapsed]);
+
+  const toggleNavCollapsed = useCallback(() => {
+    setNavCollapsed((v) => !v);
+  }, []);
 
   const renderHeader = () => {
     const headerSlotProps: HeaderSectionProps['slotProps'] = {
@@ -102,7 +131,13 @@ export function DashboardLayout({
        * @Sidebar
        *************************************** */
       sidebarSection={
-        <NavDesktop data={navData} layoutQuery={layoutQuery} workspaces={_workspaces} />
+        <NavDesktop
+          data={navData}
+          layoutQuery={layoutQuery}
+          workspaces={_workspaces}
+          collapsed={navCollapsed}
+          onToggleCollapsed={toggleNavCollapsed}
+        />
       }
       /** **************************************
        * @Footer
@@ -111,7 +146,13 @@ export function DashboardLayout({
       /** **************************************
        * @Styles
        *************************************** */
-      cssVars={{ ...dashboardLayoutVars(theme), ...cssVars }}
+      cssVars={{
+        ...dashboardLayoutVars(theme),
+        '--layout-nav-vertical-width': navCollapsed
+          ? DASHBOARD_NAV_WIDTH_COLLAPSED
+          : DASHBOARD_NAV_WIDTH_EXPANDED,
+        ...cssVars,
+      }}
       sx={[
         {
           [`& .${layoutClasses.sidebarContainer}`]: {
