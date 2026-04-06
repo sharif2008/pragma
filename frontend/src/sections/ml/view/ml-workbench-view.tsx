@@ -2562,6 +2562,14 @@ function formatPredictionModelKind(kind: string | null | undefined): string | nu
   return k;
 }
 
+function latestCreatedAtIso(reports: readonly { created_at: string }[]): string | null {
+  let latest: string | null = null;
+  for (const r of reports) {
+    if (!latest || r.created_at > latest) latest = r.created_at;
+  }
+  return latest;
+}
+
 /** Reports for a prediction batch + optional analyst row (same rules as the agentic job dropdown). */
 function agentReportsMatchingLine(
   predictionJobPublicId: string,
@@ -2598,7 +2606,7 @@ function formatAgentReportsLineSummary(
       ? 'No agent reports yet linked to this agentic job id (run agent with this job selected).'
       : `No agent reports yet for this ${scopeNoun} (same scope as the dropdown).`;
   }
-  const latest = [...lineReports].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0]!.created_at;
+  const latest = latestCreatedAtIso(lineReports) ?? lineReports[0]!.created_at;
   if (lineReports.length === 1) return `1 agent report for this ${scopeNoun} · ${fDateTime(latest)}`;
   return `${lineReports.length} agent reports for this ${scopeNoun} · latest ${fDateTime(latest)}`;
 }
@@ -3860,10 +3868,7 @@ function AgenticActionsPanel({ onNotify }: PanelProps) {
           {agenticJobsForSelect.map((j) => {
             const lineReports = agentReportsForAgenticJobLine(j, agentReportsList);
             const n = lineReports.length;
-            const latest =
-              lineReports.length === 0
-                ? null
-                : [...lineReports].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0]?.created_at ?? null;
+            const latest = latestCreatedAtIso(lineReports);
             const reportsLabel = 'Reports (linked id)';
             return (
             <MenuItem key={j.public_id} value={j.public_id}>
