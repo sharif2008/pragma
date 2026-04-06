@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0",
+  "attacks": {
+    "BENIGN": [
+      "log incident",
+      "monitor traffic"
+    ],
+    "DDOS": [
+      "limit rate",
+      "enable scrubbing",
+      "blackhole route",
+      "update ACL",
+      "block IP",
+      "scale service"
+    ],
+    "DOS": [
+      "enable syncookies",
+      "limit rate",
+      "connection limit",
+      "update ACL",
+      "block IP",
+      "enable scrubbing"
+    ],
+    "SSHPATATOR": [
+      "lock account",
+      "enforce MFA",
+      "throttle credentials",
+      "fail2ban block",
+      "block IP",
+      "update ACL"
+    ],
+    "FTPPATATOR": [
+      "lock account",
+      "enforce MFA",
+      "throttle credentials",
+      "fail2ban block",
+      "block IP",
+      "update ACL"
+    ],
+    "PORTSCAN": [
+      "block IP",
+      "limit rate",
+      "tarpit scan",
+      "update ACL",
+      "harden ports",
+      "scan threshold"
+    ],
+    "WEBATTACK": [
+      "apply WAF",
+      "virtual patch",
+      "block IP",
+      "limit rate",
+      "update ACL",
+      "isolate service"
+    ],
+    "BOT": [
+      "captcha challenge",
+      "limit rate",
+      "apply WAF",
+      "reputation filter",
+      "block IP",
+      "js challenge"
+    ],
+    "OTHERS": [
+      "limit rate",
+      "update ACL",
+      "block IP",
+      "enable scrubbing",
+      "isolate service",
+      "log incident"
+    ]
+  }
+}
