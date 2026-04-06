@@ -78,5 +78,19 @@ Desktop.ini
 *.tmp
 *.temp
 
-# Large generated datasets (GitHub file limit 100 MB; keep samples elsewhere or use Git LFS)
-backend/storage/training_datasets/*.csv
+# --- Backend runtime storage (uploads, KB files, FAISS indices, trained models, predictions, reports) ---
+# Keep only catalog JSON + directory placeholders in git.
+backend/storage/knowledge/**
+!backend/storage/knowledge/.gitkeep
+backend/storage/models/**
+!backend/storage/models/.gitkeep
+backend/storage/predictions/**
+!backend/storage/predictions/.gitkeep
+backend/storage/reports/**
+!backend/storage/reports/.gitkeep
+backend/storage/uploads/**
+!backend/storage/uploads/.gitkeep
+backend/storage/vector_db/**
+!backend/storage/vector_db/.gitkeep
+backend/storage/training_datasets/**
+!backend/storage/training_datasets/.gitkeep
