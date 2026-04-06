@@ -47,7 +47,7 @@ def start_training(
             body.algorithm,
             body.test_size,
             body.random_state,
-            body.xgboost_params,
+            xgboost_params=None,
             vfl_agent_definitions_path=body.vfl_agent_definitions_path,
         )
     except ValueError as e:

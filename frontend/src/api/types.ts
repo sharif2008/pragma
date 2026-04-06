@@ -8,7 +8,7 @@ export type FileKind =
 
 export type JobStatus = 'pending' | 'running' | 'completed' | 'failed';
 
-export type AlgorithmName = 'random_forest' | 'xgboost';
+export type AlgorithmName = 'vfl';
 
 export type IsoDateString = string;
 
@@ -43,10 +43,12 @@ export type DatasetPreviewOut = {
 export type TrainingStartRequest = {
   dataset_file_public_id: string;
   target_column: string;
+  /** Defaults to VFL on the server; included for explicit API parity. */
   algorithm?: AlgorithmName;
   test_size?: number;
   random_state?: number;
-  xgboost_params?: Record<string, unknown> | null;
+  /** Optional path to agentic_features.json (e.g. storage/agentic_features.json). */
+  vfl_agent_definitions_path?: string | null;
 };
 
 export type TrainingJobOut = {
