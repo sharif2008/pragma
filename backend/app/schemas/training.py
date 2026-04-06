@@ -9,22 +9,23 @@ from app.models.domain import JobStatus
 from app.schemas.common import ORMModel
 
 
-AlgorithmName = Literal["random_forest", "xgboost", "vfl"]
+AlgorithmName = Literal["vfl"]
 
 
 class TrainingStartRequest(BaseModel):
     dataset_file_public_id: str = Field(..., description="Managed file UUID (training CSV)")
     target_column: str
-    algorithm: AlgorithmName = "random_forest"
+    algorithm: AlgorithmName = Field(
+        default="vfl",
+        description="Vertical federated learning (3-party concat-embeddings) is the only supported trainer.",
+    )
     test_size: float = Field(default=0.2, ge=0.05, le=0.5)
     random_state: int = 42
-    xgboost_params: dict[str, Any] | None = None
     vfl_agent_definitions_path: str | None = Field(
         default=None,
         description=(
-            "For algorithm=vfl: optional path to agentic_features.json (default artifact: backend/storage/"
-            "agentic_features.json — RAN/Edge/Core logged_features) for vertical column split. "
-            "If omitted, IDS-style heuristics assign columns to 3 parties."
+            "Optional path to agentic_features.json (e.g. storage/agentic_features.json — RAN/Edge/Core "
+            "logged_features) for vertical column split. If omitted, IDS-style heuristics assign columns to 3 parties."
         ),
     )
 

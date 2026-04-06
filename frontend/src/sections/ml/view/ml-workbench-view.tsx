@@ -1,5 +1,4 @@
 import type {
-  AlgorithmName,
   ManagedFileOut,
   TrainingJobOut,
   DatasetPreviewOut,
@@ -165,12 +164,12 @@ const PIPELINE_STEPS: {
   },
   {
     label: 'Training & models',
-    summary: 'Fit a classifier from the selected dataset and register the artifact as a model version.',
+    summary: 'Train only vertical federated learning (VFL) models from the selected dataset and register each run as a model version.',
     bullets: [
-      'Pick dataset public_id, target column, and algorithm (e.g. random_forest, xgboost, or vfl on the server).',
+      'Pick dataset public_id and target column; the API and workbench use algorithm vfl (no random forest / XGBoost).',
       'Jobs run asynchronously (pending → running → completed); metrics and model_version_public_id appear when done.',
-      'VFL mode uses a fixed three-party vertical split (embed → fuse → classify); optional agent-definitions JSON steers column ownership.',
-      'Rebuild clones dataset and hyperparameters into a fresh job for retraining.',
+      'VFL uses a fixed three-party vertical split (embed → fuse → classify). The workbench sends storage/agentic_features.json for column ownership; omit vfl_agent_definitions_path via API for heuristic splits.',
+      'Rebuild clones dataset and hyperparameters into a fresh VFL job for retraining.',
     ],
     apis: 'POST /training/start · GET /training · POST /training/rebuild · GET /models',
   },
@@ -934,7 +933,6 @@ function TrainingPanel({ onNotify }: PanelProps) {
   const [datasets, setDatasets] = useState<ManagedFileOut[]>([]);
   const [datasetId, setDatasetId] = useState('');
   const [targetColumn, setTargetColumn] = useState('label');
-  const [algorithm, setAlgorithm] = useState<AlgorithmName>('random_forest');
   const [jobs, setJobs] = useState<TrainingJobOut[]>([]);
   const [models, setModels] = useState<Awaited<ReturnType<typeof listModels>>>([]);
 
@@ -989,7 +987,7 @@ function TrainingPanel({ onNotify }: PanelProps) {
         model artifact on disk.
       </Alert>
 
-      <Typography variant="subtitle2">Start training</Typography>
+      <Typography variant="subtitle2">Train VFL model</Typography>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'flex-start' }}>
         <TextField
           select
@@ -1015,10 +1013,7 @@ function TrainingPanel({ onNotify }: PanelProps) {
           ))}
         </TextField>
         <TextField label="Target column" value={targetColumn} onChange={(e) => setTargetColumn(e.target.value)} sx={{ minWidth: 140 }} />
-        <TextField select label="Algorithm" value={algorithm} onChange={(e) => setAlgorithm(e.target.value as AlgorithmName)} sx={{ minWidth: 160 }}>
-          <MenuItem value="random_forest">random_forest</MenuItem>
-          <MenuItem value="xgboost">xgboost</MenuItem>
-        </TextField>
+        <Chip label="VFL only" color="primary" variant="outlined" sx={{ height: 40, fontWeight: 700 }} />
         <Button
           variant="contained"
           disabled={!datasetId.trim()}
@@ -1028,9 +1023,10 @@ function TrainingPanel({ onNotify }: PanelProps) {
               const res = await startTraining({
                 dataset_file_public_id: datasetId.trim(),
                 target_column: targetColumn.trim(),
-                algorithm,
+                algorithm: 'vfl',
+                vfl_agent_definitions_path: 'storage/agentic_features.json',
               });
-              onNotify({ severity: 'success', text: `Training queued · job ${res.job_public_id}` });
+              onNotify({ severity: 'success', text: `VFL training queued · job ${res.job_public_id}` });
               await loadJobs();
               await refreshModels();
             } catch (e) {
@@ -1038,7 +1034,7 @@ function TrainingPanel({ onNotify }: PanelProps) {
             }
           }}
         >
-          Start training
+          Train VFL model
         </Button>
       </Stack>
 

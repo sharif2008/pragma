@@ -42,7 +42,7 @@ def main() -> None:
             json={
                 "dataset_file_public_id": dataset_id,
                 "target_column": "label",
-                "algorithm": "random_forest",
+                "algorithm": "vfl",
                 "test_size": 0.25,
             },
         )
