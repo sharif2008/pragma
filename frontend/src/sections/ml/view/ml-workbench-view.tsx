@@ -27,6 +27,8 @@ import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Paper from '@mui/material/Paper';
 import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
+import IconButton from '@mui/material/IconButton';
 import Dialog from '@mui/material/Dialog';
 import Divider from '@mui/material/Divider';
 import Checkbox from '@mui/material/Checkbox';
@@ -92,6 +94,7 @@ import {
 } from 'src/services';
 
 import { Iconify } from 'src/components/iconify';
+import { ModelVersionDetailDialog } from 'src/components/run-monitoring/detail-dialogs';
 
 import {
   AGENTIC_PREP_UPDATED_EVENT,
@@ -1311,6 +1314,7 @@ function TrainingPanel({ onNotify }: PanelProps) {
   const [targetColumn, setTargetColumn] = useState('label');
   const [jobs, setJobs] = useState<TrainingJobOut[]>([]);
   const [models, setModels] = useState<Awaited<ReturnType<typeof listModels>>>([]);
+  const [modelDetail, setModelDetail] = useState<ModelVersionOut | null>(null);
 
   const loadDatasets = useCallback(async () => {
     try {
@@ -1540,20 +1544,27 @@ function TrainingPanel({ onNotify }: PanelProps) {
           Refresh models
         </Button>
       </Stack>
-      <Table size="small">
+      <Table
+        size="small"
+        sx={{
+          '& .MuiTableCell-root': { py: 0.5, px: 1, fontSize: '0.8125rem' },
+          '& .MuiTableCell-head': { fontWeight: 700, fontSize: '0.75rem' },
+        }}
+      >
         <TableHead>
           <TableRow>
             <TableCell>public_id</TableCell>
             <TableCell>algorithm</TableCell>
             <TableCell>version</TableCell>
             <TableCell>metrics</TableCell>
+            <TableCell align="right">View</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {models.length === 0 && (
             <TableRow>
-              <TableCell colSpan={5}>
+              <TableCell colSpan={6}>
                 <Typography variant="body2" color="text.secondary">
                   No registered models yet.
                 </Typography>
@@ -1565,8 +1576,21 @@ function TrainingPanel({ onNotify }: PanelProps) {
               <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{m.public_id}</TableCell>
               <TableCell>{m.algorithm}</TableCell>
               <TableCell>{m.version_number}</TableCell>
-              <TableCell sx={{ maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <TableCell sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {m.metrics_json ? JSON.stringify(m.metrics_json) : '—'}
+              </TableCell>
+              <TableCell align="right">
+                <Tooltip title="View model details">
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    aria-label="View model details"
+                    onClick={() => setModelDetail(m)}
+                    sx={{ p: 0.35 }}
+                  >
+                    <Iconify icon="solar:eye-bold" width={18} />
+                  </IconButton>
+                </Tooltip>
               </TableCell>
               <TableCell align="right">
                 <Button
@@ -1599,6 +1623,12 @@ function TrainingPanel({ onNotify }: PanelProps) {
           ))}
         </TableBody>
       </Table>
+
+      <ModelVersionDetailDialog
+        open={Boolean(modelDetail)}
+        model={modelDetail}
+        onClose={() => setModelDetail(null)}
+      />
     </Stack>
   );
 }

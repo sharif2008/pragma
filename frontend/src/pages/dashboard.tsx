@@ -1,6 +1,6 @@
 import { CONFIG } from 'src/config-global';
 
-import { OverviewAnalyticsView as DashboardView } from 'src/sections/overview/view';
+import { SocDashboardView as DashboardView } from 'src/sections/soc/view';
 
 // ----------------------------------------------------------------------
 
@@ -10,9 +10,9 @@ export default function Page() {
       <title>{`Dashboard - ${CONFIG.appName}`}</title>
       <meta
         name="description"
-        content="The starting point for your next project with Minimal UI Kit, built on the newest version of Material-UI ©, ready to be customized to your style"
+        content="SOC dashboard for traffic detection and agentic actions"
       />
-      <meta name="keywords" content="react,material,kit,application,dashboard,admin,template" />
+      <meta name="keywords" content="soc,monitoring,agentic,rag,traffic,detection" />
 
       <DashboardView />
     </>

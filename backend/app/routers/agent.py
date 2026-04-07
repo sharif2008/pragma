@@ -32,6 +32,19 @@ from app.services.rag_templates_from_predictions import build_rag_templates_from
 router = APIRouter(prefix="/agent", tags=["agent"])
 
 
+def _load_report_artifact_json(settings: Settings, row: AgenticReport) -> dict | None:
+    if not row.report_path:
+        return None
+    path = settings.storage_root / row.report_path
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+
+
 def _enrich_report_out_with_trust_json(
     settings: Settings, row: AgenticReport, out: AgenticReportOut
 ) -> AgenticReportOut:
@@ -228,7 +241,11 @@ def get_agent_report(
     """Single agentic report by public id."""
     row = agent_service.get_agentic_report(db, public_id)
     out = agent_service.agentic_report_out(db, row)
-    return _enrich_report_out_with_trust_json(settings, row, out)
+    out = _enrich_report_out_with_trust_json(settings, row, out)
+    artifact = _load_report_artifact_json(settings, row)
+    if artifact is not None:
+        out = out.model_copy(update={"report_artifact": artifact})
+    return out
 
 
 @router.delete("/reports/{public_id}", status_code=204)
@@ -270,6 +287,15 @@ async def agent_decide(
         use_rag=body.use_rag,
     )
 
+    user_prompt = build_agentic_decide_user_prompt(
+        sample_data,
+        rag_context,
+        attack_actions_data,
+        agentic_features_data,
+        include_knowledge_base=body.use_rag,
+        feature_notes=feature_notes,
+    )
+
     report_path = settings.storage_root / "reports" / f"agentic_{job.public_id}_{uuid.uuid4().hex[:12]}.json"
     report_path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict = {
@@ -277,6 +303,7 @@ async def agent_decide(
         "results_row_index": body.results_row_index,
         "agentic_job_public_id": agentic_job_public_resolved,
         "sample_data": sample_data,
+        "user_prompt": user_prompt,
         "summary": decision["summary"],
         "recommended_action": decision["recommended_action"],
         "raw_llm_response": decision.get("raw_llm_response"),

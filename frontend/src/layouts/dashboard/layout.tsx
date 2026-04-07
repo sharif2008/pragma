@@ -1,8 +1,8 @@
 import type { Breakpoint } from '@mui/material/styles';
 
-import { useCallback, useEffect, useState } from 'react';
 import { merge } from 'es-toolkit';
 import { useBoolean } from 'minimal-shared/hooks';
+import { useCallback, useEffect, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
@@ -11,11 +11,6 @@ import { useTheme } from '@mui/material/styles';
 import { NavMobile, NavDesktop } from './nav';
 import { layoutClasses } from '../core/classes';
 import { _account } from '../nav-config-account';
-import {
-  dashboardLayoutVars,
-  DASHBOARD_NAV_WIDTH_COLLAPSED,
-  DASHBOARD_NAV_WIDTH_EXPANDED,
-} from './css-vars';
 import { navData } from '../nav-config-dashboard';
 import { MainSection } from '../core/main-section';
 import { _workspaces } from '../nav-config-workspace';
@@ -23,6 +18,12 @@ import { MenuButton } from '../components/menu-button';
 import { HeaderSection } from '../core/header-section';
 import { LayoutSection } from '../core/layout-section';
 import { AccountPopover } from '../components/account-popover';
+import { ThemePresetSelect } from '../components/theme-preset-select';
+import {
+  dashboardLayoutVars,
+  DASHBOARD_NAV_WIDTH_COLLAPSED,
+  DASHBOARD_NAV_WIDTH_EXPANDED,
+} from './css-vars';
 
 import type { MainSectionProps } from '../core/main-section';
 import type { HeaderSectionProps } from '../core/header-section';
@@ -100,6 +101,7 @@ export function DashboardLayout({
       ),
       rightArea: (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ThemePresetSelect />
           <AccountPopover data={_account} />
         </Box>
       ),

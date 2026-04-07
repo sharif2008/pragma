@@ -23,34 +23,37 @@ from app.notebook_runtime.rag_utils import (
     tier_allowed_actions,
 )
 
+from app.services.agentic_llm_prompt import create_agentic_orchestration_prompt
+
 VECTOR_STORE_DIR = Path("RAG_docs/vector_store")
 PREDICTIONS_DIR = Path("RAG_docs/predictions")
 RESULTS_DIR = Path("RAG_docs/action_plans")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-vector_store = load_vector_store(VECTOR_STORE_DIR)
-predictions_data = load_predictions(PREDICTIONS_DIR, verbose=True)
-attack_actions_data, agentic_features_data = load_attack_and_agentic(verbose=True)
+vector_store = None
+predictions_data: list[dict[str, Any]] = []
+attack_actions_data = None
+agentic_features_data = None
 
-n_attack = (
-    len(attack_actions_data.get("attacks", {}))
-    if isinstance(attack_actions_data, dict)
-    else 0
-)
-_tiers = agentic_tiers_dict(agentic_features_data)
-has_agentic = bool(_tiers and any(t in _tiers for t in ("RAN", "Edge", "Core")))
-print("-" * 60)
-print(
-    f"Predictions: {len(predictions_data)} | "
-    f"Vector store: {'loaded' if vector_store is not None else 'missing'}"
-)
-print(f"Attack types in attack_options: {n_attack}")
-print(f"Agentic features config: {'yes' if has_agentic else 'no'}")
-print("-" * 60)
+# RAG retrieval + LLM query/prompts/pipeline (search lives here next to query construction).
+_RAG_PARENTS: dict[str, Any] | None = None
 
-# RAG retrieval + LLM query/prompts/pipeline (search lives here next to query construction)
 
-_RAG_PARENTS = load_parent_store(VECTOR_STORE_DIR)
+def _ensure_runtime_loaded(*, verbose: bool = True) -> None:
+    """Lazy-load heavy on-disk artifacts.
+
+    This module is imported by other code; avoid side effects / FileNotFoundError at import time.
+    """
+    global vector_store, predictions_data, attack_actions_data, agentic_features_data, _RAG_PARENTS
+
+    if vector_store is None:
+        vector_store = load_vector_store(VECTOR_STORE_DIR)
+    if not predictions_data:
+        predictions_data = load_predictions(PREDICTIONS_DIR, verbose=verbose)
+    if attack_actions_data is None or agentic_features_data is None:
+        attack_actions_data, agentic_features_data = load_attack_and_agentic(verbose=verbose)
+    if _RAG_PARENTS is None:
+        _RAG_PARENTS = load_parent_store(VECTOR_STORE_DIR)
 
 
 _PER_QUERY_RETRIEVE_K = 20
@@ -293,6 +296,8 @@ def expand_parent_sections(
     if not ranked_children:
         return []
 
+    _ensure_runtime_loaded(verbose=False)
+
     # Build candidate sections first (may include duplicates)
     candidates: List[Dict[str, Any]] = []
 
@@ -318,7 +323,8 @@ def expand_parent_sections(
             continue
 
         pid_s = str(pid)
-        parent = _RAG_PARENTS.get(pid_s) or _RAG_PARENTS.get(pid) or {}
+        parents = _RAG_PARENTS or {}
+        parent = parents.get(pid_s) or parents.get(pid) or {}
         ptext = str(parent.get("text") or "")
         if max_parent_chars and len(ptext) > int(max_parent_chars):
             ptext = ptext[: int(max_parent_chars)] + "\n\n[parent truncated]"
@@ -653,175 +659,16 @@ def create_prompt(
     *,
     include_knowledge_base: bool = True,
 ) -> str:
-    sample_id = sample_data.get("sample_id", 0)
-    predicted_label = sample_data.get("predicted_label", "UNKNOWN")
-    confidence = sample_data.get("confidence", 0.0)
-    dominant_party, dominant_tier, dominant_pct = get_dominant_party_info(sample_data)
-
-    # IMPORTANT: Do NOT pass the full prediction/SHAP payload to the LLM.
-    # Only pass a compact evidence summary: top-3 features per tier + dominant tier.
-    s = extract_sample_summary(sample_data)
-    condensed_evidence = {
-        "predicted_label": str(s.get("label") or predicted_label),
-        "confidence": float(s.get("confidence", confidence) or 0.0),
-        "dominant_tier": s.get("dominant_tier", dominant_tier),
-        "dominant_contribution_pct": float(s.get("dominant_pct", dominant_pct) or 0.0),
-        "top_features_by_tier": s.get("top_features", {}),
-    }
-
-    attack_actions_context = ""
-    if attack_actions_data and "attacks" in attack_actions_data:
-        attack_type = predicted_label.upper()
-        if attack_type in attack_actions_data["attacks"]:
-            recommended_actions = attack_actions_data["attacks"][attack_type]
-            attack_actions_context = (
-                f"\n\nAttack-Specific Recommended Actions (from attack_options.json):\n"
-                f"For {predicted_label} attack, recommended actions: {', '.join(recommended_actions)}\n"
-            )
-        else:
-            attack_actions_context = (
-                f"\n\nAttack-Specific Actions: No specific recommendations for {predicted_label}.\n"
-            )
-
-    agentic_context = ""
-    tiers = agentic_tiers_dict(agentic_features_data)
-    if tiers:
-        agentic_context = (
-            "\n\nAgentic Features and Actions by Network Tier (from agentic_features.json):\n"
-            "Use the condensed evidence (top features by tier) to GATE which tier gets priority actions.\n"
-        )
-        tf = condensed_evidence.get("top_features_by_tier", {}) or {}
-        for tier in ["RAN", "Edge", "Core"]:
-            if tier in tiers:
-                tier_data = tiers[tier]
-                if not isinstance(tier_data, dict):
-                    continue
-                actions = tier_allowed_actions(tier_data)
-                tier_feats = tf.get(tier, []) if isinstance(tf, dict) else []
-                agentic_context += f"\n{tier} Network Tier:\n"
-                agentic_context += f"  - Top evidence features (top 3): {', '.join(tier_feats) if tier_feats else 'none'}\n"
-                agentic_context += f"  - Allowed tier actions: {', '.join(actions)}\n"
-
-    # Knowledge-base block omitted when include_knowledge_base is False (no-RAG ablation).
-    kb_block = ""
-    rag_hard_rule = ""
-    if include_knowledge_base:
-        top_5_results = rag_results[:_LLM_RAG_SECTIONS_IN_PROMPT]
-        rag_context = ""
-        if top_5_results:
-            rag_context = "\n\nKnowledge Base Context (from RAG search):\n"
-            for idx, result in enumerate(top_5_results, 1):
-                rag_context += f"\n[{idx}] {result['title']}\n"
-                rag_context += f"{result['text']}\n"
-        else:
-            rag_context = "\n\nKnowledge Base: No relevant documents found from RAG search."
-        kb_block = (
-            "\n        Retrieved knowledge (RAG – optional support, may be empty):\n"
-            f"        {rag_context}\n"
-        )
-        rag_hard_rule = (
-            "        - If RAG context is empty, rely ONLY on explainability and agentic context.\n"
-        )
-
-    network_tier_info = ""
-    if dominant_tier:
-        network_tier_info = f"\n- Dominant network tier: {dominant_tier} (contribution: {dominant_pct:.1f}%)"
-        if dominant_party:
-            network_tier_info += f"\n- Dominant party: {dominant_party}"
-
-    return f"""You are a cybersecurity decision-making agent specialized in attack response orchestration.
-        Your role is NOT to invent mitigations, but to SELECT and ASSIGN actions from a predefined
-        action set using explainability signals and agentic features.
-
-        =====================
-        INPUT CONTEXT
-        =====================
-
-        Prediction summary:
-        - sample_id: {sample_id}
-        - predicted_label: {predicted_label}
-        - confidence: {confidence:.1%}
-
-        Explainability & agentic evidence:
-        - Party-level contributions and dominance:
-        {network_tier_info}
-
-        - Condensed feature evidence (top 3 per tier):
-        {json.dumps(condensed_evidence, indent=2)}
-
-        Allowed actions (STRICT CONSTRAINT):
-        {attack_actions_context}
-        • Only actions listed above are allowed.
-        • Do NOT invent, rename, generalize, or merge actions.
-
-        Agentic decision signals:
-        {agentic_context}
-{kb_block}
-        =====================
-        TASK
-        =====================
-
-        Using ONLY the information above, generate an agent-ready action plan that:
-
-        1) Interprets how {predicted_label} manifests across network tiers (RAN, Edge, Core).
-        2) Identifies which evidence party MUST trigger mitigation first.
-        3) Selects actions ONLY from the provided Allowed actions list.
-        4) Assigns each action to the MOST appropriate executing party and network tier.
-        5) Provides explicit, evidence-grounded reasoning for EACH action.
-        6) Adapts aggressiveness and execution priority based on confidence ({confidence:.1%}).
-        7) If no allowed action is suitable, return empty action lists.
-
-        =====================
-        OUTPUT FORMAT (STRICT)
-        =====================
-
-        Return a VALID JSON object ONLY:
-
-        {{
-          "threat_level": "Critical|High|Medium|Low",
-
-          "all_actions": [
-            "action_name_1",
-            "action_name_2",
-            "action_name_3"
-          ],
-
-          "primary_actions": [
-            {{
-              "action": "EXACT action name from Allowed actions to be taken ",
-              "network_tier": "RAN|Edge|Core",
-              "party_evidence_type": "type of evidence this party observed",
-              "reasoning": "clear explanation linking evidence + agentic signals to this action"
-            }}
-          ],
-
-          "supporting_actions": [
-            {{
-              "action": "EXACT action name from Allowed actions to be taken",
-              "network_tier": "RAN|Edge|Core",
-              "party_evidence_type": "type of evidence this party observed",
-              "reasoning": "why this action supports or complements the primary action"
-            }}
-          ],
-          "overall_reasoning": "Concise summary explaining party prioritization, tier ordering, and action selection logic",
-          "execution_priority": "Immediate|High|Standard|Low",
-          "knowledge_sources_used": [
-            "allowed_actions_context",
-            "attack_actions_context"
-          ]
-        }}
-
-        =====================
-        HARD RULES (DO NOT VIOLATE)
-        =====================
-
-        - Do NOT output text outside the JSON.
-        - Do NOT generate actions not listed in Allowed actions.
-        - The "all_actions" list MUST be the union of primary_actions and supporting_actions.
-        - Do NOT alter action or party names.
-        - Every action MUST include explicit reasoning tied to evidence or agentic rules.
-        - Prefer dominant party and tier for primary actions unless contradicted by evidence.
-{rag_hard_rule}        """
+    # Dedupe: use the canonical prompt builder used by the API (`POST /agent/decide`).
+    # Keep this wrapper so the notebook runner's call sites don't change.
+    return create_agentic_orchestration_prompt(
+        sample_data,
+        rag_results,
+        attack_actions_data,
+        agentic_features_data,
+        include_knowledge_base=include_knowledge_base,
+        extra_agentic_notes=None,
+    )
 
 
 def create_prompt_without_RAG(
@@ -830,13 +677,7 @@ def create_prompt_without_RAG(
     agentic_features_data: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Same as `create_prompt` but no KB/RAG section (paired with-RAG vs no-RAG saves)."""
-    return create_prompt(
-        sample_data,
-        [],
-        attack_actions_data=attack_actions_data,
-        agentic_features_data=agentic_features_data,
-        include_knowledge_base=False,
-    )
+    return create_prompt(sample_data, [], attack_actions_data, agentic_features_data, include_knowledge_base=False)
 
 
 def call_llm_api(prompt: str) -> Optional[Dict[str, Any]]:
@@ -1100,23 +941,46 @@ QUERY_STRATEGY = "template"  # or: ["template", "rephrase"]
 # Per-query retrieval is fixed to 20 docs/query (see `_PER_QUERY_RETRIEVE_K`).
 
 
-samples_for_actions = [s for s in predictions_data if _is_predicted_attack(s)]
-n_skip = len(predictions_data) - len(samples_for_actions)
-print(
-    f"Action pipeline: {len(samples_for_actions)} sample(s) with predicted attack; "
-    f"skipping {n_skip} predicted benign."
-)
+def main() -> None:
+    _ensure_runtime_loaded(verbose=True)
 
-for sample in samples_for_actions:
-    # Top 5 contextual sections passed to the LLM by default.
-    run_agent_pipeline_for_sample(
-        sample,
-        vector_store,
-        attack_actions_data,
-        agentic_features_data,
-        RESULTS_DIR,
-        top_k_retrieve=5,
-        query_strategy=QUERY_STRATEGY,
+    n_attack = (
+        len(attack_actions_data.get("attacks", {}))
+        if isinstance(attack_actions_data, dict)
+        else 0
+    )
+    _tiers = agentic_tiers_dict(agentic_features_data)
+    has_agentic = bool(_tiers and any(t in _tiers for t in ("RAN", "Edge", "Core")))
+    print("-" * 60)
+    print(
+        f"Predictions: {len(predictions_data)} | "
+        f"Vector store: {'loaded' if vector_store is not None else 'missing'}"
+    )
+    print(f"Attack types in attack_options: {n_attack}")
+    print(f"Agentic features config: {'yes' if has_agentic else 'no'}")
+    print("-" * 60)
+
+    samples_for_actions = [s for s in predictions_data if _is_predicted_attack(s)]
+    n_skip = len(predictions_data) - len(samples_for_actions)
+    print(
+        f"Action pipeline: {len(samples_for_actions)} sample(s) with predicted attack; "
+        f"skipping {n_skip} predicted benign."
     )
 
-print("Done. Action plans in:", RESULTS_DIR)
+    for sample in samples_for_actions:
+        # Top 5 contextual sections passed to the LLM by default.
+        run_agent_pipeline_for_sample(
+            sample,
+            vector_store,
+            attack_actions_data,
+            agentic_features_data,
+            RESULTS_DIR,
+            top_k_retrieve=5,
+            query_strategy=QUERY_STRATEGY,
+        )
+
+    print("Done. Action plans in:", RESULTS_DIR)
+
+
+if __name__ == "__main__":
+    main()

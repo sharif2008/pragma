@@ -1,8 +1,8 @@
 import Grid from '@mui/material/Grid';
 import Typography from '@mui/material/Typography';
 
-import { DashboardContent } from 'src/layouts/dashboard';
 import { _tasks, _traffic, _timeline } from 'src/_mock';
+import { DashboardContent } from 'src/layouts/dashboard';
 
 import { AnalyticsTasks } from '../analytics-tasks';
 import { ChainagentBackendCard } from '../chainagent-backend-card';

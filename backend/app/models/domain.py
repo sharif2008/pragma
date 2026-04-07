@@ -36,6 +36,14 @@ class JobStatus(str, enum.Enum):
     failed = "failed"
 
 
+class AgentRunStatus(str, enum.Enum):
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    partial = "partial"
+    needs_input = "needs_input"
+
+
 class ManagedFile(Base):
     __tablename__ = "managed_files"
 
@@ -235,3 +243,84 @@ class AgenticReport(Base):
 
     prediction_job = relationship("PredictionJob")
     agentic_job = relationship("AgenticJob")
+
+
+class AgentRun(Base):
+    """End-to-end traceable run for simulated customer messages."""
+
+    __tablename__ = "agent_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(
+        CHAR(36), unique=True, default=lambda: str(uuid.uuid4()), nullable=False
+    )
+    trace_id: Mapped[str] = mapped_column(CHAR(36), index=True, nullable=False)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), unique=True, nullable=True)
+
+    status: Mapped[AgentRunStatus] = mapped_column(
+        SAEnum(AgentRunStatus, values_callable=lambda x: [e.value for e in x]),
+        default=AgentRunStatus.running,
+        index=True,
+        nullable=False,
+    )
+
+    customer_id: Mapped[str | None] = mapped_column(String(128), index=True, nullable=True)
+    channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    message_preview: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    predicted_attachment_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    predicted_shape_constraints: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    predictions_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    rag_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    final_actions: Mapped[list | dict | None] = mapped_column(JSON, nullable=True)
+
+    error_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AgentRunEvent(Base):
+    __tablename__ = "agent_run_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    event_id: Mapped[str] = mapped_column(
+        CHAR(36), unique=True, default=lambda: str(uuid.uuid4()), nullable=False
+    )
+    run_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("agent_runs.run_id", ondelete="CASCADE"), index=True)
+    trace_id: Mapped[str] = mapped_column(CHAR(36), index=True, nullable=False)
+
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    step_name: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    level: Mapped[str] = mapped_column(String(16), nullable=False, default="info")
+    message: Mapped[str] = mapped_column(String(1024), nullable=False, default="")
+    payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class RawCustomerLog(Base):
+    __tablename__ = "raw_customer_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    log_id: Mapped[str] = mapped_column(
+        CHAR(36), unique=True, default=lambda: str(uuid.uuid4()), nullable=False
+    )
+    run_id: Mapped[str] = mapped_column(CHAR(36), ForeignKey("agent_runs.run_id", ondelete="CASCADE"), index=True)
+    trace_id: Mapped[str] = mapped_column(CHAR(36), index=True, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    raw_payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    normalized_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)

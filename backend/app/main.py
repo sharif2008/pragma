@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import ensure_storage_dirs, get_settings
 from app.core.logging import setup_logging
 from app.db.session import init_db
-from app.routers import agent, datasets, files, health, kb, meta, predictions, training
+from app.routers import agent, datasets, files, health, kb, meta, predictions, runs, simulate, training
 
 
 @asynccontextmanager
@@ -55,5 +55,7 @@ app.include_router(training.models_router)
 app.include_router(predictions.router)
 app.include_router(agent.router)
 app.include_router(kb.router)
+app.include_router(simulate.router)
+app.include_router(runs.router)
 
 meta.register_meta_routes(app)

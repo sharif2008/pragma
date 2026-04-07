@@ -78,6 +78,9 @@ Desktop.ini
 *.tmp
 *.temp
 
+# --- Local datasets / exports ---
+dataset-*.csv
+
 # --- Backend runtime storage (uploads, KB files, FAISS indices, trained models, predictions, reports) ---
 # Keep only catalog JSON + directory placeholders in git.
 backend/storage/knowledge/**

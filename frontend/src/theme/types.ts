@@ -23,7 +23,7 @@ export type ThemeCssVariables = Pick<
   'colorSchemeSelector' | 'disableCssColorScheme' | 'cssVarPrefix' | 'shouldSkipGeneratingVar'
 >;
 
-type ColorSchemeOptionsExtended = ColorSystemOptions & {
+export type ColorSchemeOptionsExtended = ColorSystemOptions & {
   shadows?: Shadows;
   customShadows?: CustomShadows;
 };
