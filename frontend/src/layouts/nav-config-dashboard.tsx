@@ -23,6 +23,11 @@ export const navData = [
     icon: icon('ic-lock'),
   },
   {
+    title: 'Agentic actions',
+    path: '/agentic',
+    icon: icon('ic-blog'),
+  },
+  {
     title: 'ML & RAG',
     path: '/ml',
     icon: icon('ic-cart'),

@@ -15,6 +15,9 @@ import { DashboardLayout } from 'src/layouts/dashboard';
 export const DashboardPage = lazy(() => import('src/pages/dashboard'));
 export const MlWorkbenchPage = lazy(() => import('src/pages/ml-workbench'));
 export const MonitorPage = lazy(() => import('src/pages/monitor'));
+export const AgenticLayoutPage = lazy(() => import('src/pages/agentic-layout'));
+export const AgenticIndexPage = lazy(() => import('src/pages/agentic-index'));
+export const AgenticReportDetailPage = lazy(() => import('src/pages/agentic-report-detail'));
 export const UserPage = lazy(() => import('src/pages/user'));
 export const SignInPage = lazy(() => import('src/pages/sign-in'));
 export const Page404 = lazy(() => import('src/pages/page-not-found'));
@@ -52,6 +55,14 @@ export const routesSection: RouteObject[] = [
       { index: true, element: <DashboardPage /> },
       { path: 'ml', element: <MlWorkbenchPage /> },
       { path: 'monitor', element: <MonitorPage /> },
+      {
+        path: 'agentic',
+        element: <AgenticLayoutPage />,
+        children: [
+          { index: true, element: <AgenticIndexPage /> },
+          { path: 'report/:publicId', element: <AgenticReportDetailPage /> },
+        ],
+      },
       { path: 'user', element: <UserPage /> },
     ],
   },

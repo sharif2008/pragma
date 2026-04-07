@@ -39,12 +39,18 @@ _ALLOWED_ATTACHMENT_MIME_EXACT = {
 }
 
 
-def _validate_attachment_url(url: str) -> None:
-    u = urlparse(url)
+def _remote_attachment_url(url: str) -> str | None:
+    """
+    Only http(s) with a host are treated as remote URLs. Anything else (relative paths,
+    bare strings from network-log payloads, file:, etc.) is ignored — this path never
+    fetches URLs; attachments without a remote URL are handled like text/file-metadata only.
+    """
+    u = urlparse(url.strip())
     if u.scheme not in ("http", "https"):
-        raise ValueError("attachment url must be http(s)")
+        return None
     if not u.netloc:
-        raise ValueError("attachment url missing host")
+        return None
+    return url.strip()
 
 
 def _predict_attachment(attachments: list[dict[str, Any]]) -> dict[str, Any]:
@@ -133,13 +139,14 @@ async def run_simulated_customer_message(
         if not isinstance(attachments, list):
             attachments = []
 
-        # Validate attachments early (URL + content type allowlist).
+        # Validate attachments early (optional remote URL + content type allowlist).
         for a in attachments:
             if not isinstance(a, dict):
                 continue
             url = a.get("url")
             if isinstance(url, str) and url.strip():
-                _validate_attachment_url(url.strip())
+                remote = _remote_attachment_url(url)
+                a["url"] = remote
             ct = str(a.get("content_type") or "").lower().strip()
             if ct and not (
                 ct in _ALLOWED_ATTACHMENT_MIME_EXACT or ct.startswith(_ALLOWED_ATTACHMENT_MIME_PREFIXES)

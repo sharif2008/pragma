@@ -5,13 +5,19 @@ import { DEFAULT_THEME_PRESET_ID, THEME_PRESET_LIST, THEME_PRESETS } from './pre
 
 // ----------------------------------------------------------------------
 
-const STORAGE_KEY = 'chainagent-theme-preset-v1';
+const STORAGE_KEY = 'chainagent-theme-preset-v2';
+const LEGACY_STORAGE_KEY = 'chainagent-theme-preset-v1';
 
 function readStoredPreset(): AppThemePresetId {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw && raw in THEME_PRESETS) {
       return raw as AppThemePresetId;
+    }
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (legacy && legacy in THEME_PRESETS) {
+      localStorage.setItem(STORAGE_KEY, legacy);
+      return legacy as AppThemePresetId;
     }
   } catch {
     /* ignore */

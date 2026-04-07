@@ -342,23 +342,27 @@ function pickPredictionResultsRow(
   return rows[0] ?? null;
 }
 
-export function AgentReportDetailDialog({ open, publicId, onClose }: AgentReportDetailDialogProps) {
-  const [tab, setTab] = useState<
-    'summary' | 'data' | 'prediction' | 'rag' | 'llm' | 'actions' | 'artifact'
-  >('summary');
+export function useAgentReportDetailLoad(publicId: string | null | undefined) {
   const [report, setReport] = useState<AgenticReportOut | null>(null);
   const [predJob, setPredJob] = useState<PredictionJobOut | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    if (!publicId) return;
+    const id = publicId?.trim();
+    if (!id) {
+      setReport(null);
+      setPredJob(null);
+      setError('');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError('');
     setReport(null);
     setPredJob(null);
     try {
-      const r = await api.getAgentReport(publicId);
+      const r = await api.getAgentReport(id);
       setReport(r);
       const pid = r.prediction_job_public_id?.trim();
       if (pid) {
@@ -377,15 +381,55 @@ export function AgentReportDetailDialog({ open, publicId, onClose }: AgentReport
   }, [publicId]);
 
   useEffect(() => {
-    if (!open || !publicId) return;
     void load();
-  }, [open, publicId, load]);
+  }, [load]);
+
+  return { report, predJob, loading, error, reload: load };
+}
+
+export type AgentReportDetailContentProps = {
+  loading: boolean;
+  error: string;
+  report: AgenticReportOut | null;
+  predJob: PredictionJobOut | null;
+  publicId: string | null;
+};
+
+/** Shared tabbed body for agentic report (dialog or full page). */
+export function AgentReportDetailContent({
+  loading,
+  error,
+  report,
+  predJob,
+  publicId,
+}: AgentReportDetailContentProps) {
+  const [tab, setTab] = useState<
+    'summary' | 'data' | 'prediction' | 'rag' | 'llm' | 'actions' | 'artifact'
+  >('summary');
 
   useEffect(() => {
-    if (open) setTab('summary');
-  }, [open, publicId]);
+    setTab('summary');
+  }, [publicId]);
 
-  const artifact = report?.report_artifact ?? null;
+  if (loading) {
+    return (
+      <Stack alignItems="center" py={4}>
+        <CircularProgress size={32} />
+      </Stack>
+    );
+  }
+  if (error) {
+    return <Alert severity="error">{error}</Alert>;
+  }
+  if (!report) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        No report loaded.
+      </Typography>
+    );
+  }
+
+  const artifact = report.report_artifact ?? null;
   const sampleData = artifact && typeof artifact.sample_data !== 'undefined' ? artifact.sample_data : null;
   const userPrompt =
     artifact && typeof artifact.user_prompt === 'string' ? artifact.user_prompt : null;
@@ -396,46 +440,28 @@ export function AgentReportDetailDialog({ open, publicId, onClose }: AgentReport
       ? artifact.trust_chain
       : null;
 
-  const resultsRow = pickPredictionResultsRow(predJob, report?.results_row_index);
+  const resultsRow = pickPredictionResultsRow(predJob, report.results_row_index);
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth scroll="paper">
-      <DialogTitle sx={{ pr: 6 }}>
-        <Typography variant="h6" component="span">
-          Agentic report — full detail
-        </Typography>
-        {publicId && (
-          <Typography variant="caption" display="block" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
-            {publicId}
-          </Typography>
-        )}
-      </DialogTitle>
-      <DialogContent dividers>
-        {loading && (
-          <Stack alignItems="center" py={4}>
-            <CircularProgress size={32} />
-          </Stack>
-        )}
-        {!loading && error && <Alert severity="error">{error}</Alert>}
-        {!loading && !error && report && (
-          <>
-            <Tabs
-              value={tab}
-              onChange={(_, v) => setTab(v)}
-              variant="scrollable"
-              scrollButtons="auto"
-              sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
-            >
-              <Tab value="summary" label="Summary" />
-              <Tab value="data" label="Data row" />
-              <Tab value="prediction" label="Prediction" />
-              <Tab value="rag" label="RAG" />
-              <Tab value="llm" label="LLM" />
-              <Tab value="actions" label="Actions" />
-              <Tab value="artifact" label="Raw JSON" />
-            </Tabs>
+    <>
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider', maxWidth: 1 }}
+      >
+        <Tab value="summary" label="Summary" />
+        <Tab value="data" label="Data row" />
+        <Tab value="prediction" label="Prediction" />
+        <Tab value="rag" label="RAG" />
+        <Tab value="llm" label="LLM" />
+        <Tab value="actions" label="Actions" />
+        <Tab value="artifact" label="Raw JSON" />
+      </Tabs>
 
-            {tab === 'summary' && (
+      {tab === 'summary' && (
               <Stack spacing={1.25} divider={<Divider flexItem />}>
                 <DetailRow label="Created" value={new Date(report.created_at).toLocaleString()} />
                 <DetailRow label="Prediction job" value={report.prediction_job_public_id} mono />
@@ -668,19 +694,47 @@ export function AgentReportDetailDialog({ open, publicId, onClose }: AgentReport
               </Stack>
             )}
 
-            {tab === 'artifact' && (
-              <Stack spacing={1}>
-                <Typography variant="caption" color="text.secondary">
-                  Complete on-disk report payload when available from the API.
-                </Typography>
-                <JsonBlock data={artifact ?? { message: 'No report_artifact on this response' }} />
-              </Stack>
-            )}
-          </>
+      {tab === 'artifact' && (
+        <Stack spacing={1}>
+          <Typography variant="caption" color="text.secondary">
+            Complete on-disk report payload when available from the API.
+          </Typography>
+          <JsonBlock data={artifact ?? { message: 'No report_artifact on this response' }} />
+        </Stack>
+      )}
+    </>
+  );
+}
+
+export function AgentReportDetailDialog({ open, publicId, onClose }: AgentReportDetailDialogProps) {
+  const effectiveId = open ? publicId : null;
+  const { report, predJob, loading, error, reload } = useAgentReportDetailLoad(effectiveId);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth scroll="paper">
+      <DialogTitle sx={{ pr: 6 }}>
+        <Typography variant="h6" component="span">
+          Agentic report — full detail
+        </Typography>
+        {publicId && (
+          <Typography variant="caption" display="block" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
+            {publicId}
+          </Typography>
         )}
+      </DialogTitle>
+      <DialogContent dividers sx={{ overflowX: 'auto' }}>
+        <Box sx={{ minWidth: 0, width: 1 }}>
+          <AgentReportDetailContent
+            loading={loading}
+            error={error}
+            report={report}
+            predJob={predJob}
+            publicId={effectiveId}
+          />
+        </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => void load()} disabled={loading || !publicId}>
+        <Button onClick={() => void reload()} disabled={loading || !publicId}>
           Reload
         </Button>
         <Button variant="contained" onClick={onClose}>
