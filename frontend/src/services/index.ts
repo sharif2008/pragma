@@ -7,13 +7,25 @@ export * from './health.service';
 export * from './datasets.service';
 export * from './training.service';
 export * from './predictions.service';
+export * from './runs.service';
 export { getApiBaseUrl, DEFAULT_API_BASE_URL } from './api-base';
 export { ApiError, requestJson, requestVoid, postMultipart, type RequestInitSubset } from './http-client';
 
+import { getRun, getRunEvents, listRunEvents, listRuns } from './runs.service';
 import { listFiles, deleteFile, uploadFile } from './files.service';
 import { getHealth, getApiList, getRootMeta } from './health.service';
 import { agentDecide, getAgentReport, listAgentReports } from './agent.service';
 import { listDatasets, deleteDataset, uploadDataset, getDatasetPreview } from './datasets.service';
+import {
+  listModels,
+  deleteModel,
+  getTraining,
+  startTraining,
+  getTrainingJob,
+  rebuildTraining,
+  listTrainingJobs,
+  deleteTrainingJob,
+} from './training.service';
 import {
   kbList,
   kbQuery,
@@ -25,16 +37,6 @@ import {
   kbRagTemplatesLatestPrediction,
   kbLlmShapRetrievalQuery,
 } from './kb.service';
-import {
-  listModels,
-  deleteModel,
-  getTraining,
-  startTraining,
-  getTrainingJob,
-  rebuildTraining,
-  listTrainingJobs,
-  deleteTrainingJob,
-} from './training.service';
 import {
   getPrediction,
   startPrediction,
@@ -74,6 +76,10 @@ export const api = {
   getPredictionJob,
   deletePredictionJob,
   deleteAllPendingPredictionJobs,
+  listRuns,
+  getRun,
+  getRunEvents,
+  listRunEvents,
   agentDecide,
   listAgentReports,
   getAgentReport,

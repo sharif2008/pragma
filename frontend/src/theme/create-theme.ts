@@ -1,40 +1,48 @@
-import type { Theme } from '@mui/material/styles';
-
+import type { CssVarsThemeOptions } from '@mui/material/styles';
 import { createTheme as createMuiTheme } from '@mui/material/styles';
 
-import { shadows } from './core/shadows';
-import { palette } from './core/palette';
-import { themeConfig } from './theme-config';
+import { buildColorSchemeFromPreset } from './build-color-scheme';
+import { DEFAULT_THEME_PRESET_ID, THEME_PRESETS } from './presets';
+import type { AppThemePresetId } from './preset-types';
 import { components } from './core/components';
+import type { ColorSchemeOptionsExtended, ThemeOptions } from './types';
+import { themeConfig } from './theme-config';
 import { typography } from './core/typography';
-import { customShadows } from './core/custom-shadows';
 
-import type { ThemeOptions } from './types';
+import type {} from './extend-theme-types';
 
 // ----------------------------------------------------------------------
 
-export const baseTheme: ThemeOptions = {
-  colorSchemes: {
-    light: {
-      palette: palette.light,
-      shadows: shadows.light,
-      customShadows: customShadows.light,
+function resolvePreset(presetId: AppThemePresetId | string) {
+  const def = THEME_PRESETS[presetId as AppThemePresetId];
+  return def ?? THEME_PRESETS[DEFAULT_THEME_PRESET_ID];
+}
+
+export function createAppTheme(
+  presetId: AppThemePresetId = DEFAULT_THEME_PRESET_ID,
+  userOverrides?: ThemeOptions
+) {
+  const def = resolvePreset(presetId);
+  const { palette, shadows, customShadows } = buildColorSchemeFromPreset(def);
+
+  const lightScheme: ColorSchemeOptionsExtended = { palette, shadows, customShadows };
+
+  const theme: CssVarsThemeOptions = createMuiTheme(
+    {
+      colorSchemes: {
+        light: lightScheme,
+      },
+      components,
+      shape: { borderRadius: 8 },
+      cssVariables: themeConfig.cssVariables,
     },
-  },
-  components,
-  typography,
-  shape: { borderRadius: 8 },
-  cssVariables: themeConfig.cssVariables,
-};
-
-// ----------------------------------------------------------------------
-
-type CreateThemeProps = {
-  themeOverrides?: ThemeOptions;
-};
-
-export function createTheme({ themeOverrides = {} }: CreateThemeProps = {}): Theme {
-  const theme = createMuiTheme(baseTheme, themeOverrides);
+    {
+      typography: typography as ThemeOptions['typography'],
+      ...userOverrides,
+    }
+  );
 
   return theme;
 }
+
+export { themeConfig };

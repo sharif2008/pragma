@@ -160,3 +160,8 @@ class AgenticReportOut(ORMModel):
         default=None,
         description="e.g. demo_local_commitment when anchor_trust_chain was used.",
     )
+    report_artifact: dict[str, Any] | None = Field(
+        default=None,
+        description="Full on-disk report JSON when present (sample_data, user_prompt, structured_plan, trust_chain, …). "
+        "Only set on GET /agent/reports/{public_id}, not on list.",
+    )

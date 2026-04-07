@@ -5,3 +5,5 @@ export * from './types';
 export * from './theme-config';
 
 export * from './theme-provider';
+
+export * from './theme-preset-context';

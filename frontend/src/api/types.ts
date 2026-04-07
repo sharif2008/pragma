@@ -230,6 +230,11 @@ export type AgenticReportOut = {
   /** Set on POST /agent/decide response when anchor_trust_chain was true. */
   trust_commitment?: string | null;
   trust_chain_mode?: string | null;
+  /**
+   * Full on-disk report JSON (GET /agent/reports/:id only): sample_data, user_prompt,
+   * structured_plan, trust_chain, rag_context_used, …
+   */
+  report_artifact?: Record<string, unknown> | null;
 };
 
 export type KBQueryResponse = {
@@ -326,4 +331,55 @@ export type ApiListResponse = {
   redoc: string;
   openapi_json: string;
   routes: ApiListRouteItem[];
+};
+
+// ----------------------------------------------------------------------
+// Runs / monitoring (agent_runs)
+
+export type AgentRunStatus = 'running' | 'completed' | 'failed' | 'partial' | 'needs_input';
+
+export type RunListItemOut = {
+  run_id: string;
+  trace_id: string;
+  status: AgentRunStatus;
+  created_at: IsoDateString;
+  updated_at: IsoDateString;
+  customer_id?: string | null;
+  channel?: string | null;
+  message_preview?: string | null;
+  predicted_attachment_type?: string | null;
+  predicted_label?: string | null;
+  flagged_attack_or_anomaly?: boolean | null;
+  duration_ms?: number | null;
+  last_step?: string | null;
+};
+
+export type RunEventOut = {
+  event_id: string;
+  run_id: string;
+  trace_id: string;
+  timestamp: IsoDateString;
+  step_name: string;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+  payload?: Record<string, unknown> | null;
+  duration_ms?: number | null;
+};
+
+export type RunSummaryOut = {
+  run_id: string;
+  trace_id: string;
+  status: AgentRunStatus;
+  created_at: IsoDateString;
+  updated_at: IsoDateString;
+  completed_at?: IsoDateString | null;
+  customer_id?: string | null;
+  channel?: string | null;
+  message_preview?: string | null;
+  duration_ms?: number | null;
+  last_step?: string | null;
+  predictions?: Record<string, unknown> | null;
+  rag?: Record<string, unknown> | null;
+  actions?: Array<Record<string, unknown>> | null;
+  error?: { step_name?: string | null; message?: string | null } | null;
 };
