@@ -15,7 +15,7 @@ import type {
   JobStatus,
 } from 'src/api/types';
 
-import { useId, useRef, useMemo, Fragment, useState, useEffect, useCallback } from 'react';
+import { useId, useRef, useMemo, Fragment, useState, useEffect, useCallback, type ReactNode } from 'react';
 
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
@@ -310,6 +310,11 @@ const PIPELINE_STEPS: {
     apis: '(roadmap) chain notary / Web3 adapter — not in this demo API yet.',
   },
 ];
+
+/** Stages 1–3: ingest data and produce predictions (Data & training + Predictions tabs). */
+const PIPELINE_STEPS_DATA = PIPELINE_STEPS.slice(0, 3);
+/** Stages 4–6: KB retrieval, policy LLM, trust (Knowledge base + RAG prep + Agentic). */
+const PIPELINE_STEPS_LLM_RAG = PIPELINE_STEPS.slice(3);
 
 const PIPELINE_STAGE_CARDS: {
   id: string;
@@ -859,6 +864,73 @@ function PipelineDecisionTreeDiagram({ embedded = false }: { embedded?: boolean 
   );
 }
 
+function renderPipelineStepAccordions(steps: typeof PIPELINE_STEPS) {
+  return steps.map((s) => (
+    <Accordion
+      key={s.label}
+      defaultExpanded={false}
+      disableGutters
+      sx={{
+        border: 1,
+        borderColor: 'divider',
+        borderRadius: 1.5,
+        overflow: 'hidden',
+        boxShadow: 'none',
+        '&:before': { display: 'none' },
+      }}
+    >
+      <AccordionSummary
+        expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" width={18} />}
+        sx={{ px: 2, py: 1.25, minHeight: 48, '&.Mui-expanded': { minHeight: 48 } }}
+      >
+        <Stack spacing={0.25} sx={{ pr: 1, textAlign: 'left' }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            {s.label}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ lineHeight: 1.4, display: { xs: 'none', sm: 'block' } }}
+          >
+            {s.summary}
+          </Typography>
+        </Stack>
+      </AccordionSummary>
+      <AccordionDetails sx={{ pt: 0, px: 2, pb: 2 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: { xs: 'block', sm: 'none' }, mb: 1.5, lineHeight: 1.5 }}
+        >
+          {s.summary}
+        </Typography>
+        <Box
+          component="ul"
+          sx={{ m: 0, pl: 2.25, typography: 'body2', color: 'text.secondary', '& li': { mb: 0.5 } }}
+        >
+          {s.bullets.map((b, i) => (
+            <li key={`${s.label}-${i}`}>{b}</li>
+          ))}
+        </Box>
+        <Typography
+          variant="caption"
+          color="text.disabled"
+          sx={{
+            display: 'block',
+            mt: 1.5,
+            fontFamily: 'monospace',
+            fontSize: 11,
+            wordBreak: 'break-all',
+            lineHeight: 1.5,
+          }}
+        >
+          {s.apis}
+        </Typography>
+      </AccordionDetails>
+    </Accordion>
+  ));
+}
+
 function PipelineSummaryPanel() {
   const theme = useTheme();
   return (
@@ -911,13 +983,89 @@ function PipelineSummaryPanel() {
           >
             Pipeline overview
           </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 2.75, maxWidth: 720, lineHeight: 1.7, fontSize: 16 }}>
-            Datasets → VFL training → predictions → knowledge (RAG) → agentic policy → trust attestation. Each stage
-            maps to Summary, Data & training, or Predict, RAG & agent—use this page as your map.
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 2, maxWidth: 800, lineHeight: 1.7, fontSize: 16 }}>
+            Datasets → VFL training → predictions → knowledge (RAG) → agentic policy → trust. Use the{' '}
+            <strong>Data &amp; training</strong> tab for ingest and models, and <strong>Predict, RAG &amp; agent</strong> for
+            batch scoring, RAG/LLM prep, and agentic runs.
           </Typography>
-          <Divider sx={{ mb: 3, borderColor: (t) => alpha(t.palette.divider, 0.9) }} />
-          <PipelineInteractiveFlow />
+          <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2.5 }}>
+            <Chip size="small" variant="outlined" color="info" label="Tabs: Data & training · Datasets / Training / KB" />
+            <Chip
+              size="small"
+              variant="outlined"
+              color="success"
+              label="Tabs: Predict & agent · Predictions / RAG & LLM prep / Agentic"
+            />
+          </Stack>
         </Box>
+      </Paper>
+
+      <Box>
+        <Typography
+          variant="overline"
+          sx={{ fontWeight: 800, letterSpacing: 0.9, color: 'text.secondary', mb: 0.5, display: 'block' }}
+        >
+          Stage reference
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, maxWidth: 900 }}>
+          <strong>Left column:</strong> data through batch predictions. <strong>Right column:</strong> retrieval, grounded LLM,
+          and agentic policy — open accordions for API hints and step details.
+        </Typography>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="stretch">
+          <Paper
+            variant="outlined"
+            sx={{
+              flex: 1,
+              p: 2,
+              borderRadius: 2,
+              borderTop: 3,
+              borderTopColor: 'info.main',
+              bgcolor: (t) => alpha(t.palette.info.main, 0.04),
+            }}
+          >
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.25 }}>
+              Data → prediction
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+              Datasets, VFL training, scoring jobs
+            </Typography>
+            <Stack spacing={0.75}>{renderPipelineStepAccordions(PIPELINE_STEPS_DATA)}</Stack>
+          </Paper>
+          <Paper
+            variant="outlined"
+            sx={{
+              flex: 1,
+              p: 2,
+              borderRadius: 2,
+              borderTop: 3,
+              borderTopColor: 'success.main',
+              bgcolor: (t) => alpha(t.palette.success.main, 0.05),
+            }}
+          >
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.25 }}>
+              LLM, RAG &amp; agent
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+              KB stack, policy model, optional trust anchor
+            </Typography>
+            <Stack spacing={0.75}>{renderPipelineStepAccordions(PIPELINE_STEPS_LLM_RAG)}</Stack>
+          </Paper>
+        </Stack>
+      </Box>
+
+      <Paper
+        elevation={0}
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: 2,
+          border: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2 }}>
+          Interactive flow
+        </Typography>
+        <PipelineInteractiveFlow />
       </Paper>
 
       <Paper
@@ -964,81 +1112,6 @@ function PipelineSummaryPanel() {
         </Stack>
         <PipelineDecisionTreeDiagram embedded />
       </Paper>
-
-      <Box>
-        <Typography
-          variant="overline"
-          sx={{ fontWeight: 700, letterSpacing: 0.8, color: 'text.secondary', mb: 1.5, display: 'block' }}
-        >
-          Stage reference
-        </Typography>
-        <Stack spacing={0.75}>
-          {PIPELINE_STEPS.map((s) => (
-            <Accordion
-              key={s.label}
-              defaultExpanded={false}
-              disableGutters
-              sx={{
-                border: 1,
-                borderColor: 'divider',
-                borderRadius: 1.5,
-                overflow: 'hidden',
-                boxShadow: 'none',
-                '&:before': { display: 'none' },
-              }}
-            >
-              <AccordionSummary
-                expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" width={18} />}
-                sx={{ px: 2, py: 1.25, minHeight: 48, '&.Mui-expanded': { minHeight: 48 } }}
-              >
-                <Stack spacing={0.25} sx={{ pr: 1, textAlign: 'left' }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    {s.label}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ lineHeight: 1.4, display: { xs: 'none', sm: 'block' } }}
-                  >
-                    {s.summary}
-                  </Typography>
-                </Stack>
-              </AccordionSummary>
-              <AccordionDetails sx={{ pt: 0, px: 2, pb: 2 }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ display: { xs: 'block', sm: 'none' }, mb: 1.5, lineHeight: 1.5 }}
-                >
-                  {s.summary}
-                </Typography>
-                <Box
-                  component="ul"
-                  sx={{ m: 0, pl: 2.25, typography: 'body2', color: 'text.secondary', '& li': { mb: 0.5 } }}
-                >
-                  {s.bullets.map((b, i) => (
-                    <li key={`${s.label}-${i}`}>{b}</li>
-                  ))}
-                </Box>
-                <Typography
-                  variant="caption"
-                  color="text.disabled"
-                  sx={{
-                    display: 'block',
-                    mt: 1.5,
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    wordBreak: 'break-all',
-                    lineHeight: 1.5,
-                  }}
-                >
-                  {s.apis}
-                </Typography>
-              </AccordionDetails>
-            </Accordion>
-          ))}
-        </Stack>
-      </Box>
     </Stack>
   );
 }
@@ -2716,6 +2789,51 @@ function renderAgenticJobOrphanMenuItem(
   );
 }
 
+function RagPrepSection({
+  kicker,
+  title,
+  description,
+  children,
+}: {
+  kicker: string;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: { xs: 1.75, sm: 2.25 },
+        borderRadius: 2,
+        border: 1,
+        borderColor: 'divider',
+        bgcolor: (t) => alpha(t.palette.grey[500], 0.04),
+      }}
+    >
+      <Stack spacing={1.75}>
+        <Box>
+          <Typography
+            variant="overline"
+            sx={{ color: 'primary.main', fontWeight: 800, letterSpacing: 0.7, display: 'block', lineHeight: 1.3 }}
+          >
+            {kicker}
+          </Typography>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.3 }}>
+            {title}
+          </Typography>
+          {description ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, maxWidth: 920, lineHeight: 1.6 }}>
+              {description}
+            </Typography>
+          ) : null}
+        </Box>
+        <Box sx={{ '& > .MuiAlert-root:first-of-type': { mt: description ? 0 : -0.5 } }}>{children}</Box>
+      </Stack>
+    </Paper>
+  );
+}
+
 function RagLlmPrepPanel({ onNotify }: PanelProps) {
   const [jobRows, setJobRows] = useState<PredictionJobListItem[]>([]);
   const [listLoading, setListLoading] = useState(false);
@@ -2922,42 +3040,55 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
   };
 
   return (
-    <Stack spacing={2}>
-      <Alert severity="info" variant="outlined">
-        Choose a <strong>prediction job</strong> by <strong>public_id</strong> in the dropdown — the app loads{' '}
-        <strong>full results for all rows</strong> (<code>include_results</code>). Use <strong>All rows</strong> for batch
-        templates, or pick a single row for SHAP-aware queries. <strong>Reload all row results from server</strong> refreshes that
-        payload without changing the selection.
-      </Alert>
-
-      <Accordion
-        defaultExpanded={false}
-        disableGutters
-        elevation={0}
-        sx={{ border: 1, borderColor: 'divider', borderRadius: 1, '&:before': { display: 'none' } }}
+    <Stack spacing={2.5}>
+      <RagPrepSection
+        kicker="Overview"
+        title="RAG & LLM prep"
+        description="Load a completed prediction job, set row scope, configure retrieval tracks, run vector fusion, then hand hits to Agentic actions."
       >
-        <AccordionSummary expandIcon={<Iconify width={20} icon="eva:arrow-ios-downward-fill" />}>
-          <Typography variant="subtitle2">5G / 6G mobile network context (RAN · Edge · Core)</Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Stack spacing={1.5}>
-            <Typography variant="body2" color="text.secondary">
-              Use this mental model when reading SHAP parties and RAG hits: <strong>RAN</strong> covers radio access
-              (gNB, NR air interface, O-RAN near-RT / non-RT RIC), <strong>Edge</strong> is MEC and UPF user-plane
-              offload close to subscribers, and <strong>Core</strong> is the 5GC control / user-plane anchor (AMF, SMF,
-              UPF, slicing, NEF/NRF). <strong>6G</strong> extends this with IMT-2030 themes (AI-native RAN, ISAC, NTN)—treat
-              KB matches as forward-looking research where applicable.
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              After you load a <strong>completed prediction job</strong>, the API adds a template pack{' '}
-              <strong>5G / 6G mobile network (RAN · Edge · Core)</strong> with retrieval strings and an LLM synthesis
-              prompt aligned to that batch. Row-level SHAP templates append the same framing so vectors stay relevant to
-              mobile operator SOC work.
-            </Typography>
-          </Stack>
-        </AccordionDetails>
-      </Accordion>
+        <Stack spacing={1.5}>
+          <Alert severity="info" variant="outlined">
+            Choose a <strong>prediction job</strong> by <strong>public_id</strong> — the app loads{' '}
+            <strong>full results for all rows</strong> (<code>include_results</code>). Use <strong>All rows</strong> for batch
+            templates, or pick one row for SHAP-aware queries. <strong>Reload all row results</strong> refreshes the payload
+            without changing the selection.
+          </Alert>
 
+          <Accordion
+            defaultExpanded={false}
+            disableGutters
+            elevation={0}
+            sx={{ border: 1, borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper', '&:before': { display: 'none' } }}
+          >
+            <AccordionSummary expandIcon={<Iconify width={20} icon="eva:arrow-ios-downward-fill" />}>
+              <Typography variant="subtitle2">5G / 6G mobile network context (RAN · Edge · Core)</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Stack spacing={1.5}>
+                <Typography variant="body2" color="text.secondary">
+                  Use this mental model when reading SHAP parties and RAG hits: <strong>RAN</strong> covers radio access
+                  (gNB, NR air interface, O-RAN near-RT / non-RT RIC), <strong>Edge</strong> is MEC and UPF user-plane
+                  offload close to subscribers, and <strong>Core</strong> is the 5GC control / user-plane anchor (AMF, SMF,
+                  UPF, slicing, NEF/NRF). <strong>6G</strong> extends this with IMT-2030 themes (AI-native RAN, ISAC, NTN)—treat
+                  KB matches as forward-looking research where applicable.
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  After you load a <strong>completed prediction job</strong>, the API adds a template pack{' '}
+                  <strong>5G / 6G mobile network (RAN · Edge · Core)</strong> with retrieval strings and an LLM synthesis
+                  prompt aligned to that batch. Row-level SHAP templates append the same framing so vectors stay relevant to
+                  mobile operator SOC work.
+                </Typography>
+              </Stack>
+            </AccordionDetails>
+          </Accordion>
+        </Stack>
+      </RagPrepSection>
+
+      <RagPrepSection
+        kicker="Step 1"
+        title="Prediction job"
+        description="Select a job from the list or paste an orphan id. Refresh the list after external runs; delete only when you intend to remove stored results."
+      >
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
         <Button size="small" variant="outlined" onClick={() => void loadJobList()} disabled={listLoading}>
           {listLoading ? 'Loading jobs…' : 'Refresh job list'}
@@ -3039,32 +3170,43 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
         </Button>
         {(loadJobLoading || templatesLoading) && <CircularProgress size={22} aria-label="Loading job or templates" />}
       </Stack>
+      </RagPrepSection>
 
       {loadedJob && (
-        <TextField
-          select
-          fullWidth
-          label="Prediction row (for per-agent SHAP RAG templates)"
-          value={rowIndex === null ? '' : String(rowIndex)}
-          onChange={(e) => void onRowSelectionChange(e.target.value)}
-          disabled={!resultRows?.length}
-          helperText={
-            resultRows?.length
-              ? 'All rows: job-level templates only. Pick one row for top-3 SHAP RAG strings per agent (full results already loaded).'
-              : 'No rows in results_json — re-run prediction with SHAP or use “Reload all row results from server”.'
-          }
+        <RagPrepSection
+          kicker="Step 2"
+          title="Row scope"
+          description="Use job-level templates for the whole batch, or select one row to unlock SHAP-aware retrieval drafts and rephrase tracks."
         >
-          <MenuItem value="">All rows — batch / job-level templates</MenuItem>
-          {resultRows?.map((r, i) => (
-            <MenuItem key={i} value={String(i)}>
-              {predictionRowMenuLabel(r, i)}
-            </MenuItem>
-          ))}
-        </TextField>
+          <TextField
+            select
+            fullWidth
+            label="Prediction row (for per-agent SHAP RAG templates)"
+            value={rowIndex === null ? '' : String(rowIndex)}
+            onChange={(e) => void onRowSelectionChange(e.target.value)}
+            disabled={!resultRows?.length}
+            helperText={
+              resultRows?.length
+                ? 'All rows: job-level templates only. Pick one row for top-3 SHAP RAG strings per agent (full results already loaded).'
+                : 'No rows in results_json — re-run prediction with SHAP or use “Reload all row results from server”.'
+            }
+          >
+            <MenuItem value="">All rows — batch / job-level templates</MenuItem>
+            {resultRows?.map((r, i) => (
+              <MenuItem key={i} value={String(i)}>
+                {predictionRowMenuLabel(r, i)}
+              </MenuItem>
+            ))}
+          </TextField>
+        </RagPrepSection>
       )}
 
       {predCtx?.templates && predCtx.templates.length > 0 && (
-        <>
+        <RagPrepSection
+          kicker="Step 3"
+          title="Templates, retrieval & fusion"
+          description="Pick a template pack, enable template and/or rephrase tracks (and optional SHAP track 3), tune fusion/MMR, then submit to the KB stack."
+        >
           <TextField
             select
             fullWidth
@@ -3486,11 +3628,16 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
               )}
             </>
           )}
-        </>
+        </RagPrepSection>
       )}
 
       {selectedTemplate && multiHits.length > 0 && (
-        <Paper variant="outlined" sx={{ p: 2 }}>
+        <RagPrepSection
+          kicker="Step 4"
+          title="Retrieval results"
+          description="Review fused top chunks, scores, and excerpts before saving citations for Agentic actions."
+        >
+        <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.paper' }}>
           <Typography variant="subtitle1" gutterBottom>
             Results · top documents for agentic handoff
           </Typography>
@@ -3575,6 +3722,7 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
             )}
           </Box>
         </Paper>
+        </RagPrepSection>
       )}
     </Stack>
   );

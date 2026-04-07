@@ -4,17 +4,18 @@ import { useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Avatar from '@mui/material/Avatar';
+import Chip from '@mui/material/Chip';
 import Popover from '@mui/material/Popover';
 import Divider from '@mui/material/Divider';
 import MenuList from '@mui/material/MenuList';
+import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import MenuItem, { menuItemClasses } from '@mui/material/MenuItem';
 
+import { CONFIG } from 'src/config-global';
+import { Logo } from 'src/components/logo';
 import { useRouter, usePathname } from 'src/routes/hooks';
-
-import { _myAccount } from 'src/_mock';
 
 // ----------------------------------------------------------------------
 
@@ -54,19 +55,22 @@ export function AccountPopover({ data = [], sx, ...other }: AccountPopoverProps)
     <>
       <IconButton
         onClick={handleOpenPopover}
+        aria-label={`${CONFIG.appName} menu`}
         sx={{
-          p: '2px',
-          width: 40,
-          height: 40,
-          background: (theme) =>
-            `conic-gradient(${theme.vars.palette.primary.light}, ${theme.vars.palette.warning.light}, ${theme.vars.palette.primary.light})`,
+          p: 0.5,
+          width: 44,
+          height: 44,
+          border: 1,
+          borderColor: 'divider',
+          borderRadius: 1,
+          bgcolor: 'background.paper',
           ...sx,
         }}
         {...other}
       >
-        <Avatar src={_myAccount.photoURL} alt={_myAccount.displayName} sx={{ width: 1, height: 1 }}>
-          {_myAccount.displayName.charAt(0).toUpperCase()}
-        </Avatar>
+        <Box sx={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Logo disabled href="/" sx={{ width: 34, height: 34 }} />
+        </Box>
       </IconButton>
 
       <Popover
@@ -81,15 +85,21 @@ export function AccountPopover({ data = [], sx, ...other }: AccountPopoverProps)
           },
         }}
       >
-        <Box sx={{ p: 2, pb: 1.5 }}>
-          <Typography variant="subtitle2" noWrap>
-            {_myAccount?.displayName}
-          </Typography>
-
-          <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>
-            {_myAccount?.email}
-          </Typography>
-        </Box>
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ p: 2, pb: 1.5 }}>
+          <Logo disabled href="/" sx={{ width: 40, height: 40, flexShrink: 0 }} />
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle1" noWrap fontWeight={700}>
+              {CONFIG.appName}
+            </Typography>
+            <Chip
+              size="small"
+              label={CONFIG.deploymentLabel}
+              color={import.meta.env.PROD ? 'success' : 'default'}
+              variant={import.meta.env.PROD ? 'filled' : 'outlined'}
+              sx={{ mt: 0.5, height: 22, '& .MuiChip-label': { px: 0.75, fontSize: 11, fontWeight: 700 } }}
+            />
+          </Box>
+        </Stack>
 
         <Divider sx={{ borderStyle: 'dashed' }} />
 
@@ -129,7 +139,7 @@ export function AccountPopover({ data = [], sx, ...other }: AccountPopoverProps)
         <Divider sx={{ borderStyle: 'dashed' }} />
 
         <Box sx={{ p: 1 }}>
-          <Button fullWidth color="error" size="medium" variant="text">
+          <Button fullWidth color="inherit" size="medium" variant="text" sx={{ color: 'text.secondary' }}>
             Logout
           </Button>
         </Box>

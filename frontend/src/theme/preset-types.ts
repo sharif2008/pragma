@@ -4,7 +4,14 @@ import type { PaletteColorNoChannels } from './core/palette';
 
 // ----------------------------------------------------------------------
 
-export type AppThemePresetId = 'earth' | 'midnight' | 'light' | 'graphite' | 'aurora';
+export type AppThemePresetId =
+  | 'shamrock'
+  | 'sage'
+  | 'earth'
+  | 'midnight'
+  | 'light'
+  | 'graphite'
+  | 'aurora';
 
 export type ThemePresetSurfaces = {
   text: { primary: string; secondary: string; disabled: string };

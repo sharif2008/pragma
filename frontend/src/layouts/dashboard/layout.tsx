@@ -13,7 +13,6 @@ import { layoutClasses } from '../core/classes';
 import { _account } from '../nav-config-account';
 import { navData } from '../nav-config-dashboard';
 import { MainSection } from '../core/main-section';
-import { _workspaces } from '../nav-config-workspace';
 import { MenuButton } from '../components/menu-button';
 import { HeaderSection } from '../core/header-section';
 import { LayoutSection } from '../core/layout-section';
@@ -96,7 +95,7 @@ export function DashboardLayout({
             onClick={onOpen}
             sx={{ mr: 1, ml: -1, [theme.breakpoints.up(layoutQuery)]: { display: 'none' } }}
           />
-          <NavMobile data={navData} open={open} onClose={onClose} workspaces={_workspaces} />
+          <NavMobile data={navData} open={open} onClose={onClose} />
         </>
       ),
       rightArea: (
@@ -136,7 +135,6 @@ export function DashboardLayout({
         <NavDesktop
           data={navData}
           layoutQuery={layoutQuery}
-          workspaces={_workspaces}
           collapsed={navCollapsed}
           onToggleCollapsed={toggleNavCollapsed}
         />

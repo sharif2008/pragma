@@ -1,6 +1,6 @@
 import type { AgenticReportOut, RunEventOut, RunListItemOut } from 'src/api/types';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -19,6 +19,7 @@ import Typography from '@mui/material/Typography';
 import CardHeader from '@mui/material/CardHeader';
 import CardContent from '@mui/material/CardContent';
 import TablePagination from '@mui/material/TablePagination';
+import TableContainer from '@mui/material/TableContainer';
 
 import { Iconify } from 'src/components/iconify';
 import {
@@ -85,8 +86,6 @@ function pct(n: number) {
 export function SocDashboardView() {
   const REFRESH_MS = 10_000;
   const toast = useAppSnackbar();
-  const didShowReady = useRef(false);
-  const lastSilentToastAt = useRef(0);
   const [runs, setRuns] = useState<RunListItemOut[]>([]);
   const [events, setEvents] = useState<RunEventOut[]>([]);
   const [agentReports, setAgentReports] = useState<AgenticReportOut[]>([]);
@@ -164,7 +163,7 @@ export function SocDashboardView() {
         const [runData, evData, repData] = await Promise.all([
           api.listRuns({ limit: 50 }),
           api.listRunEvents({ limit: eventsRowsPerPage, offset }),
-          api.listAgentReports(10, 0),
+          api.listAgentReports(25, 0),
         ]);
         setRuns(runData);
         setEvents(evData);
@@ -172,12 +171,8 @@ export function SocDashboardView() {
         setError('');
         if (manual) {
           toast.showSuccess('Dashboard refreshed', { autoHideMs: 3200 });
-        } else if (!didShowReady.current) {
-          didShowReady.current = true;
-          toast.showSuccess('Dashboard ready', { autoHideMs: 3200 });
-        } else if (Date.now() - lastSilentToastAt.current > 45_000) {
-          lastSilentToastAt.current = Date.now();
-          toast.showInfo('Dashboard updated', { autoHideMs: 2400 });
+        } else {
+          toast.showSuccess('Dashboard updated', { autoHideMs: REFRESH_MS });
         }
       } catch (e) {
         const msg = e instanceof ApiError ? e.message : e instanceof Error ? e.message : String(e);
@@ -230,7 +225,16 @@ export function SocDashboardView() {
                 `radial-gradient(800px circle at 90% 30%, ${theme.vars.palette.info.lighter}18, transparent 50%)`,
             }}
           >
-            <CardHeader title="Runs" subheader="Last 50" sx={SX_COMPACT_CARD_HEADER} />
+            <CardHeader
+              title="Runs"
+              subheader="Last 50"
+              sx={SX_COMPACT_CARD_HEADER}
+              action={
+                <Box sx={{ color: 'primary.main', mr: 0.25, display: 'flex', alignItems: 'center', opacity: 0.92 }}>
+                  <Iconify icon="eva:trending-up-fill" width={22} />
+                </Box>
+              }
+            />
             <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
               <Typography variant="overline" sx={{ color: 'text.secondary', fontSize: 10, lineHeight: 1.2 }}>
                 Runs
@@ -249,7 +253,16 @@ export function SocDashboardView() {
                 `radial-gradient(800px circle at 90% 10%, ${theme.vars.palette.warning.lighter}15, transparent 55%)`,
             }}
           >
-            <CardHeader title="Flagged" subheader="Triage first" sx={SX_COMPACT_CARD_HEADER} />
+            <CardHeader
+              title="Flagged"
+              subheader="Triage first"
+              sx={SX_COMPACT_CARD_HEADER}
+              action={
+                <Box sx={{ color: 'error.main', mr: 0.25, display: 'flex', alignItems: 'center', opacity: 0.88 }}>
+                  <Iconify icon="solar:bell-bing-bold-duotone" width={24} />
+                </Box>
+              }
+            />
             <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
               <Typography variant="overline" sx={{ color: 'text.secondary', fontSize: 10, lineHeight: 1.2 }}>
                 Flagged
@@ -273,7 +286,16 @@ export function SocDashboardView() {
                 `radial-gradient(800px circle at 90% 50%, ${theme.vars.palette.primary.lighter}12, transparent 55%)`,
             }}
           >
-            <CardHeader title="Running now" subheader="Active pipelines" sx={SX_COMPACT_CARD_HEADER} />
+            <CardHeader
+              title="Running now"
+              subheader="Active pipelines"
+              sx={SX_COMPACT_CARD_HEADER}
+              action={
+                <Box sx={{ color: 'info.main', mr: 0.25, display: 'flex', alignItems: 'center', opacity: 0.9 }}>
+                  <Iconify icon="solar:restart-bold" width={22} />
+                </Box>
+              }
+            />
             <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
               <Typography variant="overline" sx={{ color: 'text.secondary', fontSize: 10, lineHeight: 1.2 }}>
                 Running now
@@ -292,7 +314,16 @@ export function SocDashboardView() {
                 `radial-gradient(800px circle at 90% 50%, ${theme.vars.palette.error.lighter}16, transparent 55%)`,
             }}
           >
-            <CardHeader title="Reliability" subheader="Fail rate + duration" sx={SX_COMPACT_CARD_HEADER} />
+            <CardHeader
+              title="Reliability"
+              subheader="Fail rate + duration"
+              sx={SX_COMPACT_CARD_HEADER}
+              action={
+                <Box sx={{ color: 'success.main', mr: 0.25, display: 'flex', alignItems: 'center', opacity: 0.9 }}>
+                  <Iconify icon="solar:check-circle-bold" width={22} />
+                </Box>
+              }
+            />
             <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
               <Typography variant="overline" sx={{ color: 'text.secondary', fontSize: 10, lineHeight: 1.2 }}>
                 Fail rate
@@ -342,7 +373,6 @@ export function SocDashboardView() {
                         <TableCell>Status</TableCell>
                         <TableCell>Label</TableCell>
                         <TableCell>Message</TableCell>
-                        <TableCell>Attach</TableCell>
                         <TableCell>Last step</TableCell>
                         <TableCell align="right">Duration</TableCell>
                         <TableCell>Run</TableCell>
@@ -375,7 +405,6 @@ export function SocDashboardView() {
                                 {r.message_preview ?? '—'}
                               </Typography>
                             </TableCell>
-                            <TableCell>{r.predicted_attachment_type ?? '—'}</TableCell>
                             <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{r.last_step ?? '—'}</TableCell>
                             <TableCell align="right">
                               {typeof r.duration_ms === 'number' ? `${r.duration_ms}ms` : '—'}
@@ -420,49 +449,69 @@ export function SocDashboardView() {
             <Card>
               <CardHeader
                 title="Agentic actions summary"
-                subheader="Latest saved agent reports"
+                subheader="Latest saved agent reports (scrollable · View opens full detail modal)"
                 sx={SX_COMPACT_CARD_HEADER}
               />
               <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
                 {agentReports.length ? (
-                  <Table size="small" sx={SX_COMPACT_TABLE}>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Report</TableCell>
-                        <TableCell>Recommended</TableCell>
-                        <TableCell>Summary</TableCell>
-                        <TableCell>Created</TableCell>
-                        <TableCell align="right">View</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {agentReports.map((r) => (
-                        <TableRow key={r.public_id} hover>
-                          <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{r.public_id}</TableCell>
-                          <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{r.recommended_action || '—'}</TableCell>
-                          <TableCell sx={{ maxWidth: 360 }}>
-                            <Typography variant="body2" noWrap title={r.summary}>
-                              {r.summary}
-                            </Typography>
-                          </TableCell>
-                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleString()}</TableCell>
-                          <TableCell align="right">
-                            <Tooltip title="Open full agent report">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                aria-label="View agent report"
-                                onClick={() => setReportDetailId(r.public_id)}
-                                sx={{ p: 0.35 }}
-                              >
-                                <Iconify icon="solar:eye-bold" width={18} />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <Box sx={{ overflowX: 'auto' }}>
+                    <TableContainer
+                      sx={{
+                        maxHeight: 320,
+                        overflow: 'auto',
+                        border: 1,
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Table size="small" stickyHeader sx={{ minWidth: 640, ...SX_COMPACT_TABLE }}>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ bgcolor: 'background.paper' }}>Report</TableCell>
+                            <TableCell sx={{ bgcolor: 'background.paper' }}>Recommended</TableCell>
+                            <TableCell sx={{ bgcolor: 'background.paper' }}>Summary</TableCell>
+                            <TableCell sx={{ bgcolor: 'background.paper' }}>Created</TableCell>
+                            <TableCell align="right" sx={{ bgcolor: 'background.paper' }}>
+                              View
+                            </TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {agentReports.map((r) => (
+                            <TableRow key={r.public_id} hover>
+                              <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{r.public_id}</TableCell>
+                              <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
+                                {r.recommended_action || '—'}
+                              </TableCell>
+                              <TableCell sx={{ maxWidth: 360 }}>
+                                <Typography variant="body2" noWrap title={r.summary}>
+                                  {r.summary}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                {new Date(r.created_at).toLocaleString()}
+                              </TableCell>
+                              <TableCell align="right">
+                                <Tooltip title="Open full agent report (modal)">
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    color="primary"
+                                    aria-label="View agent report"
+                                    onClick={() => setReportDetailId(r.public_id)}
+                                    startIcon={<Iconify icon="solar:eye-bold" width={18} />}
+                                    sx={{ py: 0.25, px: 1, minWidth: 0, fontSize: '0.75rem' }}
+                                  >
+                                    View
+                                  </Button>
+                                </Tooltip>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
                 ) : (
                   <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                     No agent reports found yet.

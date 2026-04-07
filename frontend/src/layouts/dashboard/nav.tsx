@@ -1,6 +1,6 @@
 import type { Theme, SxProps, Breakpoint } from '@mui/material/styles';
 
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
 import { varAlpha } from 'minimal-shared/utils';
 
 import Box from '@mui/material/Box';
@@ -18,10 +18,9 @@ import { Logo } from 'src/components/logo';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 
-import { WorkspacesPopover } from '../components/workspaces-popover';
+import { AgenticNavReports } from './agentic-nav-reports';
 
 import type { NavItem } from '../nav-config-dashboard';
-import type { WorkspacesPopoverProps } from '../components/workspaces-popover';
 
 // ----------------------------------------------------------------------
 
@@ -31,7 +30,6 @@ export type NavContentProps = {
     topArea?: React.ReactNode;
     bottomArea?: React.ReactNode;
   };
-  workspaces: WorkspacesPopoverProps['data'];
   sx?: SxProps<Theme>;
 };
 
@@ -39,7 +37,6 @@ export function NavDesktop({
   sx,
   data,
   slots,
-  workspaces,
   layoutQuery,
   collapsed = false,
   onToggleCollapsed,
@@ -78,7 +75,6 @@ export function NavDesktop({
       <NavContent
         data={data}
         slots={slots}
-        workspaces={workspaces}
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
       />
@@ -94,7 +90,6 @@ export function NavMobile({
   open,
   slots,
   onClose,
-  workspaces,
 }: NavContentProps & { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
 
@@ -119,7 +114,7 @@ export function NavMobile({
         },
       }}
     >
-      <NavContent data={data} slots={slots} workspaces={workspaces} />
+      <NavContent data={data} slots={slots} />
     </Drawer>
   );
 }
@@ -129,7 +124,6 @@ export function NavMobile({
 export function NavContent({
   data,
   slots,
-  workspaces,
   sx,
   collapsed = false,
   onToggleCollapsed,
@@ -146,14 +140,13 @@ export function NavContent({
           display: 'flex',
           justifyContent: collapsed ? 'center' : 'flex-start',
           width: 1,
+          mb: 2,
         }}
       >
         <Logo />
       </Box>
 
       {slots?.topArea}
-
-      <WorkspacesPopover data={workspaces} collapsed={collapsed} sx={{ my: 2 }} />
 
       <Scrollbar fillContent>
         <Box
@@ -176,7 +169,9 @@ export function NavContent({
             }}
           >
             {data.map((item) => {
-              const isActived = item.path === pathname;
+              const isActived =
+                item.path === pathname ||
+                (item.path === '/agentic' && pathname.startsWith('/agentic'));
 
               const button = (
                 <ListItemButton
@@ -224,15 +219,18 @@ export function NavContent({
               );
 
               return (
-                <ListItem disableGutters disablePadding key={item.title}>
-                  {collapsed ? (
-                    <Tooltip title={item.title} placement="right">
-                      {button}
-                    </Tooltip>
-                  ) : (
-                    button
-                  )}
-                </ListItem>
+                <Fragment key={item.title}>
+                  <ListItem disableGutters disablePadding>
+                    {collapsed ? (
+                      <Tooltip title={item.title} placement="right">
+                        {button}
+                      </Tooltip>
+                    ) : (
+                      button
+                    )}
+                  </ListItem>
+                  {item.path === '/agentic' && !collapsed ? <AgenticNavReports /> : null}
+                </Fragment>
               );
             })}
           </Box>
