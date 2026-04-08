@@ -1,5 +1,6 @@
 """Application settings loaded from environment variables."""
 
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -41,6 +42,9 @@ class Settings(BaseSettings):
         alias="EMBEDDING_MODEL",
     )
 
+    # HuggingFace cache root (models, tokenizers, etc.). Keeping this stable avoids re-downloads.
+    hf_home: Path = Field(default=_BACKEND_DIR / "storage" / "hf_home", alias="HF_HOME")
+
     rag_chunk_size: int = 512
     rag_chunk_overlap: int = 64
     rag_top_k: int = 5
@@ -48,6 +52,14 @@ class Settings(BaseSettings):
     # Training / prediction
     default_test_size: float = 0.2
     default_random_state: int = 42
+
+    # Trust anchoring (local Hardhat / JSON-RPC)
+    trust_chain_enabled: bool = Field(default=False, alias="TRUST_CHAIN_ENABLED")
+    trust_chain_rpc_url: str = Field(default="http://127.0.0.1:8545", alias="TRUST_CHAIN_RPC_URL")
+    trust_chain_private_key: str | None = Field(default=None, alias="TRUST_CHAIN_PRIVATE_KEY")
+    trust_chain_contract_address: str | None = Field(default=None, alias="TRUST_CHAIN_CONTRACT_ADDRESS")
+    trust_chain_chain_id: int = Field(default=31337, alias="TRUST_CHAIN_CHAIN_ID")
+    trust_chain_payload_version: str = Field(default="v1", alias="TRUST_CHAIN_PAYLOAD_VERSION")
 
 
 @lru_cache
@@ -69,3 +81,8 @@ def ensure_storage_dirs(settings: Settings) -> None:
     )
     for d in subdirs:
         d.mkdir(parents=True, exist_ok=True)
+
+    # Ensure a stable local HuggingFace cache directory.
+    settings.hf_home.mkdir(parents=True, exist_ok=True)
+    # Only set if not already defined by the environment (let ops override).
+    os.environ.setdefault("HF_HOME", str(settings.hf_home))

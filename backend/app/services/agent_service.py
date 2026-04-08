@@ -12,9 +12,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.models.domain import AgenticJob, AgenticReport, JobStatus, PredictionJob
+from app.models.domain import (
+    AgenticJob,
+    AgenticReport,
+    AgenticReportTrustAnchor,
+    JobStatus,
+    PredictionJob,
+)
 from app.schemas.prediction import AgenticJobOut, AgenticReportOut
 from app.services import prediction_service
+from app.services import trust_chain_service
 from app.utils.file_utils import remove_path
 
 logger = logging.getLogger(__name__)
@@ -106,6 +113,60 @@ def persist_agentic_report_from_decision(
     db.add(row)
     db.commit()
     db.refresh(row)
+
+    # Optional: anchor a hash-only commitment on the local chain (non-fatal).
+    if settings.trust_chain_enabled:
+        try:
+            structured_plan = payload.get("structured_plan")
+            commitment, _canonical_payload = trust_chain_service.compute_trust_commitment_sha256(
+                payload_version=settings.trust_chain_payload_version,
+                agentic_report_public_id=row.public_id,
+                prediction_job_public_id=job.public_id,
+                results_row_index=results_row_index,
+                created_at=row.created_at,
+                raw_llm_response=row.raw_llm_response,
+                rag_context_used=row.rag_context_used,
+                structured_plan=structured_plan,
+            )
+            tx_hash, contract_addr, agent_key_sha, report_key_sha = (
+                trust_chain_service.anchor_report_commitment_on_chain(
+                    settings=settings,
+                    agentic_job_public_id=agentic_job_public_id,
+                    agentic_report_public_id=row.public_id,
+                    commitment_sha256_hex=commitment,
+                )
+            )
+            anchor = AgenticReportTrustAnchor(
+                agentic_report_id=row.id,
+                chain_id=settings.trust_chain_chain_id,
+                contract_address=contract_addr,
+                tx_hash=tx_hash,
+                payload_version=settings.trust_chain_payload_version,
+                commitment_sha256=commitment,
+                agent_key_sha256=agent_key_sha,
+                report_key_sha256=report_key_sha,
+                error=None,
+            )
+            db.add(anchor)
+            db.commit()
+        except Exception as e:
+            # Persist error for later inspection; do not fail the report creation.
+            try:
+                anchor = AgenticReportTrustAnchor(
+                    agentic_report_id=row.id,
+                    chain_id=settings.trust_chain_chain_id,
+                    contract_address=str(settings.trust_chain_contract_address or ""),
+                    tx_hash="",
+                    payload_version=settings.trust_chain_payload_version,
+                    commitment_sha256="",
+                    agent_key_sha256="",
+                    report_key_sha256="",
+                    error=str(e)[:2000],
+                )
+                db.add(anchor)
+                db.commit()
+            except Exception:
+                pass
     return row, payload
 
 
@@ -162,10 +223,27 @@ def resolve_agentic_job_for_decide(
 def agentic_report_out(db: Session, row: AgenticReport) -> AgenticReportOut:
     pj = db.get(PredictionJob, row.prediction_job_id)
     aj = db.get(AgenticJob, row.agentic_job_id) if row.agentic_job_id else None
+    anchor = db.scalar(
+        select(AgenticReportTrustAnchor).where(AgenticReportTrustAnchor.agentic_report_id == row.id)
+    )
+    anchor_out = None
+    if anchor:
+        anchor_out = {
+            "chain_id": anchor.chain_id,
+            "contract_address": anchor.contract_address,
+            "tx_hash": anchor.tx_hash,
+            "payload_version": anchor.payload_version,
+            "commitment_sha256": anchor.commitment_sha256,
+            "agent_key_sha256": anchor.agent_key_sha256,
+            "report_key_sha256": anchor.report_key_sha256,
+            "anchored_at": anchor.anchored_at.isoformat() if anchor.anchored_at else None,
+            "error": anchor.error,
+        }
     return AgenticReportOut.model_validate(row).model_copy(
         update={
             "prediction_job_public_id": pj.public_id if pj else None,
             "agentic_job_public_id": aj.public_id if aj else None,
+            "trust_anchor": anchor_out,
         }
     )
 

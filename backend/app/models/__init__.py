@@ -3,6 +3,7 @@
 from app.models.domain import (
     AgenticJob,
     AgenticReport,
+    AgenticReportTrustAnchor,
     KnowledgeBaseFile,
     ManagedFile,
     ModelVersion,
@@ -18,4 +19,5 @@ __all__ = [
     "KnowledgeBaseFile",
     "AgenticJob",
     "AgenticReport",
+    "AgenticReportTrustAnchor",
 ]

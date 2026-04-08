@@ -165,3 +165,9 @@ class AgenticReportOut(ORMModel):
         description="Full on-disk report JSON when present (sample_data, user_prompt, structured_plan, trust_chain, …). "
         "Only set on GET /agent/reports/{public_id}, not on list.",
     )
+
+    # On-chain trust anchor (hash-only commitment) — optional and non-fatal
+    trust_anchor: dict[str, Any] | None = Field(
+        default=None,
+        description="If configured, contains local-chain tx metadata for the trust anchoring commitment.",
+    )

@@ -245,6 +245,30 @@ class AgenticReport(Base):
     agentic_job = relationship("AgenticJob")
 
 
+class AgenticReportTrustAnchor(Base):
+    """On-chain trust anchor for an AgenticReport (hash-only commitment)."""
+
+    __tablename__ = "agentic_report_trust_anchors"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    agentic_report_id: Mapped[int] = mapped_column(
+        ForeignKey("agentic_reports.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
+    chain_id: Mapped[int] = mapped_column(Integer, nullable=False, default=31337)
+    contract_address: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    tx_hash: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    payload_version: Mapped[str] = mapped_column(String(32), nullable=False, default="v1")
+    commitment_sha256: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    agent_key_sha256: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    report_key_sha256: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    anchored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    agentic_report = relationship("AgenticReport")
+
+
 class AgentRun(Base):
     """End-to-end traceable run for simulated customer messages."""
 
