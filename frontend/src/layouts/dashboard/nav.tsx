@@ -18,8 +18,6 @@ import { Logo } from 'src/components/logo';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 
-import { AgenticNavReports } from './agentic-nav-reports';
-
 import type { NavItem } from '../nav-config-dashboard';
 
 // ----------------------------------------------------------------------
@@ -229,7 +227,6 @@ export function NavContent({
                       button
                     )}
                   </ListItem>
-                  {item.path === '/agentic' && !collapsed ? <AgenticNavReports /> : null}
                 </Fragment>
               );
             })}

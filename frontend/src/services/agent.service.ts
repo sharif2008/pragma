@@ -1,8 +1,8 @@
 import type {
+  AgenticJobOut,
   AgenticReportOut,
   AgenticDecideRequest,
   AgenticPromptPreviewOut,
-  AgenticJobOut,
   AgenticJobCreateRequest,
 } from 'src/api/types';
 

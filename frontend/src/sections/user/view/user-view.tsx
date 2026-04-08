@@ -26,6 +26,11 @@ import type { UserProps } from '../user-table-row';
 
 // ----------------------------------------------------------------------
 
+const SX_TABLE_COMPACT = {
+  '& .MuiTableCell-root': { py: 0.5, px: 1.25, fontSize: '0.8125rem' },
+  '& .MuiTableCell-head': { fontWeight: 700, fontSize: '0.75rem' },
+} as const;
+
 export function UserView() {
   const table = useTable();
 
@@ -43,18 +48,20 @@ export function UserView() {
     <DashboardContent>
       <Box
         sx={{
-          mb: 5,
+          mb: 2,
           display: 'flex',
           alignItems: 'center',
+          gap: 1.5,
         }}
       >
-        <Typography variant="h4" sx={{ flexGrow: 1 }}>
+        <Typography variant="h5" sx={{ flexGrow: 1, fontWeight: 700 }}>
           Users
         </Typography>
         <Button
+          size="small"
           variant="contained"
           color="inherit"
-          startIcon={<Iconify icon="mingcute:add-line" />}
+          startIcon={<Iconify icon="mingcute:add-line" width={18} />}
         >
           New user
         </Button>
@@ -72,7 +79,7 @@ export function UserView() {
 
         <Scrollbar>
           <TableContainer sx={{ overflow: 'unset' }}>
-            <Table sx={{ minWidth: 800 }}>
+            <Table size="small" sx={{ minWidth: 720, ...SX_TABLE_COMPACT }}>
               <UserTableHead
                 order={table.order}
                 orderBy={table.orderBy}
@@ -110,7 +117,7 @@ export function UserView() {
                   ))}
 
                 <TableEmptyRows
-                  height={68}
+                  height={44}
                   emptyRows={emptyRows(table.page, table.rowsPerPage, _users.length)}
                 />
 
@@ -122,12 +129,14 @@ export function UserView() {
 
         <TablePagination
           component="div"
+          size="small"
           page={table.page}
           count={_users.length}
           rowsPerPage={table.rowsPerPage}
           onPageChange={table.onChangePage}
           rowsPerPageOptions={[5, 10, 25]}
           onRowsPerPageChange={table.onChangeRowsPerPage}
+          sx={{ '& .MuiTablePagination-toolbar': { minHeight: 44, px: 1.5 } }}
         />
       </Card>
     </DashboardContent>

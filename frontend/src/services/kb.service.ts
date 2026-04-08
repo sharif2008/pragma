@@ -8,9 +8,9 @@ import type {
   KBMultiQueryRequest,
   KBMultiQueryResponse,
   KBFuseHitsMMRRequest,
-  KBRAGLatestPredictionResponse,
   KBLLMShapRetrievalRequest,
   KBLLMShapRetrievalResponse,
+  KBRAGLatestPredictionResponse,
 } from 'src/api/types';
 
 import { paths } from './paths';

@@ -8,6 +8,7 @@ import Checkbox from '@mui/material/Checkbox';
 import MenuList from '@mui/material/MenuList';
 import TableCell from '@mui/material/TableCell';
 import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
 import MenuItem, { menuItemClasses } from '@mui/material/MenuItem';
 
 import { Label } from 'src/components/label';
@@ -45,42 +46,65 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   return (
     <>
       <TableRow hover tabIndex={-1} role="checkbox" selected={selected}>
-        <TableCell padding="checkbox">
-          <Checkbox disableRipple checked={selected} onChange={onSelectRow} />
+        <TableCell padding="checkbox" sx={{ py: 0.25 }}>
+          <Checkbox size="small" disableRipple checked={selected} onChange={onSelectRow} />
         </TableCell>
 
-        <TableCell component="th" scope="row">
+        <TableCell component="th" scope="row" sx={{ py: 0.5 }}>
           <Box
             sx={{
-              gap: 2,
+              gap: 1.25,
               display: 'flex',
               alignItems: 'center',
+              minWidth: 0,
             }}
           >
-            <Avatar alt={row.name} src={row.avatarUrl} />
-            {row.name}
+            <Avatar alt={row.name} src={row.avatarUrl} sx={{ width: 32, height: 32, flexShrink: 0 }} />
+            <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
+              {row.name}
+            </Typography>
           </Box>
         </TableCell>
 
-        <TableCell>{row.company}</TableCell>
+        <TableCell sx={{ py: 0.5 }}>
+          <Typography variant="body2" noWrap>
+            {row.company}
+          </Typography>
+        </TableCell>
 
-        <TableCell>{row.role}</TableCell>
+        <TableCell sx={{ py: 0.5 }}>
+          <Typography variant="body2" color="text.secondary" noWrap>
+            {row.role}
+          </Typography>
+        </TableCell>
 
-        <TableCell align="center">
+        <TableCell align="center" sx={{ py: 0.5 }}>
           {row.isVerified ? (
-            <Iconify width={22} icon="solar:check-circle-bold" sx={{ color: 'success.main' }} />
+            <Iconify width={18} icon="solar:check-circle-bold" sx={{ color: 'success.main' }} />
           ) : (
-            '-'
+            <Typography variant="caption" color="text.disabled">
+              —
+            </Typography>
           )}
         </TableCell>
 
-        <TableCell>
-          <Label color={(row.status === 'banned' && 'error') || 'success'}>{row.status}</Label>
+        <TableCell sx={{ py: 0.5 }}>
+          <Label
+            color={(row.status === 'banned' && 'error') || 'success'}
+            sx={{
+              height: 22,
+              px: 0.75,
+              fontSize: '0.6875rem',
+              fontWeight: 600,
+            }}
+          >
+            {row.status}
+          </Label>
         </TableCell>
 
-        <TableCell align="right">
-          <IconButton onClick={handleOpenPopover}>
-            <Iconify icon="eva:more-vertical-fill" />
+        <TableCell align="right" sx={{ py: 0.25, width: 48 }}>
+          <IconButton size="small" onClick={handleOpenPopover} sx={{ p: 0.35 }}>
+            <Iconify icon="eva:more-vertical-fill" width={18} />
           </IconButton>
         </TableCell>
       </TableRow>

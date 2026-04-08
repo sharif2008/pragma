@@ -119,6 +119,8 @@ def get_run_summary(
     if row.error_summary:
         err = {"step_name": last, "message": row.error_summary[:1000]}
 
+    raw_pred = row.predictions_json if isinstance(row.predictions_json, dict) else None
+
     return RunSummaryOut(
         run_id=row.run_id,
         trace_id=row.trace_id,
@@ -132,6 +134,7 @@ def get_run_summary(
         duration_ms=row.duration_ms,
         last_step=last,
         predictions=preds,  # type: ignore[arg-type]
+        predictions_payload=raw_pred,
         rag=rag,  # type: ignore[arg-type]
         actions=row.final_actions if isinstance(row.final_actions, list) else None,
         error=err,  # type: ignore[arg-type]

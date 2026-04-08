@@ -1,6 +1,7 @@
-import type { AgenticReportOut, RunEventOut, RunListItemOut } from 'src/api/types';
+import type { IconifyName } from 'src/components/iconify/register-icons';
+import type { RunEventOut, RunListItemOut, AgenticReportOut } from 'src/api/types';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -10,31 +11,92 @@ import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
-import IconButton from '@mui/material/IconButton';
+import { alpha } from '@mui/material/styles';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import CardHeader from '@mui/material/CardHeader';
 import CardContent from '@mui/material/CardContent';
 import TablePagination from '@mui/material/TablePagination';
-import TableContainer from '@mui/material/TableContainer';
 
-import { Iconify } from 'src/components/iconify';
-import {
-  AgentReportDetailDialog,
-  RunDetailDialog,
-  RunEventDetailDialog,
-} from 'src/components/run-monitoring/detail-dialogs';
-import { useAppSnackbar } from 'src/contexts/app-snackbar-context';
+import { RouterLink } from 'src/routes/components';
+
+import { sortByTime, type TimeSortOrder } from 'src/utils/table-time-sort';
+
 import { api, ApiError } from 'src/services';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useAppSnackbar } from 'src/contexts/app-snackbar-context';
+
+import { Iconify } from 'src/components/iconify';
+import { TimeSortHeadCell } from 'src/components/table-sort/time-sort-head-cell';
+import { RunDetailDialog, RunEventDetailDialog } from 'src/components/run-monitoring/detail-dialogs';
 
 const SX_COMPACT_TABLE = {
-  '& .MuiTableCell-root': { py: 0.5, px: 1, fontSize: '0.8125rem' },
-  '& .MuiTableCell-head': { fontWeight: 700, fontSize: '0.75rem' },
+  '& .MuiTableCell-root': {
+    py: 0.625,
+    px: 1.125,
+    fontSize: '0.8125rem',
+    borderColor: 'divider',
+  },
+  '& .MuiTableCell-head': { fontWeight: 700, fontSize: '0.75rem', letterSpacing: 0.01 },
+  width: '100%',
+  tableLayout: 'fixed',
 } as const;
+
+/** Balanced column weights for fixed-layout tables (sum 100%). */
+const RUNS_TABLE_COLGROUP = (
+  <colgroup>
+    <col style={{ width: '18%' }} />
+    <col style={{ width: '17%' }} />
+    <col style={{ width: '38%' }} />
+    <col style={{ width: '20%' }} />
+    <col style={{ width: '7%' }} />
+  </colgroup>
+);
+
+const EVENTS_TABLE_COLGROUP = (
+  <colgroup>
+    <col style={{ width: '22%' }} />
+    <col style={{ width: '13%' }} />
+    <col style={{ width: '60%' }} />
+    <col style={{ width: '5%' }} />
+  </colgroup>
+);
+
+function headerAvatarIcon(icon: IconifyName, color: 'primary' | 'error' | 'info' | 'success' | 'warning' | 'secondary') {
+  return (
+    <Box
+      sx={(theme) => ({
+        width: 40,
+        height: 40,
+        borderRadius: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: theme.palette[color].main,
+        bgcolor: alpha(theme.palette[color].main, 0.12),
+      })}
+    >
+      <Iconify icon={icon} width={22} />
+    </Box>
+  );
+}
+
+function clampCellSx(lines: number) {
+  return {
+    overflow: 'hidden',
+    wordBreak: 'break-word' as const,
+    '& .MuiTypography-root': {
+      display: '-webkit-box',
+      WebkitLineClamp: lines,
+      WebkitBoxOrient: 'vertical' as const,
+      overflow: 'hidden',
+    },
+  };
+}
 
 const SX_COMPACT_CARD_HEADER = {
   py: 1,
@@ -67,12 +129,6 @@ function severityChip(run: RunListItemOut) {
   return <Chip size="small" sx={sx} variant="outlined" label="Low" />;
 }
 
-function shortId(id: string) {
-  if (!id) return '—';
-  if (id.length <= 14) return id;
-  return `${id.slice(0, 8)}…${id.slice(-4)}`;
-}
-
 function safeNumber(v: unknown): number | null {
   if (typeof v !== 'number' || Number.isNaN(v)) return null;
   return v;
@@ -81,6 +137,23 @@ function safeNumber(v: unknown): number | null {
 function pct(n: number) {
   if (!Number.isFinite(n)) return '—';
   return `${(n * 100).toFixed(1)}%`;
+}
+
+function FullPageCornerLink({ href, title }: { href: string; title: string }) {
+  return (
+    <Tooltip title={title}>
+      <IconButton
+        component={RouterLink}
+        href={href}
+        size="small"
+        color="default"
+        aria-label={title}
+        sx={{ color: 'text.secondary', mr: -0.25, mt: -0.25 }}
+      >
+        <Iconify icon="eva:arrow-ios-forward-fill" width={20} />
+      </IconButton>
+    </Tooltip>
+  );
 }
 
 export function SocDashboardView() {
@@ -99,7 +172,9 @@ export function SocDashboardView() {
 
   const [runDetailId, setRunDetailId] = useState<string | null>(null);
   const [eventDetail, setEventDetail] = useState<RunEventOut | null>(null);
-  const [reportDetailId, setReportDetailId] = useState<string | null>(null);
+
+  const [runsTimeOrder, setRunsTimeOrder] = useState<TimeSortOrder>('desc');
+  const [eventsTimeOrder, setEventsTimeOrder] = useState<TimeSortOrder>('desc');
 
   const kpis = useMemo(() => {
     const total = runs.length;
@@ -125,16 +200,32 @@ export function SocDashboardView() {
       .slice(0, 6);
   }, [runs]);
 
+  const runsSorted = useMemo(
+    () => sortByTime(runs, (r) => r.updated_at, runsTimeOrder),
+    [runs, runsTimeOrder]
+  );
+
   const runsPageRows = useMemo(() => {
     const start = runsPage * runsRowsPerPage;
-    return runs.slice(start, start + runsRowsPerPage);
-  }, [runs, runsPage, runsRowsPerPage]);
+    return runsSorted.slice(start, start + runsRowsPerPage);
+  }, [runsSorted, runsPage, runsRowsPerPage]);
+
+  /** Newest first, cap for compact SOC summary card */
+  const latestAgentReports = useMemo(
+    () => sortByTime(agentReports, (r) => r.created_at, 'desc').slice(0, 5),
+    [agentReports]
+  );
+
+  const sortedEvents = useMemo(
+    () => sortByTime(events, (e) => e.timestamp, eventsTimeOrder),
+    [events, eventsTimeOrder]
+  );
 
   const eventsSummary = useMemo(() => {
-    const total = events.length;
+    const total = sortedEvents.length;
     const byLevel = new Map<string, number>();
     const byStep = new Map<string, number>();
-    for (const e of events) {
+    for (const e of sortedEvents) {
       byLevel.set(e.level, (byLevel.get(e.level) ?? 0) + 1);
       byStep.set(e.step_name, (byStep.get(e.step_name) ?? 0) + 1);
     }
@@ -149,7 +240,7 @@ export function SocDashboardView() {
       error: byLevel.get('error') ?? 0,
       topSteps,
     };
-  }, [events]);
+  }, [sortedEvents]);
 
   const loadDashboard = useCallback(
     async (mode: 'silent' | 'manual') => {
@@ -226,14 +317,11 @@ export function SocDashboardView() {
             }}
           >
             <CardHeader
+              avatar={headerAvatarIcon('eva:trending-up-fill', 'primary')}
+              action={<FullPageCornerLink href="/monitor" title="Open Monitor — full runs & events" />}
               title="Runs"
               subheader="Last 50"
               sx={SX_COMPACT_CARD_HEADER}
-              action={
-                <Box sx={{ color: 'primary.main', mr: 0.25, display: 'flex', alignItems: 'center', opacity: 0.92 }}>
-                  <Iconify icon="eva:trending-up-fill" width={22} />
-                </Box>
-              }
             />
             <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
               <Typography variant="overline" sx={{ color: 'text.secondary', fontSize: 10, lineHeight: 1.2 }}>
@@ -254,14 +342,11 @@ export function SocDashboardView() {
             }}
           >
             <CardHeader
+              avatar={headerAvatarIcon('solar:bell-bing-bold-duotone', 'error')}
+              action={<FullPageCornerLink href="/monitor" title="Open Monitor — full runs & events" />}
               title="Flagged"
               subheader="Triage first"
               sx={SX_COMPACT_CARD_HEADER}
-              action={
-                <Box sx={{ color: 'error.main', mr: 0.25, display: 'flex', alignItems: 'center', opacity: 0.88 }}>
-                  <Iconify icon="solar:bell-bing-bold-duotone" width={24} />
-                </Box>
-              }
             />
             <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
               <Typography variant="overline" sx={{ color: 'text.secondary', fontSize: 10, lineHeight: 1.2 }}>
@@ -287,14 +372,11 @@ export function SocDashboardView() {
             }}
           >
             <CardHeader
+              avatar={headerAvatarIcon('solar:restart-bold', 'info')}
+              action={<FullPageCornerLink href="/monitor" title="Open Monitor — full runs & events" />}
               title="Running now"
               subheader="Active pipelines"
               sx={SX_COMPACT_CARD_HEADER}
-              action={
-                <Box sx={{ color: 'info.main', mr: 0.25, display: 'flex', alignItems: 'center', opacity: 0.9 }}>
-                  <Iconify icon="solar:restart-bold" width={22} />
-                </Box>
-              }
             />
             <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
               <Typography variant="overline" sx={{ color: 'text.secondary', fontSize: 10, lineHeight: 1.2 }}>
@@ -315,14 +397,11 @@ export function SocDashboardView() {
             }}
           >
             <CardHeader
+              avatar={headerAvatarIcon('solar:check-circle-bold', 'success')}
+              action={<FullPageCornerLink href="/monitor" title="Open Monitor — full runs & events" />}
               title="Reliability"
               subheader="Fail rate + duration"
               sx={SX_COMPACT_CARD_HEADER}
-              action={
-                <Box sx={{ color: 'success.main', mr: 0.25, display: 'flex', alignItems: 'center', opacity: 0.9 }}>
-                  <Iconify icon="solar:check-circle-bold" width={22} />
-                </Box>
-              }
             />
             <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
               <Typography variant="overline" sx={{ color: 'text.secondary', fontSize: 10, lineHeight: 1.2 }}>
@@ -345,13 +424,17 @@ export function SocDashboardView() {
       <Grid container spacing={1.25}>
         <Grid size={{ xs: 12, lg: 6 }}>
           <Stack spacing={1.25}>
-            <Card>
+            <Card sx={{ overflow: 'hidden' }}>
               <CardHeader
+                avatar={headerAvatarIcon('solar:eye-bold', 'primary')}
+                action={<FullPageCornerLink href="/monitor" title="Open Monitor — full table & filters" />}
                 title="Detections & triage"
-                subheader="Last 50 runs (paged)"
+                subheader="Essential fields · open a row for channel, customer, run id, and trace"
                 sx={SX_COMPACT_CARD_HEADER}
-                action={
-                  <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+              />
+              <CardContent sx={{ pt: 0, px: 1.5, pb: 1, width: 1, minWidth: 0 }}>
+                {topLabels.length > 0 && (
+                  <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.5} sx={{ mb: 1.25, rowGap: 0.5 }}>
                     {topLabels.map((x) => (
                       <Chip
                         key={x.label}
@@ -362,21 +445,23 @@ export function SocDashboardView() {
                       />
                     ))}
                   </Stack>
-                }
-              />
-              <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
-                <Box sx={{ overflowX: 'auto' }}>
-                  <Table size="small" sx={{ minWidth: 920, ...SX_COMPACT_TABLE }}>
+                )}
+                <Box sx={{ width: 1, minWidth: 0 }}>
+                  <Table size="small" sx={SX_COMPACT_TABLE}>
+                    {RUNS_TABLE_COLGROUP}
                     <TableHead>
                       <TableRow>
-                        <TableCell>Severity</TableCell>
-                        <TableCell>Status</TableCell>
+                        <TableCell>Triage</TableCell>
                         <TableCell>Label</TableCell>
                         <TableCell>Message</TableCell>
-                        <TableCell>Last step</TableCell>
-                        <TableCell align="right">Duration</TableCell>
-                        <TableCell>Run</TableCell>
-                        <TableCell align="right">View</TableCell>
+                        <TimeSortHeadCell
+                          label="Updated"
+                          order={runsTimeOrder}
+                          onOrderChange={setRunsTimeOrder}
+                        />
+                        <TableCell align="center" sx={{ px: 0.75 }}>
+                          View
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -392,26 +477,37 @@ export function SocDashboardView() {
                               }),
                             }}
                           >
-                            <TableCell>{severityChip(r)}</TableCell>
-                            <TableCell>{statusChip(r.status)}</TableCell>
-                            <TableCell>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Typography variant="body2">{r.predicted_label ?? '—'}</Typography>
+                            <TableCell sx={{ verticalAlign: 'top' }}>
+                              <Stack spacing={0.35} alignItems="flex-start">
+                                {severityChip(r)}
+                                {statusChip(r.status)}
+                              </Stack>
+                            </TableCell>
+                            <TableCell sx={{ verticalAlign: 'top', minWidth: 0 }}>
+                              <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                                <Typography variant="body2" component="span" fontWeight={600}>
+                                  {r.predicted_label ?? '—'}
+                                </Typography>
                                 {flagged && <Chip size="small" sx={CHIP_COMPACT} color="error" label="flagged" />}
                               </Stack>
                             </TableCell>
-                            <TableCell sx={{ maxWidth: 320 }}>
-                              <Typography variant="body2" noWrap title={r.message_preview ?? ''}>
+                            <TableCell sx={{ verticalAlign: 'top', minWidth: 0, ...clampCellSx(2) }}>
+                              <Typography variant="body2" title={r.message_preview ?? ''}>
                                 {r.message_preview ?? '—'}
                               </Typography>
                             </TableCell>
-                            <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{r.last_step ?? '—'}</TableCell>
-                            <TableCell align="right">
-                              {typeof r.duration_ms === 'number' ? `${r.duration_ms}ms` : '—'}
+                            <TableCell
+                              sx={{
+                                verticalAlign: 'top',
+                                typography: 'caption',
+                                lineHeight: 1.35,
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {new Date(r.updated_at).toLocaleString()}
                             </TableCell>
-                            <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{shortId(r.run_id)}</TableCell>
-                            <TableCell align="right">
-                              <Tooltip title="Open run details">
+                            <TableCell align="center" sx={{ verticalAlign: 'top', px: 0.5 }}>
+                              <Tooltip title="Details (channel, customer, ids, steps)">
                                 <IconButton
                                   size="small"
                                   color="primary"
@@ -434,7 +530,7 @@ export function SocDashboardView() {
                   size="small"
                   rowsPerPageOptions={[10, 25, 50]}
                   sx={{ '& .MuiTablePagination-toolbar': { minHeight: 44, px: 0.5 } }}
-                  count={runs.length}
+                  count={runsSorted.length}
                   page={runsPage}
                   onPageChange={(_, p) => setRunsPage(p)}
                   rowsPerPage={runsRowsPerPage}
@@ -446,76 +542,74 @@ export function SocDashboardView() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card sx={{ overflow: 'hidden' }}>
               <CardHeader
-                title="Agentic actions summary"
-                subheader="Latest saved agent reports (scrollable · View opens full detail modal)"
+                avatar={headerAvatarIcon('solar:shield-keyhole-bold-duotone', 'secondary')}
+                action={<FullPageCornerLink href="/agentic" title="Open Agentic actions — full list" />}
+                title="Agentic actions"
+                subheader="Recommended action & time · open row for full report page"
                 sx={SX_COMPACT_CARD_HEADER}
               />
-              <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
+              <CardContent sx={{ pt: 0, px: 1.5, pb: 1, overflow: 'hidden' }}>
                 {agentReports.length ? (
-                  <Box sx={{ overflowX: 'auto' }}>
-                    <TableContainer
-                      sx={{
-                        maxHeight: 320,
-                        overflow: 'auto',
-                        border: 1,
-                        borderColor: 'divider',
-                        borderRadius: 1,
-                      }}
-                    >
-                      <Table size="small" stickyHeader sx={{ minWidth: 640, ...SX_COMPACT_TABLE }}>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell sx={{ bgcolor: 'background.paper' }}>Report</TableCell>
-                            <TableCell sx={{ bgcolor: 'background.paper' }}>Recommended</TableCell>
-                            <TableCell sx={{ bgcolor: 'background.paper' }}>Summary</TableCell>
-                            <TableCell sx={{ bgcolor: 'background.paper' }}>Created</TableCell>
-                            <TableCell align="right" sx={{ bgcolor: 'background.paper' }}>
-                              View
-                            </TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {agentReports.map((r) => (
-                            <TableRow key={r.public_id} hover>
-                              <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{r.public_id}</TableCell>
-                              <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>
-                                {r.recommended_action || '—'}
-                              </TableCell>
-                              <TableCell sx={{ maxWidth: 360 }}>
-                                <Typography variant="body2" noWrap title={r.summary}>
-                                  {r.summary}
-                                </Typography>
-                              </TableCell>
-                              <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                                {new Date(r.created_at).toLocaleString()}
-                              </TableCell>
-                              <TableCell align="right">
-                                <Tooltip title="Open full agent report (modal)">
-                                  <Button
-                                    size="small"
-                                    variant="outlined"
-                                    color="primary"
-                                    aria-label="View agent report"
-                                    onClick={() => setReportDetailId(r.public_id)}
-                                    startIcon={<Iconify icon="solar:eye-bold" width={18} />}
-                                    sx={{ py: 0.25, px: 1, minWidth: 0, fontSize: '0.75rem' }}
-                                  >
-                                    View
-                                  </Button>
-                                </Tooltip>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
+                  <Stack spacing={1} sx={{ width: 1, minWidth: 0 }}>
+                    {latestAgentReports.map((r) => (
+                      <Stack
+                        key={r.public_id}
+                        direction="row"
+                        alignItems="center"
+                        spacing={1.25}
+                        sx={{ minWidth: 0, width: 1, py: 0.25 }}
+                      >
+                        <Box
+                          sx={{
+                            color: 'primary.main',
+                            flexShrink: 0,
+                            width: 28,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Iconify icon="solar:chat-round-dots-bold" width={18} />
+                        </Box>
+                        <Box sx={{ minWidth: 0, flex: '1 1 auto' }}>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 600, display: 'block', lineHeight: 1.4 }}
+                            title={r.recommended_action || undefined}
+                          >
+                            {r.recommended_action || '—'}
+                          </Typography>
+                          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.35, minWidth: 0 }}>
+                            <Iconify icon="solar:clock-circle-outline" width={14} style={{ opacity: 0.65, flexShrink: 0 }} />
+                            <Typography variant="caption" color="text.secondary" noWrap sx={{ minWidth: 0 }}>
+                              {new Date(r.created_at).toLocaleString()}
+                            </Typography>
+                          </Stack>
+                        </Box>
+                        <Tooltip title="Open full report">
+                          <IconButton
+                            component={RouterLink}
+                            href={`/agentic/report/${encodeURIComponent(r.public_id)}`}
+                            size="small"
+                            color="default"
+                            aria-label="Open full agentic report"
+                            sx={{ color: 'text.secondary', flexShrink: 0, width: 36, height: 36 }}
+                          >
+                            <Iconify icon="eva:arrow-ios-forward-fill" width={18} />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    ))}
+                  </Stack>
                 ) : (
-                  <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                    No agent reports found yet.
-                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Iconify icon="eva:search-fill" width={20} style={{ opacity: 0.55 }} />
+                    <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                      No agent reports yet.
+                    </Typography>
+                  </Stack>
                 )}
               </CardContent>
             </Card>
@@ -524,27 +618,39 @@ export function SocDashboardView() {
 
         <Grid size={{ xs: 12, lg: 6 }}>
           <Stack spacing={1.25}>
-            <Card>
-              <CardHeader title="Events" subheader="Newest first (across all runs)" sx={SX_COMPACT_CARD_HEADER} />
-              <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
-                <Box sx={{ overflowX: 'auto' }}>
-                  <Table size="small" sx={{ minWidth: 920, ...SX_COMPACT_TABLE }}>
+            <Card sx={{ overflow: 'hidden' }}>
+              <CardHeader
+                avatar={headerAvatarIcon('solar:clock-circle-outline', 'info')}
+                action={<FullPageCornerLink href="/monitor" title="Open Monitor — full events table" />}
+                title="Events"
+                subheader="Time, level, step & message · open a row for run id, trace, timing"
+                sx={SX_COMPACT_CARD_HEADER}
+              />
+              <CardContent sx={{ pt: 0, px: 1.5, pb: 1, width: 1, minWidth: 0 }}>
+                <Box sx={{ width: 1, minWidth: 0 }}>
+                  <Table size="small" sx={SX_COMPACT_TABLE}>
+                    {EVENTS_TABLE_COLGROUP}
                     <TableHead>
                       <TableRow>
-                        <TableCell>Time</TableCell>
+                        <TimeSortHeadCell
+                          label="Time"
+                          order={eventsTimeOrder}
+                          onOrderChange={setEventsTimeOrder}
+                        />
                         <TableCell>Level</TableCell>
-                        <TableCell>Step</TableCell>
-                        <TableCell>Message</TableCell>
-                        <TableCell align="right">ms</TableCell>
-                        <TableCell>Run</TableCell>
-                        <TableCell align="right">View</TableCell>
+                        <TableCell>Step &amp; message</TableCell>
+                        <TableCell align="center" sx={{ px: 0.75 }}>
+                          View
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {events.map((e) => (
+                      {sortedEvents.map((e) => (
                         <TableRow key={e.event_id} hover>
-                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(e.timestamp).toLocaleString()}</TableCell>
-                          <TableCell>
+                          <TableCell sx={{ typography: 'caption', lineHeight: 1.35, verticalAlign: 'top' }}>
+                            {new Date(e.timestamp).toLocaleString()}
+                          </TableCell>
+                          <TableCell sx={{ verticalAlign: 'top' }}>
                             <Chip
                               size="small"
                               sx={CHIP_COMPACT}
@@ -553,16 +659,25 @@ export function SocDashboardView() {
                               variant={e.level === 'info' ? 'outlined' : 'filled'}
                             />
                           </TableCell>
-                          <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{e.step_name}</TableCell>
-                          <TableCell sx={{ maxWidth: 360 }}>
-                            <Typography variant="body2" noWrap title={e.message}>
-                              {e.message}
+                          <TableCell sx={{ verticalAlign: 'top', minWidth: 0 }}>
+                            <Typography
+                              variant="caption"
+                              fontFamily="monospace"
+                              fontSize={11}
+                              color="text.secondary"
+                              display="block"
+                              sx={{ mb: 0.25 }}
+                            >
+                              {e.step_name}
                             </Typography>
+                            <Box sx={{ ...clampCellSx(2) }}>
+                              <Typography variant="body2" title={e.message}>
+                                {e.message}
+                              </Typography>
+                            </Box>
                           </TableCell>
-                          <TableCell align="right">{typeof e.duration_ms === 'number' ? e.duration_ms : '—'}</TableCell>
-                          <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{shortId(e.run_id)}</TableCell>
-                          <TableCell align="right">
-                            <Tooltip title="Open event details">
+                          <TableCell align="center" sx={{ verticalAlign: 'top', px: 0.5 }}>
+                            <Tooltip title="Details (run, trace, duration ms)">
                               <IconButton
                                 size="small"
                                 color="primary"
@@ -576,9 +691,9 @@ export function SocDashboardView() {
                           </TableCell>
                         </TableRow>
                       ))}
-                      {!events.length && (
+                      {!sortedEvents.length && (
                         <TableRow>
-                          <TableCell colSpan={7}>
+                          <TableCell colSpan={4}>
                             <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                               No events yet.
                             </Typography>
@@ -606,8 +721,14 @@ export function SocDashboardView() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader title="Event summary" subheader="Counts from current page" sx={SX_COMPACT_CARD_HEADER} />
+            <Card sx={{ overflow: 'hidden' }}>
+              <CardHeader
+                avatar={headerAvatarIcon('ic:round-filter-list', 'warning')}
+                action={<FullPageCornerLink href="/monitor" title="Open Monitor — full event history" />}
+                title="Event summary"
+                subheader="Counts from current page"
+                sx={SX_COMPACT_CARD_HEADER}
+              />
               <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
                 <Grid container spacing={1}>
                   <Grid size={{ xs: 4 }}>
@@ -657,11 +778,6 @@ export function SocDashboardView() {
         open={Boolean(eventDetail)}
         event={eventDetail}
         onClose={() => setEventDetail(null)}
-      />
-      <AgentReportDetailDialog
-        open={Boolean(reportDetailId)}
-        publicId={reportDetailId}
-        onClose={() => setReportDetailId(null)}
       />
     </DashboardContent>
   );

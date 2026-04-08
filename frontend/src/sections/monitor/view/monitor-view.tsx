@@ -1,37 +1,41 @@
 import type { RunEventOut, RunListItemOut } from 'src/api/types';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
+import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
-import CardHeader from '@mui/material/CardHeader';
 import Chip from '@mui/material/Chip';
+import Tabs from '@mui/material/Tabs';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
-import Tooltip from '@mui/material/Tooltip';
-import IconButton from '@mui/material/IconButton';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import MenuItem from '@mui/material/MenuItem';
 import Select from '@mui/material/Select';
 import Switch from '@mui/material/Switch';
+import Tooltip from '@mui/material/Tooltip';
+import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableHead from '@mui/material/TableHead';
 import TableCell from '@mui/material/TableCell';
+import CardHeader from '@mui/material/CardHeader';
+import IconButton from '@mui/material/IconButton';
+import InputLabel from '@mui/material/InputLabel';
 import Typography from '@mui/material/Typography';
+import FormControl from '@mui/material/FormControl';
 import CardContent from '@mui/material/CardContent';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import TablePagination from '@mui/material/TablePagination';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
+import FormControlLabel from '@mui/material/FormControlLabel';
 
-import { Iconify } from 'src/components/iconify';
-import { RunDetailDialog, RunEventDetailDialog } from 'src/components/run-monitoring/detail-dialogs';
-import { useAppSnackbar } from 'src/contexts/app-snackbar-context';
+import { sortByTime, type TimeSortOrder } from 'src/utils/table-time-sort';
+
 import { api, ApiError } from 'src/services';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useAppSnackbar } from 'src/contexts/app-snackbar-context';
+
+import { Iconify } from 'src/components/iconify';
+import { TimeSortHeadCell } from 'src/components/table-sort/time-sort-head-cell';
+import { RunDetailDialog, RunEventDetailDialog } from 'src/components/run-monitoring/detail-dialogs';
 
 const SX_COMPACT_TABLE = {
   '& .MuiTableCell-root': { py: 0.5, px: 1, fontSize: '0.8125rem' },
@@ -88,30 +92,30 @@ export function MonitorView() {
   const [runDetailId, setRunDetailId] = useState<string | null>(null);
   const [eventDetail, setEventDetail] = useState<RunEventOut | null>(null);
 
+  const [runsTimeOrder, setRunsTimeOrder] = useState<TimeSortOrder>('desc');
+  const [eventsTimeOrder, setEventsTimeOrder] = useState<TimeSortOrder>('desc');
+
   const filteredRuns = useMemo(() => {
     if (!flaggedOnly) return runs;
     return runs.filter((r) => r.flagged_attack_or_anomaly === true);
   }, [runs, flaggedOnly]);
 
-  const liveRunsSorted = useMemo(() => {
-    const running = filteredRuns
-      .filter((r) => r.status === 'running')
-      .slice()
-      .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
-    const completedChron = filteredRuns
-      .filter((r) => r.status !== 'running')
-      .slice()
-      // Chronological for the completed section (older → newer), so the newest completed ends up at the bottom.
-      .sort((a, b) => (a.updated_at < b.updated_at ? -1 : 1));
-    return [...running, ...completedChron];
-  }, [filteredRuns]);
+  const liveRunsSorted = useMemo(
+    () => sortByTime(filteredRuns, (r) => r.updated_at, runsTimeOrder),
+    [filteredRuns, runsTimeOrder]
+  );
 
   const runsPageRows = useMemo(() => {
     const start = runsPage * runsRowsPerPage;
     return liveRunsSorted.slice(start, start + runsRowsPerPage);
   }, [liveRunsSorted, runsPage, runsRowsPerPage]);
 
-  const eventsPageRows = events;
+  const sortedEvents = useMemo(
+    () => sortByTime(events, (e) => e.timestamp, eventsTimeOrder),
+    [events, eventsTimeOrder]
+  );
+
+  const eventsPageRows = sortedEvents;
 
   const loadMonitoring = useCallback(
     async (mode: 'silent' | 'manual') => {
@@ -228,7 +232,7 @@ export function MonitorView() {
         <Card sx={{ minWidth: 0, width: 1 }}>
           <CardHeader
             title="Live traffic monitoring"
-            subheader="Running runs are pinned to the top. Completed runs are shown in chronological order at the bottom."
+            subheader="Sort by last update (default: newest first). Use the Updated column header to toggle order."
             sx={SX_COMPACT_CARD_HEADER}
           />
           <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
@@ -237,7 +241,7 @@ export function MonitorView() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Status</TableCell>
-                    <TableCell>Updated</TableCell>
+                    <TimeSortHeadCell label="Updated" order={runsTimeOrder} onOrderChange={setRunsTimeOrder} />
                     <TableCell>Channel</TableCell>
                     <TableCell>Customer</TableCell>
                     <TableCell>Label</TableCell>
@@ -324,7 +328,7 @@ export function MonitorView() {
         <Card sx={{ minWidth: 0, width: 1 }}>
           <CardHeader
             title="All events"
-            subheader="Newest events first (across runs)"
+            subheader="Sort by time (default: newest first). Toggle via the Time column header."
             sx={SX_COMPACT_CARD_HEADER}
           />
           <CardContent sx={{ pt: 0, px: 1.5, pb: 1 }}>
@@ -332,7 +336,7 @@ export function MonitorView() {
               <Table size="small" sx={{ minWidth: 980, ...SX_COMPACT_TABLE }}>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Time</TableCell>
+                    <TimeSortHeadCell label="Time" order={eventsTimeOrder} onOrderChange={setEventsTimeOrder} />
                     <TableCell>Level</TableCell>
                     <TableCell>Step</TableCell>
                     <TableCell>Message</TableCell>

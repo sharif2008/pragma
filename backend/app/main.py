@@ -1,9 +1,13 @@
 """FastAPI entrypoint: modular ML + RAG + agentic API."""
 
 from contextlib import asynccontextmanager
+import logging
+import time
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from app.core.config import ensure_storage_dirs, get_settings
 from app.core.logging import setup_logging
@@ -38,6 +42,52 @@ app = FastAPI(
         "tryItOutEnabled": True,
     },
 )
+
+_http_fail_logger = logging.getLogger("app.http.fail")
+_HTTP_FAIL_LOG_IGNORE_PREFIXES = (
+    "/docs",
+    "/openapi.json",
+    "/health",
+)
+
+
+@app.middleware("http")
+async def log_failed_http_requests(request: Request, call_next):
+    """
+    Log only failed API calls (>= 400) + unhandled exceptions.
+
+    We intentionally keep successful requests quiet to reduce log noise and
+    to make "why did the dashboard fail?" investigations faster.
+    """
+    path = request.url.path
+    if any(path.startswith(p) for p in _HTTP_FAIL_LOG_IGNORE_PREFIXES):
+        return await call_next(request)
+
+    t0 = time.perf_counter()
+    try:
+        response: Response = await call_next(request)
+    except Exception:
+        ms = int((time.perf_counter() - t0) * 1000)
+        _http_fail_logger.exception(
+            "request_failed exception method=%s path=%s qs=%s duration_ms=%s",
+            request.method,
+            path,
+            request.url.query,
+            ms,
+        )
+        raise
+
+    if response.status_code >= 400:
+        ms = int((time.perf_counter() - t0) * 1000)
+        _http_fail_logger.warning(
+            "request_failed status=%s method=%s path=%s qs=%s duration_ms=%s",
+            response.status_code,
+            request.method,
+            path,
+            request.url.query,
+            ms,
+        )
+    return response
 
 app.add_middleware(
     CORSMiddleware,

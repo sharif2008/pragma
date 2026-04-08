@@ -1,35 +1,38 @@
 import type {
-  AgenticReportOut,
-  ModelVersionOut,
-  PredictionJobOut,
   RunEventOut,
   RunSummaryOut,
+  ModelVersionOut,
+  AgenticReportOut,
+  PredictionJobOut,
 } from 'src/api/types';
 
-import { useCallback, useEffect, useState } from 'react';
+import { varAlpha } from 'minimal-shared/utils';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Alert from '@mui/material/Alert';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Divider from '@mui/material/Divider';
-import Stack from '@mui/material/Stack';
-import Table from '@mui/material/Table';
-import Typography from '@mui/material/Typography';
-import DialogTitle from '@mui/material/DialogTitle';
+import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
+import Typography from '@mui/material/Typography';
+import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import CircularProgress from '@mui/material/CircularProgress';
 
-import { varAlpha } from 'minimal-shared/utils';
+import { sortByTime, type TimeSortOrder } from 'src/utils/table-time-sort';
 
 import { api, ApiError } from 'src/services';
+
+import { TimeSortHeadCell } from 'src/components/table-sort/time-sort-head-cell';
 
 // ----------------------------------------------------------------------
 
@@ -68,6 +71,28 @@ function formatField(v: unknown): string {
   return JSON.stringify(v);
 }
 
+function predField(summary: RunSummaryOut, key: string): unknown {
+  const p = summary.predictions;
+  const raw = summary.predictions_payload;
+  if (p && typeof p === 'object' && key in p) {
+    const v = (p as Record<string, unknown>)[key];
+    if (v !== undefined && v !== null && v !== '') return v;
+  }
+  if (raw && typeof raw === 'object' && key in raw) {
+    return (raw as Record<string, unknown>)[key];
+  }
+  return undefined;
+}
+
+function formatRowsFlagged(summary: RunSummaryOut): string | null {
+  const total = predField(summary, 'rows_total');
+  const flagged = predField(summary, 'rows_flagged');
+  if (typeof total !== 'number' && typeof flagged !== 'number') return null;
+  const t = typeof total === 'number' ? total : '—';
+  const f = typeof flagged === 'number' ? flagged : '—';
+  return `${t} / ${f}`;
+}
+
 // ----------------------------------------------------------------------
 
 export type RunDetailDialogProps = {
@@ -80,8 +105,14 @@ export function RunDetailDialog({ open, runId, onClose }: RunDetailDialogProps) 
   const [tab, setTab] = useState<'summary' | 'events' | 'extra'>('summary');
   const [summary, setSummary] = useState<RunSummaryOut | null>(null);
   const [events, setEvents] = useState<RunEventOut[]>([]);
+  const [eventTimeOrder, setEventTimeOrder] = useState<TimeSortOrder>('desc');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const sortedEvents = useMemo(
+    () => sortByTime(events, (e) => e.timestamp, eventTimeOrder),
+    [events, eventTimeOrder]
+  );
 
   const load = useCallback(async () => {
     if (!runId) return;
@@ -93,6 +124,7 @@ export function RunDetailDialog({ open, runId, onClose }: RunDetailDialogProps) 
       const [s, ev] = await Promise.all([api.getRun(runId), api.getRunEvents(runId, 500)]);
       setSummary(s);
       setEvents(ev);
+      setEventTimeOrder('desc');
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : e instanceof Error ? e.message : String(e);
       setError(msg);
@@ -152,6 +184,16 @@ export function RunDetailDialog({ open, runId, onClose }: RunDetailDialogProps) 
                 <DetailRow label="Duration" value={typeof summary.duration_ms === 'number' ? `${summary.duration_ms} ms` : null} />
                 <DetailRow label="Last step" value={summary.last_step} mono />
                 <DetailRow label="Message" value={summary.message_preview} />
+                <DetailRow label="Predicted label" value={predField(summary, 'predicted_label')} />
+                <DetailRow
+                  label="Flagged (attack / anomaly)"
+                  value={predField(summary, 'flagged_attack_or_anomaly')}
+                />
+                <DetailRow label="Max class probability" value={predField(summary, 'max_class_probability')} />
+                <DetailRow label="Attachment type" value={predField(summary, 'attachment_type')} />
+                <DetailRow label="Prediction job" value={predField(summary, 'prediction_job_public_id')} mono />
+                <DetailRow label="Rows (total / flagged)" value={formatRowsFlagged(summary)} />
+                <DetailRow label="Model kind" value={predField(summary, 'model_kind')} mono />
                 {summary.error && (
                   <Alert severity="error">
                     {summary.error.step_name && (
@@ -170,14 +212,14 @@ export function RunDetailDialog({ open, runId, onClose }: RunDetailDialogProps) 
                 <Table size="small" sx={{ minWidth: 520 }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Time</TableCell>
+                      <TimeSortHeadCell label="Time" order={eventTimeOrder} onOrderChange={setEventTimeOrder} />
                       <TableCell>Level</TableCell>
                       <TableCell>Step</TableCell>
                       <TableCell>Message</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {events.map((e) => (
+                    {sortedEvents.map((e) => (
                       <TableRow key={e.event_id}>
                         <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(e.timestamp).toLocaleString()}</TableCell>
                         <TableCell>{e.level}</TableCell>
@@ -191,7 +233,7 @@ export function RunDetailDialog({ open, runId, onClose }: RunDetailDialogProps) 
                     ))}
                   </TableBody>
                 </Table>
-                {!events.length && (
+                {!sortedEvents.length && (
                   <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>
                     No events returned for this run.
                   </Typography>
@@ -203,9 +245,15 @@ export function RunDetailDialog({ open, runId, onClose }: RunDetailDialogProps) 
               <Stack spacing={2}>
                 <Box>
                   <Typography variant="subtitle2" gutterBottom>
-                    Predictions
+                    Predictions (full JSON)
                   </Typography>
-                  <JsonBlock data={summary.predictions ?? null} />
+                  <JsonBlock
+                    data={
+                      summary.predictions_payload ??
+                      summary.predictions ??
+                      null
+                    }
+                  />
                 </Box>
                 <Box>
                   <Typography variant="subtitle2" gutterBottom>
@@ -367,7 +415,7 @@ export function useAgentReportDetailLoad(publicId: string | null | undefined) {
       const pid = r.prediction_job_public_id?.trim();
       if (pid) {
         try {
-          setPredJob(await api.getPredictionJob(pid));
+          setPredJob(await api.getPredictionJob(pid, { includeResults: true }));
         } catch {
           setPredJob(null);
         }

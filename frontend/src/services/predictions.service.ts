@@ -1,8 +1,8 @@
 import type {
+  ManagedFileOut,
   PredictionJobOut,
   FileUploadResponse,
   PredictionStartRequest,
-  ManagedFileOut,
   PendingPredictionPurgeOut,
 } from 'src/api/types';
 

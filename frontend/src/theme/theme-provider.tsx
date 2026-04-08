@@ -6,7 +6,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider as ThemeVarsProvider } from '@mui/material/styles';
 
 import { createAppTheme } from './create-theme';
-import { ThemePresetProvider, useThemePreset } from './theme-preset-context';
+import { useThemePreset, ThemePresetProvider } from './theme-preset-context';
 
 import type {} from './extend-theme-types';
 import type { ThemeOptions } from './types';

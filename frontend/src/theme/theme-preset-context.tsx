@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { useMemo, useState, useContext, useCallback, createContext } from 'react';
+
+import { THEME_PRESETS, THEME_PRESET_LIST, DEFAULT_THEME_PRESET_ID } from './presets';
 
 import type { AppThemePresetId } from './preset-types';
-import { DEFAULT_THEME_PRESET_ID, THEME_PRESET_LIST, THEME_PRESETS } from './presets';
 
 // ----------------------------------------------------------------------
 
