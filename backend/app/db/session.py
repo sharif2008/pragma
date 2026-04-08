@@ -105,3 +105,39 @@ def init_db() -> None:
     _ensure_prediction_jobs_results_json()
     _ensure_agentic_reports_results_row_index()
     _ensure_agentic_reports_agentic_job_id()
+    _ensure_agentic_report_trust_anchors_table()
+
+
+def _ensure_agentic_report_trust_anchors_table() -> None:
+    """Create trust anchor table for existing MySQL DBs if missing."""
+    if engine.dialect.name != "mysql":
+        return
+    with engine.begin() as conn:
+        cnt = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM information_schema.TABLES "
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'agentic_report_trust_anchors'"
+            )
+        ).scalar_one()
+        if int(cnt) == 0:
+            # Multi-worker startup can race; IF NOT EXISTS makes this idempotent.
+            conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS agentic_report_trust_anchors ("
+                    "id INT AUTO_INCREMENT PRIMARY KEY,"
+                    "agentic_report_id INT NOT NULL UNIQUE,"
+                    "chain_id INT NOT NULL DEFAULT 31337,"
+                    "contract_address VARCHAR(128) NOT NULL DEFAULT '',"
+                    "tx_hash VARCHAR(128) NOT NULL DEFAULT '',"
+                    "payload_version VARCHAR(32) NOT NULL DEFAULT 'v1',"
+                    "commitment_sha256 VARCHAR(64) NOT NULL DEFAULT '',"
+                    "agent_key_sha256 VARCHAR(64) NOT NULL DEFAULT '',"
+                    "report_key_sha256 VARCHAR(64) NOT NULL DEFAULT '',"
+                    "anchored_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),"
+                    "error TEXT NULL,"
+                    "INDEX(agentic_report_id),"
+                    "CONSTRAINT fk_anchor_report FOREIGN KEY (agentic_report_id) "
+                    "REFERENCES agentic_reports(id) ON DELETE CASCADE"
+                    ")"
+                )
+            )

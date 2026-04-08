@@ -235,6 +235,8 @@ export type AgenticReportOut = {
    * structured_plan, trust_chain, rag_context_used, …
    */
   report_artifact?: Record<string, unknown> | null;
+  /** Optional on-chain trust anchor metadata (local Hardhat). */
+  trust_anchor?: Record<string, unknown> | null;
 };
 
 export type KBQueryResponse = {

@@ -57,7 +57,7 @@ If you run heavy simulation/prediction steps, a **single** Uvicorn worker can ge
 ```bash
 # Windows (PowerShell / cmd)
 cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
 ```
 
 Notes:
@@ -157,5 +157,11 @@ Optional **`notebooks/*.ipynb`** — install Jupyter separately if needed.
 | `OPENAI_API_KEY` | If unset, agent and RAG-LLM paths use mock responses |
 | `OPENAI_MODEL` | Chat model id when using OpenAI |
 | `EMBEDDING_MODEL` | SentenceTransformers model id for embeddings/RAG |
+| `TRUST_CHAIN_ENABLED` | If true, anchor a hash-only trust commitment on local chain after each agentic report is saved |
+| `TRUST_CHAIN_RPC_URL` | JSON-RPC URL (default `http://127.0.0.1:8545`) |
+| `TRUST_CHAIN_PRIVATE_KEY` | Deployer/signer private key (Hardhat dev key) |
+| `TRUST_CHAIN_CONTRACT_ADDRESS` | Deployed `AgenticTrustRegistry` address |
+| `TRUST_CHAIN_CHAIN_ID` | Chain id (default `31337`) |
+| `TRUST_CHAIN_PAYLOAD_VERSION` | Hash payload version string (default `v1`) |
 
 See **`app/core/config.py`** for defaults such as `rag_chunk_size`, `rag_top_k`, and training split settings.
