@@ -1,22 +1,31 @@
 const hre = require("hardhat");
 
 async function main() {
-  const address = process.env.SIMPLE_STORAGE_ADDRESS;
+  const address = process.env.TRUST_REGISTRY_ADDRESS;
   if (!address) {
-    throw new Error("Set SIMPLE_STORAGE_ADDRESS to the deployed contract address.");
+    throw new Error("Set TRUST_REGISTRY_ADDRESS to the deployed contract address.");
   }
 
   const [signer] = await hre.ethers.getSigners();
   console.log("Using signer:", signer.address);
 
-  const simpleStorage = await hre.ethers.getContractAt("SimpleStorage", address, signer);
+  const registry = await hre.ethers.getContractAt("AgenticTrustRegistry", address, signer);
 
-  const tx = await simpleStorage.set(42n);
-  console.log("set(42) tx hash:", tx.hash);
+  const agentKey = process.env.AGENT_KEY_BYTES32;
+  const reportKey = process.env.REPORT_KEY_BYTES32;
+  const commitment = process.env.COMMITMENT_BYTES32;
+  if (!agentKey || !reportKey || !commitment) {
+    throw new Error(
+      "Set AGENT_KEY_BYTES32, REPORT_KEY_BYTES32, COMMITMENT_BYTES32 (all 0x-prefixed 32-byte hex)."
+    );
+  }
+
+  const tx = await registry.anchor(agentKey, reportKey, commitment);
+  console.log("anchor tx hash:", tx.hash);
   await tx.wait();
 
-  const value = await simpleStorage.get();
-  console.log("Stored value:", value.toString());
+  const stored = await registry.getCommitment(agentKey, reportKey);
+  console.log("Stored commitment:", stored);
 }
 
 main().catch((error) => {

@@ -4,12 +4,12 @@ async function main() {
   const [deployer] = await hre.ethers.getSigners();
   console.log("Deploying with:", deployer.address);
 
-  const SimpleStorage = await hre.ethers.getContractFactory("SimpleStorage");
-  const simpleStorage = await SimpleStorage.deploy();
-  await simpleStorage.waitForDeployment();
+  const AgenticTrustRegistry = await hre.ethers.getContractFactory("AgenticTrustRegistry");
+  const registry = await AgenticTrustRegistry.deploy();
+  await registry.waitForDeployment();
 
-  const address = await simpleStorage.getAddress();
-  console.log("SimpleStorage deployed to:", address);
+  const address = await registry.getAddress();
+  console.log("AgenticTrustRegistry deployed to:", address);
 }
 
 main().catch((error) => {

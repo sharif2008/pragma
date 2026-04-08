@@ -36,7 +36,7 @@ Equivalent: `npx hardhat node`
 
 The process prints dev accounts and private keys (local-only; never use on mainnet).
 
-### Deploy to localhost
+### Deploy registry to localhost
 
 In a **second terminal** (same `hardhat-blockchain/` directory, with the node still running):
 
@@ -46,26 +46,35 @@ npm run deploy:local
 
 Equivalent: `npx hardhat run scripts/deploy.js --network localhost`
 
-Copy the printed **SimpleStorage** contract address for the next step.
+Copy the printed **AgenticTrustRegistry** contract address for the next step.
 
-### Interact with the deployed contract
+### Anchor a trust commitment (demo)
 
-The interact script expects **`SIMPLE_STORAGE_ADDRESS`** to be set to that address.
+The anchor script expects:
+- **`TRUST_REGISTRY_ADDRESS`**: deployed contract address
+- **`AGENT_KEY_BYTES32`**, **`REPORT_KEY_BYTES32`**, **`COMMITMENT_BYTES32`**: `0x`-prefixed 32-byte hex strings
 
 **Linux / macOS:**
 
 ```bash
-SIMPLE_STORAGE_ADDRESS=0xYourDeployedAddress npm run interact:local
+TRUST_REGISTRY_ADDRESS=0xYourDeployedAddress \
+AGENT_KEY_BYTES32=0x0000000000000000000000000000000000000000000000000000000000000001 \
+REPORT_KEY_BYTES32=0x0000000000000000000000000000000000000000000000000000000000000002 \
+COMMITMENT_BYTES32=0x0000000000000000000000000000000000000000000000000000000000000003 \
+npm run anchor:local
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-$env:SIMPLE_STORAGE_ADDRESS = "0xYourDeployedAddress"
-npm run interact:local
+$env:TRUST_REGISTRY_ADDRESS = "0xYourDeployedAddress"
+$env:AGENT_KEY_BYTES32 = "0x0000000000000000000000000000000000000000000000000000000000000001"
+$env:REPORT_KEY_BYTES32 = "0x0000000000000000000000000000000000000000000000000000000000000002"
+$env:COMMITMENT_BYTES32 = "0x0000000000000000000000000000000000000000000000000000000000000003"
+npm run anchor:local
 ```
 
-Equivalent: `npx hardhat run scripts/interact.js --network localhost` (with the same environment variable).
+Equivalent: `npx hardhat run scripts/interact.js --network localhost` (with the same env vars).
 
 ### npm scripts reference
 
@@ -73,8 +82,8 @@ Equivalent: `npx hardhat run scripts/interact.js --network localhost` (with the 
 | ----------------- | -------------------------------- |
 | `npm run compile` | Compile Solidity                 |
 | `npm run node`    | Start local chain on `:8545`     |
-| `npm run deploy:local` | Deploy `SimpleStorage`    |
-| `npm run interact:local` | Call `set` / `get` via script |
+| `npm run deploy:local` | Deploy `AgenticTrustRegistry` |
+| `npm run anchor:local` | Call `anchor` / `getCommitment` |
 
 ### MetaMask (optional)
 
