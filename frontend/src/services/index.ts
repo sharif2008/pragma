@@ -1,19 +1,19 @@
 export * from './kb.service';
+export * from './runs.service';
 export { paths } from './paths';
-export * from './files.service';
 
+export * from './files.service';
 export * from './agent.service';
 export * from './health.service';
 export * from './datasets.service';
 export * from './training.service';
 export * from './predictions.service';
-export * from './runs.service';
 export { getApiBaseUrl, DEFAULT_API_BASE_URL } from './api-base';
 export { ApiError, requestJson, requestVoid, postMultipart, type RequestInitSubset } from './http-client';
 
-import { getRun, getRunEvents, listRunEvents, listRuns } from './runs.service';
 import { listFiles, deleteFile, uploadFile } from './files.service';
 import { getHealth, getApiList, getRootMeta } from './health.service';
+import { getRun, listRuns, getRunEvents, listRunEvents } from './runs.service';
 import { agentDecide, getAgentReport, listAgentReports } from './agent.service';
 import { listDatasets, deleteDataset, uploadDataset, getDatasetPreview } from './datasets.service';
 import {
@@ -34,18 +34,18 @@ import {
   kbUpload,
   kbListFiles,
   kbFuseHitsMmr,
-  kbRagTemplatesLatestPrediction,
   kbLlmShapRetrievalQuery,
+  kbRagTemplatesLatestPrediction,
 } from './kb.service';
 import {
   getPrediction,
   startPrediction,
   getPredictionJob,
   deletePredictionJob,
-  deleteAllPendingPredictionJobs,
   uploadPredictionCsv,
   listPredictionInputs,
   uploadPredictionInput,
+  deleteAllPendingPredictionJobs,
 } from './predictions.service';
 
 /** Namespace import: `import { api } from 'src/services'` */

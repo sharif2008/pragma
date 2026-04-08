@@ -1,9 +1,10 @@
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
-
 import type { AppThemePresetId } from 'src/theme/preset-types';
+
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import InputLabel from '@mui/material/InputLabel';
+import FormControl from '@mui/material/FormControl';
+
 import { useThemePreset } from 'src/theme/theme-preset-context';
 
 // ----------------------------------------------------------------------

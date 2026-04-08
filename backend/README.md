@@ -1,80 +1,124 @@
 # ChainAgentVFL backend
 
-FastAPI service for file versioning, CSV ML training, batch predictions, FAISS RAG, and optional OpenAI agentic decisions. Data and artifacts use **`storage/`** under this directory unless overridden.
+FastAPI service for versioned files, CSV ML training (including VFL), batch predictions, FAISS + SentenceTransformers RAG, run/monitoring traces, and optional OpenAI-backed agentic actions. Artifacts live under **`storage/`** in this directory unless `STORAGE_ROOT` overrides it.
 
 ## Prerequisites
 
 - **Python** 3.11+ (3.12–3.13 recommended; some ML stacks warn on 3.14+).
-- **MySQL** 8.x (or compatible) with a database created for the app.
-- Enough disk/RAM for **sentence-transformers** / **PyTorch** on first run (models download on demand).
+- **MySQL** 8.x (or compatible). The default config targets MySQL via PyMySQL.
+- Disk/RAM for **sentence-transformers** / **PyTorch** on first use (models download on demand).
 
 ## Setup
 
-1. **Create the MySQL database** — default name **`agentic-vfl`** (hyphen; backticks in SQL). From **`backend`**:
+1. **Database** — default DB name **`agentic-vfl`** (hyphen; quote with backticks in SQL):
 
    ```bash
    mysql -u root -p < db/init_mysql.sql
    ```
 
-   Or:
+   Or run the same statement in a SQL client (quote the database name with backticks because of the hyphen).
 
-   ```sql
-   CREATE DATABASE `agentic-vfl` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-   ```
+2. **Environment** — from `backend/`:
 
-2. **Create ORM tables** (optional; the API also runs `create_all` on startup):
+   - Windows: `copy .env.example .env`
+   - Linux/macOS: `cp .env.example .env`
 
-   ```bash
-   cd backend
-   python scripts/init_orm_tables.py
-   ```
+   Edit `DATABASE_URL` if needed. Leave **`STORAGE_ROOT`** empty to use **`backend/storage/`**.
 
-3. **Environment file** — copy the example and edit:
-
-   ```bash
-   cd backend
-   ```
-
-   Windows: `copy .env.example .env` — Linux/macOS: `cp .env.example .env`
-
-   Default example: user **`root`**, password **`test`**, database **`agentic-vfl`**:
-
-   ```env
-   DATABASE_URL=mysql+pymysql://root:test@127.0.0.1:3306/agentic-vfl
-   ```
-
-   Leave **`STORAGE_ROOT`** empty to use **`backend/storage/`**.
-
-4. **Install dependencies**:
+3. **Virtualenv and dependencies**:
 
    ```bash
    cd backend
    python -m venv .venv
-   .venv\Scripts\activate
+   .venv\Scripts\activate          # Windows
+   # source .venv/bin/activate     # Linux/macOS
    pip install -r requirements.txt
    ```
 
-   On Linux/macOS, activate with `source .venv/bin/activate`.
+4. **Tables** — optional before first run; the app also runs SQLAlchemy **`create_all`** on startup:
+
+   ```bash
+   python scripts/init_orm_tables.py
+   ```
 
 ## Run the API
 
-From the **`backend`** directory (so `app` imports resolve):
+Always run from **`backend/`** so `app` imports resolve:
 
 ```bash
 cd backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-- **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **Health**: [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
+### Multiple workers (recommended for responsiveness)
 
-On first startup the app creates **`storage/`** subfolders and applies SQLAlchemy **`create_all`** to your MySQL schema (for production, prefer migrations such as Alembic). If an older DB is missing **`prediction_jobs.results_json`**, startup runs a one-time **`ALTER TABLE`** to add it (or run `scripts/alter_prediction_jobs_add_results_json.sql` manually).
+If you run heavy simulation/prediction steps, a **single** Uvicorn worker can get saturated and the dashboard will appear to hang. You can start Uvicorn with multiple worker processes:
 
-**Tracking / history:** `GET /predictions?limit=100&offset=0` lists inference jobs; `GET /agent/reports` and `GET /agent/reports/{public_id}` list agentic action records. Knowledge base entries: `GET /kb/files`.
+```bash
+# Windows (PowerShell / cmd)
+cd backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+```
 
-## Optional: smoke-test the HTTP API
+Notes:
+- **`--reload` + `--workers`**: typically avoid combining in dev; prefer `--reload` while iterating, and `--workers N` when you want responsiveness under load.
+- **Worker count**: start with **4** (or roughly `2 * CPU_cores`) and adjust based on CPU/RAM.
 
-With the server running:
+| URL | Purpose |
+|-----|---------|
+| http://127.0.0.1:8000/docs | Swagger UI |
+| http://127.0.0.1:8000/openapi.json | OpenAPI schema |
+| http://127.0.0.1:8000/health | Liveness |
+
+### Startup behavior
+
+- Ensures **`storage/`** subfolders exist (`uploads`, `knowledge`, `models`, `predictions`, `reports`, `vector_db`, `training_datasets`).
+- Runs **`init_db()`** (`create_all` + small MySQL compatibility checks). For production, prefer **Alembic** (or similar) instead of relying on `create_all` alone.
+- Older MySQL databases may get a one-time **`ALTER TABLE`** for `prediction_jobs.results_json` if the column is missing.
+
+## API surface (routers)
+
+| Area | Typical endpoints (prefix `/api/v1` where applicable) |
+|------|-----------------------------------------------------|
+| Health | `GET /health` |
+| Files & datasets | Managed uploads, training/prediction CSVs |
+| Training & models | Start training, list jobs, register/delete model versions |
+| Predictions | Batch jobs, results, pending purge |
+| Agent | Decide, reports, agentic jobs |
+| Knowledge base | Upload, query, RAG helpers |
+| Simulate | `POST .../simulate/network-row`, `network-row/simple`, `network-traffic`, `network-event` |
+| Runs | List runs and events for monitoring |
+
+**Useful reads:** `GET /predictions`, `GET /agent/reports`, `GET /kb/files`, `GET /runs`, `GET /runs/{id}/events`.
+
+## Simulate network traffic (curl)
+
+End-to-end demo (recommended): from **`backend/`** with the server running:
+
+```bash
+python scripts/simulate_network_event_demo.py --base http://127.0.0.1:8000
+```
+
+**Windows:** use **`curl.exe`** (not PowerShell’s `curl` alias). Avoid bash-style `\` line continuations — use a **single line** or `--data-binary @body.json`.
+
+**Idempotency:** send a fresh **`Idempotency-Key`** per new run; repeating a key can return the **same** run (including a previous **failed** result).
+
+**Minimal example** (`network-event` — tiny schema; real VFL rows need columns aligned to your model):
+
+```bash
+curl.exe -sS -X POST "http://127.0.0.1:8000/api/v1/simulate/network-event" -H "Content-Type: application/json" -H "Idempotency-Key: demo-event-001" -d "{\"model_version_public_id\":null,\"columns_csv\":\"bidirectional_duration_ms,bidirectional_packets,label\",\"row_csv\":\"100,5,BENIGN\",\"metadata\":{},\"simulate\":{\"latency_ms\":0}}"
+```
+
+**Fixed feature row** (no header; length must match server `VFL_FIXED_COLUMNS` in `app/routers/simulate.py`): `POST /api/v1/simulate/network-row/simple` with JSON `{"values_csv":"<comma-separated-numbers>","metadata":{},"simulate":{}}` — copy a full `values_csv` from `scripts/simulate_network_event_demo.py` (row without trailing `label`).
+
+**After `202` responses**, poll:
+
+```bash
+curl.exe -sS "http://127.0.0.1:8000/api/v1/runs/<RUN_ID>"
+curl.exe -sS "http://127.0.0.1:8000/api/v1/runs/<RUN_ID>/events"
+```
+
+## Optional: HTTP smoke test
 
 ```bash
 cd backend
@@ -83,32 +127,35 @@ python scripts/api_client_demo.py --base http://127.0.0.1:8000
 
 Uses **`scripts/data/sample_train.csv`** by default.
 
-## Standalone CLI scripts (no `.ipynb` required)
+## Standalone CLI scripts
 
-Logic lives in **`app/notebook_runtime/`** (copied/merged from the old notebook utils). Run from **`backend`**; each launcher **`chdir`s to the repo root** so paths like **`RAG_docs/`**, **`datasets/`** match the notebooks.
+Run from **`backend/`**. Notebook-derived helpers live under **`app/notebook_runtime/`**; launchers may `chdir` to the repo root for paths like **`RAG_docs/`**, **`datasets/`**.
 
-```bash
-cd backend
-python scripts/rag_part1_build_vector_store.py   # RAG index build
-python scripts/rag_part2_agent_actions.py        # RAG + action plans
-python scripts/vfl_shap_multiclass.py
-python scripts/vfl_shap_prediction.py
-python scripts/scoring_evaluation.py
-python scripts/generate_sample_csv.py
-python scripts/build_local_faiss_demo.py
-python scripts/init_orm_tables.py
-python scripts/api_client_demo.py
-```
+| Script | Role |
+|--------|------|
+| `scripts/api_client_demo.py` | API smoke test |
+| `scripts/simulate_network_event_demo.py` | Simulate network traffic + poll run/events |
+| `scripts/init_orm_tables.py` | Create tables early |
+| `scripts/rag_part1_build_vector_store.py` | RAG index build |
+| `scripts/rag_part2_agent_actions.py` | RAG + action plans |
+| `scripts/vfl_shap_multiclass.py` | VFL SHAP (multiclass) |
+| `scripts/vfl_shap_prediction.py` | VFL SHAP prediction |
+| `scripts/scoring_evaluation.py` | Scoring evaluation |
+| `scripts/generate_sample_csv.py` | Sample CSV |
+| `scripts/build_local_faiss_demo.py` | Local FAISS demo |
+| `scripts/merge_notebook_to_task.py` | Regenerate merged runners from `.ipynb` |
 
-- **Regenerate** merged runners after editing an ipynb: `python scripts/merge_notebook_to_task.py`
-- Optional **`backend/notebooks/*.ipynb`** remain for interactive use; install Jupyter separately if needed.
+Optional **`notebooks/*.ipynb`** — install Jupyter separately if needed.
 
-## Configuration summary
+## Configuration
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | MySQL URL, e.g. `mysql+pymysql://root:test@127.0.0.1:3306/agentic-vfl` |
-| `STORAGE_ROOT` | Override artifact root; default `backend/storage` |
-| `OPENAI_API_KEY` | If unset, agent and RAG-LLM use mock responses |
+| `DATABASE_URL` | SQLAlchemy URL (default MySQL: `mysql+pymysql://root:test@127.0.0.1:3306/agentic-vfl`) |
+| `STORAGE_ROOT` | Artifact root; empty → `backend/storage` |
+| `DEBUG` | Verbose logging when enabled (via settings) |
+| `OPENAI_API_KEY` | If unset, agent and RAG-LLM paths use mock responses |
 | `OPENAI_MODEL` | Chat model id when using OpenAI |
-| `EMBEDDING_MODEL` | SentenceTransformers model id for RAG |
+| `EMBEDDING_MODEL` | SentenceTransformers model id for embeddings/RAG |
+
+See **`app/core/config.py`** for defaults such as `rag_chunk_size`, `rag_top_k`, and training split settings.

@@ -3,9 +3,9 @@ import type { ColorSystemOptions } from '@mui/material/styles';
 import { varAlpha, createPaletteChannel } from 'minimal-shared/utils';
 
 import { createShadows } from './core/shadows';
-import type { ThemePresetDefinition } from './preset-types';
 
 import type { CustomShadows } from './core/custom-shadows';
+import type { ThemePresetDefinition } from './preset-types';
 
 function createShadowColor(colorChannel: string): string {
   return `0 8px 16px 0 ${varAlpha(colorChannel, 0.24)}`;

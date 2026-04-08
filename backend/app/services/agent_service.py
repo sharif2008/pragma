@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
+import uuid
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -44,6 +48,65 @@ def agentic_job_out(db: Session, row: AgenticJob) -> AgenticJobOut:
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
+
+
+def persist_agentic_report_from_decision(
+    db: Session,
+    settings: Settings,
+    *,
+    job: PredictionJob,
+    results_row_index: int | None,
+    agentic_job_id: int | None,
+    agentic_job_public_id: str | None,
+    sample_data: dict[str, Any],
+    user_prompt: str,
+    decision: dict[str, Any],
+) -> tuple[AgenticReport, dict[str, Any]]:
+    """
+    Write on-disk report JSON and insert ``agentic_reports`` (same shape as POST /agent/decide).
+
+    Returns the ORM row and the payload dict (caller may append e.g. trust_chain and rewrite the file).
+    """
+    report_abs = settings.storage_root / "reports" / f"agentic_{job.public_id}_{uuid.uuid4().hex[:12]}.json"
+    report_abs.parent.mkdir(parents=True, exist_ok=True)
+    summary = str(decision.get("summary") or "").strip() or "—"
+    recommended_action = str(decision.get("recommended_action") or "").strip() or "—"
+    payload: dict[str, Any] = {
+        "prediction_job_public_id": job.public_id,
+        "results_row_index": results_row_index,
+        "agentic_job_public_id": (agentic_job_public_id.strip() if isinstance(agentic_job_public_id, str) else None),
+        "sample_data": sample_data,
+        "user_prompt": user_prompt,
+        "summary": summary,
+        "recommended_action": recommended_action,
+        "raw_llm_response": decision.get("raw_llm_response"),
+        "rag_context_used": decision.get("rag_context_used"),
+    }
+    raw_llm = decision.get("raw_llm_response")
+    if isinstance(raw_llm, str) and raw_llm.strip():
+        m = re.search(r"\{[\s\S]*\}", raw_llm)
+        if m:
+            try:
+                payload["structured_plan"] = json.loads(m.group())
+            except json.JSONDecodeError:
+                pass
+    report_abs.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    rel = str(report_abs.relative_to(settings.storage_root))
+
+    row = AgenticReport(
+        prediction_job_id=job.id,
+        results_row_index=results_row_index,
+        agentic_job_id=agentic_job_id,
+        summary=summary,
+        recommended_action=recommended_action,
+        raw_llm_response=decision.get("raw_llm_response"),
+        rag_context_used=decision.get("rag_context_used"),
+        report_path=rel,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row, payload
 
 
 def create_agentic_job(

@@ -3,7 +3,6 @@
 import hashlib
 import json
 import re
-import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
@@ -13,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
-from app.models.domain import AgenticJob, AgenticReport
+from app.models.domain import AgenticJob
 from app.schemas.prediction import (
     AgenticDecideRequest,
     AgenticJobCreate,
@@ -296,43 +295,18 @@ async def agent_decide(
         feature_notes=feature_notes,
     )
 
-    report_path = settings.storage_root / "reports" / f"agentic_{job.public_id}_{uuid.uuid4().hex[:12]}.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    payload: dict = {
-        "prediction_job_public_id": job.public_id,
-        "results_row_index": body.results_row_index,
-        "agentic_job_public_id": agentic_job_public_resolved,
-        "sample_data": sample_data,
-        "user_prompt": user_prompt,
-        "summary": decision["summary"],
-        "recommended_action": decision["recommended_action"],
-        "raw_llm_response": decision.get("raw_llm_response"),
-        "rag_context_used": decision.get("rag_context_used"),
-    }
-    raw_llm = decision.get("raw_llm_response")
-    if isinstance(raw_llm, str) and raw_llm.strip():
-        m = re.search(r"\{[\s\S]*\}", raw_llm)
-        if m:
-            try:
-                payload["structured_plan"] = json.loads(m.group())
-            except json.JSONDecodeError:
-                pass
-    report_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    rel = str(report_path.relative_to(settings.storage_root))
-
-    row = AgenticReport(
-        prediction_job_id=job.id,
+    row, payload = agent_service.persist_agentic_report_from_decision(
+        db,
+        settings,
+        job=job,
         results_row_index=body.results_row_index,
         agentic_job_id=agentic_job_id,
-        summary=decision["summary"],
-        recommended_action=decision["recommended_action"],
-        raw_llm_response=decision.get("raw_llm_response"),
-        rag_context_used=decision.get("rag_context_used"),
-        report_path=rel,
+        agentic_job_public_id=agentic_job_public_resolved,
+        sample_data=sample_data,
+        user_prompt=user_prompt,
+        decision=decision,
     )
-    db.add(row)
-    db.commit()
-    db.refresh(row)
+    report_path = settings.storage_root / row.report_path
 
     trust_commitment: str | None = None
     trust_chain_mode: str | None = None

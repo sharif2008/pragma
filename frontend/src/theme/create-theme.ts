@@ -1,15 +1,16 @@
 import type { CssVarsThemeOptions } from '@mui/material/styles';
+
 import { createTheme as createMuiTheme } from '@mui/material/styles';
 
-import { buildColorSchemeFromPreset } from './build-color-scheme';
-import { DEFAULT_THEME_PRESET_ID, THEME_PRESETS } from './presets';
-import type { AppThemePresetId } from './preset-types';
-import { components } from './core/components';
-import type { ColorSchemeOptionsExtended, ThemeOptions } from './types';
 import { themeConfig } from './theme-config';
+import { components } from './core/components';
 import { typography } from './core/typography';
+import { buildColorSchemeFromPreset } from './build-color-scheme';
+import { THEME_PRESETS, DEFAULT_THEME_PRESET_ID } from './presets';
 
 import type {} from './extend-theme-types';
+import type { AppThemePresetId } from './preset-types';
+import type { ThemeOptions, ColorSchemeOptionsExtended } from './types';
 
 // ----------------------------------------------------------------------
 

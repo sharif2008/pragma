@@ -379,6 +379,8 @@ export type RunSummaryOut = {
   duration_ms?: number | null;
   last_step?: string | null;
   predictions?: Record<string, unknown> | null;
+  /** Full DB predictions_json (batch job id, row counts, model_kind, etc.). */
+  predictions_payload?: Record<string, unknown> | null;
   rag?: Record<string, unknown> | null;
   actions?: Array<Record<string, unknown>> | null;
   error?: { step_name?: string | null; message?: string | null } | null;

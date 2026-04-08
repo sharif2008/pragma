@@ -425,3 +425,57 @@ def latest_prediction_rag_context(db: Session, settings: Settings) -> dict[str, 
         "row_index": None,
         "row_context": None,
     }
+
+
+def format_kb_hits_for_agent_context(hits: list[dict[str, Any]] | None) -> str | None:
+    """Format ``query_kb_multi_mmr`` hits the same way as POST /agent/decide."""
+    if not hits:
+        return None
+    lines: list[str] = []
+    for h in hits:
+        rr = h.get("rerank_score")
+        rrs = f"{float(rr):.3f}" if rr is not None else "n/a"
+        lines.append(f"- (sim={h['score']:.3f} rerank={rrs}) {h['text'][:800]}")
+    return "\n\n".join(lines)
+
+
+def default_rag_context_from_prediction_summary(
+    db: Session,
+    settings: Settings,
+    summary: dict[str, Any],
+) -> str | None:
+    """
+    Batch-level RAG string using the same defaults as POST /agent/decide when ``use_rag`` is true
+    and ``kb_citations`` are not provided: first template's retrieval queries, multi-query MMR,
+    ``final_k`` capped at 12, ``per_query_k=12``, ``mmr_lambda=0.55``, then ``query_kb`` fallback.
+    """
+    templates = build_rag_templates_from_summary(summary)
+    queries: list[str] = []
+    if templates and isinstance(templates[0], dict):
+        rq = templates[0].get("retrieval_queries")
+        if isinstance(rq, list):
+            queries = [str(x) for x in rq if str(x).strip()]
+    if not queries:
+        queries = [
+            "Security policy actions for network anomalies and attack classification outcomes. "
+            f"Batch stats: flagged={summary.get('rows_flagged')}, total={summary.get('rows_total')}."
+        ]
+    raw_hits, _meta = query_kb_multi_mmr(
+        db,
+        settings,
+        queries,
+        final_k=min(max(settings.rag_top_k, 6), 12),
+        per_query_k=12,
+        mmr_lambda=0.55,
+        kb_public_ids=None,
+    )
+    if raw_hits:
+        return format_kb_hits_for_agent_context(raw_hits)
+    q = (
+        "Security policy actions for network anomalies and attack classification outcomes. "
+        f"Batch stats: flagged={summary.get('rows_flagged')}, total={summary.get('rows_total')}."
+    )
+    hits = query_kb(db, settings, q, settings.rag_top_k, None)
+    if hits:
+        return "\n\n".join(f"- ({s:.3f}) {c.get('text', '')[:800]}" for s, c, _ in hits)
+    return None

@@ -3,19 +3,21 @@ import type { IconButtonProps } from '@mui/material/IconButton';
 import { useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Popover from '@mui/material/Popover';
 import Divider from '@mui/material/Divider';
 import MenuList from '@mui/material/MenuList';
-import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import MenuItem, { menuItemClasses } from '@mui/material/MenuItem';
 
-import { CONFIG } from 'src/config-global';
-import { Logo } from 'src/components/logo';
 import { useRouter, usePathname } from 'src/routes/hooks';
+
+import { CONFIG } from 'src/config-global';
+
+import { Logo } from 'src/components/logo';
 
 // ----------------------------------------------------------------------
 

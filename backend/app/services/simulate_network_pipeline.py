@@ -7,7 +7,7 @@ import csv
 import io
 import json
 import logging
-import uuid
+import time
 from typing import Any
 
 from fastapi import UploadFile
@@ -19,8 +19,9 @@ from app.core.config import Settings
 from app.db.session import SessionLocal
 from app.models.domain import AgentRunStatus, ManagedFile, ModelVersion
 from app.models.domain import FileKind, JobStatus, PredictionJob
-from app.services import file_service, prediction_service
+from app.services import agent_service, file_service, prediction_service
 from app.services.agentic_llm_prompt import (
+    build_agentic_decide_user_prompt,
     build_sample_from_prediction_job,
     load_attack_agentic_config,
 )
@@ -30,6 +31,50 @@ from app.services.rag_templates_row_context import build_row_agent_templates
 from app.services.run_service import StepTimer, emit_event, now_utc, sanitize_error, update_run
 
 logger = logging.getLogger(__name__)
+
+# Must match app.schemas.runs.AttachmentType for RunPredictionOut validation.
+_PRED_ATTACHMENT_TYPES = frozenset({"none", "image", "pdf", "audio", "text", "unknown"})
+
+
+def _agent_decide_rag_k(settings: Settings) -> tuple[int, int, float]:
+    """Same RAG pool sizing as POST /agent/decide (``_build_rag_context``)."""
+    return min(max(settings.rag_top_k, 6), 12), 12, 0.55
+
+
+def _merge_batch_and_row_rag(batch_ctx: str | None, row_ctx: str | None) -> str | None:
+    parts: list[str] = []
+    b = (batch_ctx or "").strip()
+    r = (row_ctx or "").strip()
+    if b:
+        parts.append("=== Batch context (latest prediction summary → default RAG) ===\n" + b)
+    if r:
+        parts.append("=== Row context (SHAP-targeted retrieval) ===\n" + r)
+    return "\n\n".join(parts) if parts else None
+
+
+async def _wait_for_prediction_job(
+    db: Session,
+    job_db_id: int,
+    *,
+    timeout_s: float = 300.0,
+    poll_s: float = 0.2,
+) -> PredictionJob | None:
+    """
+    Reload the prediction job until it leaves pending/running.
+
+    ``run_prediction_job_sync`` uses a separate DB session. On SQLite especially, the
+    caller's session can see a stale ``pending`` row until the transaction is reset.
+    """
+    deadline = time.monotonic() + timeout_s
+    last: PredictionJob | None = None
+    while time.monotonic() < deadline:
+        db.rollback()
+        last = db.get(PredictionJob, job_db_id)
+        if last is not None and last.status in (JobStatus.completed, JobStatus.failed):
+            return last
+        await asyncio.sleep(poll_s)
+    db.rollback()
+    return db.get(PredictionJob, job_db_id)
 
 
 def _upload_file_from_bytes(*, filename: str, content_type: str, data: bytes) -> UploadFile:
@@ -141,6 +186,7 @@ async def run_simulated_network_traffic(
         t_pred = StepTimer()
         emit_event(db, run_id=run_id, trace_id=trace_id, step_name="prediction", level="info", message="started")
         job = prediction_service.create_prediction_job(db, mv_public, mf.public_id, config={"compute_shap": True})
+        jid = job.id
         emit_event(
             db,
             run_id=run_id,
@@ -150,25 +196,55 @@ async def run_simulated_network_traffic(
             message="job_created",
             payload={"prediction_job_public_id": job.public_id, "model_version_public_id": mv_public},
         )
-        prediction_service.run_prediction_job_sync(job.id)
-        # run_prediction_job_sync uses its own SessionLocal; expunge so we reload this row from DB.
-        jid = job.id
         db.expunge(job)
-        job2 = db.get(PredictionJob, jid)
+        db.rollback()
+        prediction_service.run_prediction_job_sync(jid)
+        job2 = await _wait_for_prediction_job(db, jid)
         if not job2 or job2.status != JobStatus.completed or not isinstance(job2.results_json, dict):
-            raise RuntimeError(f"prediction failed status={(job2.status.value if job2 else 'missing')}")
+            hint = (job2.error_message or "").strip()[:400] if job2 else ""
+            raise RuntimeError(
+                f"prediction failed status={(job2.status.value if job2 else 'missing')}"
+                + (f": {hint}" if hint else "")
+            )
 
         rj = job2.results_json
         rows_json = rj.get("rows") if isinstance(rj, dict) else None
         rows_list: list[dict[str, Any]] = [x for x in (rows_json or []) if isinstance(x, dict)]
+        rows_flagged = sum(1 for x in rows_list if x.get("flagged_attack_or_anomaly"))
+        pick_row: dict[str, Any] | None = None
+        for x in rows_list:
+            if x.get("flagged_attack_or_anomaly"):
+                pick_row = x
+                break
+        if pick_row is None and rows_list:
+            pick_row = rows_list[0]
 
-        # Store run-level summary in predictions_json for dashboard list
-        pred_summary = {
+        # Store run-level summary in predictions_json for dashboard list / run detail API
+        pred_summary: dict[str, Any] = {
             "prediction_job_public_id": job2.public_id,
             "model_kind": rj.get("model_kind"),
             "rows_total": len(rows_list),
-            "rows_flagged": sum(1 for x in rows_list if x.get("flagged_attack_or_anomaly")),
+            "rows_flagged": rows_flagged,
         }
+        if pick_row:
+            pred_summary["predicted_label"] = pick_row.get("predicted_label")
+            pred_summary["max_class_probability"] = pick_row.get("max_class_probability")
+            pred_summary["flagged_attack_or_anomaly"] = bool(pick_row.get("flagged_attack_or_anomaly"))
+            at = pick_row.get("attachment_type")
+            if isinstance(at, str):
+                at_norm = at.strip().lower()
+                if at_norm in _PRED_ATTACHMENT_TYPES:
+                    pred_summary["attachment_type"] = at_norm
+            mc = pick_row.get("max_class_probability")
+            if mc is not None:
+                try:
+                    pred_summary["confidence"] = float(mc)
+                except (TypeError, ValueError):
+                    pass
+        if "confidence" not in pred_summary and rows_list:
+            pred_summary["confidence"] = rows_flagged / max(len(rows_list), 1)
+        if "flagged_attack_or_anomaly" not in pred_summary:
+            pred_summary["flagged_attack_or_anomaly"] = rows_flagged > 0
         emit_event(
             db,
             run_id=run_id,
@@ -245,19 +321,19 @@ async def run_simulated_network_traffic(
                 duration_ms=t_ragw.ms(),
             )
 
-        # For each relevant row, run retrieval + agentic decide
+        # For each traffic row: batch RAG (same defaults as POST /agent/decide) + SHAP-row RAG + agentic decide.
         summary = prediction_service.load_prediction_summary(settings, job2)
+        batch_rag_ctx = kb_service.default_rag_context_from_prediction_summary(db, settings, summary)
         attack_actions_data, agentic_features_data = load_attack_agentic_config(verbose=False)
+        final_k, per_qk, mmr_lam = _agent_decide_rag_k(settings)
 
         actions_out: list[dict[str, Any]] = []
         for row in rows_list:
+            if not isinstance(row, dict):
+                continue
             row_idx = row.get("row_index")
-            pred_label = str(row.get("predicted_label") or "").strip().upper()
+            pred_label = str(row.get("predicted_label") or "").strip().upper() or "UNKNOWN"
             flagged = bool(row.get("flagged_attack_or_anomaly"))
-            if not pred_label:
-                continue
-            if pred_label == "BENIGN" and not flagged:
-                continue
 
             t_row = StepTimer()
             emit_event(
@@ -299,12 +375,13 @@ async def run_simulated_network_traffic(
                 db,
                 settings,
                 retrieval_queries[:6],
-                final_k=min(max(settings.rag_top_k, 6), 10),
-                per_query_k=12,
-                mmr_lambda=0.55,
+                final_k=final_k,
+                per_query_k=per_qk,
+                mmr_lambda=mmr_lam,
                 kb_public_ids=None,
             )
-            rag_context = "\n\n".join(f"- (sim={h['score']:.3f}) {h['text'][:800]}" for h in (hits or [])) if hits else None
+            row_rag_ctx = kb_service.format_kb_hits_for_agent_context(hits)
+            rag_context = _merge_batch_and_row_rag(batch_rag_ctx, row_rag_ctx)
             emit_event(
                 db,
                 run_id=run_id,
@@ -341,11 +418,37 @@ async def run_simulated_network_traffic(
                 agentic_features_data=agentic_features_data,
                 use_rag=True,
             )
+            user_prompt = build_agentic_decide_user_prompt(
+                sample_data,
+                rag_context,
+                attack_actions_data,
+                agentic_features_data,
+                include_knowledge_base=True,
+                feature_notes=None,
+            )
+            aj = agent_service.create_agentic_job(
+                db,
+                prediction_job_public_id=job2.public_id,
+                results_row_index=ri,
+                label=f"net-pipeline:{run_id[:8]} row={ri} {pred_label}",
+            )
+            agent_service.persist_agentic_report_from_decision(
+                db,
+                settings,
+                job=job2,
+                results_row_index=ri,
+                agentic_job_id=aj.id,
+                agentic_job_public_id=aj.public_id,
+                sample_data=sample_data,
+                user_prompt=user_prompt,
+                decision=decision,
+            )
             row_action = {
                 "row_index": ri,
                 "predicted_label": pred_label,
                 "flagged_attack_or_anomaly": flagged,
                 "row_context": row_ctx,
+                "agentic_job_public_id": aj.public_id,
                 "agentic_summary": decision.get("summary"),
                 "recommended_action": decision.get("recommended_action"),
             }
@@ -459,7 +562,8 @@ async def run_simulated_network_event(
         # Step: prediction job
         t_pred = StepTimer()
         emit_event(db, run_id=run_id, trace_id=trace_id, step_name="prediction", level="info", message="started")
-        job = prediction_service.create_prediction_job(db, mv_public, mf.public_id, config={"compute_shap": False})
+        job = prediction_service.create_prediction_job(db, mv_public, mf.public_id, config={"compute_shap": True})
+        jid = job.id
         emit_event(
             db,
             run_id=run_id,
@@ -469,12 +573,16 @@ async def run_simulated_network_event(
             message="job_created",
             payload={"prediction_job_public_id": job.public_id, "model_version_public_id": mv_public},
         )
-        prediction_service.run_prediction_job_sync(job.id)
-        jid = job.id
         db.expunge(job)
-        job2 = db.get(PredictionJob, jid)
+        db.rollback()
+        prediction_service.run_prediction_job_sync(jid)
+        job2 = await _wait_for_prediction_job(db, jid)
         if not job2 or job2.status != JobStatus.completed or not isinstance(job2.results_json, dict):
-            raise RuntimeError(f"prediction failed status={(job2.status.value if job2 else 'missing')}")
+            hint = (job2.error_message or "").strip()[:400] if job2 else ""
+            raise RuntimeError(
+                f"prediction failed status={(job2.status.value if job2 else 'missing')}"
+                + (f": {hint}" if hint else "")
+            )
 
         rows = job2.results_json.get("rows")
         r0 = rows[0] if isinstance(rows, list) and rows and isinstance(rows[0], dict) else {}
@@ -500,49 +608,121 @@ async def run_simulated_network_event(
         if isinstance(force_step, str) and force_step.strip() == "prediction":
             raise RuntimeError("Forced error at step=prediction")
 
-        # Step: action_selection (agentic orchestration for non-BENIGN predictions)
-        predicted_label = str(pred_payload.get("predicted_label") or "").strip().upper()
-        if predicted_label and predicted_label != "BENIGN":
-            t_act = StepTimer()
-            emit_event(db, run_id=run_id, trace_id=trace_id, step_name="action_selection", level="info", message="started")
-            summary = prediction_service.load_prediction_summary(settings, job2)
-            sample_data = build_sample_from_prediction_job(job2, summary, results_row_index=0)
-            attack_actions_data, agentic_features_data = load_attack_agentic_config(verbose=False)
-            prompt = build_agentic_decide_user_prompt(
-                sample_data,
-                rag_context=None,
-                attack_actions_data=attack_actions_data,
-                agentic_features_data=agentic_features_data,
-                include_knowledge_base=False,
-                feature_notes=None,
-            )
-            # Use the existing LLM client wrapper (OpenAI if configured; mock otherwise).
-            decision = await llm_service.agent_decide(
-                settings,
-                sample_data=sample_data,
-                feature_notes=None,
-                rag_context=None,
-                attack_actions_data=attack_actions_data,
-                agentic_features_data=agentic_features_data,
-                use_rag=False,
-            )
+        # Step: action_selection — batch RAG + SHAP-row RAG + agent decide + agentic job/report (POST /decide parity)
+        predicted_label = str(pred_payload.get("predicted_label") or "").strip().upper() or "UNKNOWN"
+        flagged = bool(pred_payload.get("flagged_attack_or_anomaly"))
+        t_act = StepTimer()
+        emit_event(db, run_id=run_id, trace_id=trace_id, step_name="action_selection", level="info", message="started")
+        summary = prediction_service.load_prediction_summary(settings, job2)
+        batch_rag_ctx = kb_service.default_rag_context_from_prediction_summary(db, settings, summary)
+        sample_data = build_sample_from_prediction_job(job2, summary, results_row_index=0)
+        attack_actions_data, agentic_features_data = load_attack_agentic_config(verbose=False)
+        final_k, per_qk, mmr_lam = _agent_decide_rag_k(settings)
 
-            actions_payload: dict[str, Any] = {"agentic_summary": decision.get("summary"), "recommended_action": decision.get("recommended_action")}
-            raw = decision.get("raw_llm_response")
-            if isinstance(raw, str) and raw.strip():
-                actions_payload["raw_llm_response"] = raw[:20000]
+        base = f"{summary.get('rows_flagged')} flagged / {summary.get('rows_total')} total"
+        _extra_templates, row_ctx = build_row_agent_templates(
+            job_public_id=job2.public_id,
+            row=r0,
+            base_summary_line=str(base),
+        )
+        retrieval_queries: list[str] = []
+        if _extra_templates and isinstance(_extra_templates[0], dict):
+            rq = _extra_templates[0].get("retrieval_queries")
+            if isinstance(rq, list):
+                retrieval_queries = [str(x) for x in rq if str(x).strip()]
+        if not retrieval_queries:
+            retrieval_queries = [f"SOC runbooks and response guidance for label={predicted_label}"]
 
-            update_run(db, run_id, final_actions=actions_payload)
-            emit_event(
-                db,
-                run_id=run_id,
-                trace_id=trace_id,
-                step_name="action_selection",
-                level="info",
-                message="completed",
-                payload={"recommended_action": decision.get("recommended_action")},
-                duration_ms=t_act.ms(),
-            )
+        t_ret = StepTimer()
+        emit_event(
+            db,
+            run_id=run_id,
+            trace_id=trace_id,
+            step_name="retrieval",
+            level="info",
+            message="started",
+            payload={"queries": len(retrieval_queries)},
+        )
+        hits, meta = kb_service.query_kb_multi_mmr(
+            db,
+            settings,
+            retrieval_queries[:6],
+            final_k=final_k,
+            per_query_k=per_qk,
+            mmr_lambda=mmr_lam,
+            kb_public_ids=None,
+        )
+        row_rag_ctx = kb_service.format_kb_hits_for_agent_context(hits)
+        rag_context = _merge_batch_and_row_rag(batch_rag_ctx, row_rag_ctx)
+        emit_event(
+            db,
+            run_id=run_id,
+            trace_id=trace_id,
+            step_name="retrieval",
+            level="info",
+            message="completed",
+            payload={"hits": len(hits or []), "meta": meta},
+            duration_ms=t_ret.ms(),
+        )
+
+        decision = await llm_service.agent_decide(
+            settings,
+            sample_data=sample_data,
+            feature_notes=None,
+            rag_context=rag_context,
+            attack_actions_data=attack_actions_data,
+            agentic_features_data=agentic_features_data,
+            use_rag=True,
+        )
+        user_prompt = build_agentic_decide_user_prompt(
+            sample_data,
+            rag_context,
+            attack_actions_data,
+            agentic_features_data,
+            include_knowledge_base=True,
+            feature_notes=None,
+        )
+        aj = agent_service.create_agentic_job(
+            db,
+            prediction_job_public_id=job2.public_id,
+            results_row_index=0,
+            label=f"net-event:{run_id[:8]} {predicted_label}",
+        )
+        agent_service.persist_agentic_report_from_decision(
+            db,
+            settings,
+            job=job2,
+            results_row_index=0,
+            agentic_job_id=aj.id,
+            agentic_job_public_id=aj.public_id,
+            sample_data=sample_data,
+            user_prompt=user_prompt,
+            decision=decision,
+        )
+
+        actions_payload: dict[str, Any] = {
+            "predicted_label": predicted_label,
+            "flagged_attack_or_anomaly": flagged,
+            "row_context": row_ctx,
+            "agentic_job_public_id": aj.public_id,
+            "agentic_summary": decision.get("summary"),
+            "recommended_action": decision.get("recommended_action"),
+        }
+        raw = decision.get("raw_llm_response")
+        if isinstance(raw, str) and raw.strip():
+            actions_payload["raw_llm_response"] = raw[:20000]
+
+        update_run(db, run_id, final_actions=actions_payload)
+        emit_event(
+            db,
+            run_id=run_id,
+            trace_id=trace_id,
+            step_name="action_selection",
+            level="info",
+            message="completed",
+            payload={"recommended_action": decision.get("recommended_action")},
+            duration_ms=t_act.ms(),
+        )
 
         # Step: completed
         update_run(

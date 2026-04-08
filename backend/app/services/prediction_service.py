@@ -134,6 +134,7 @@ def run_prediction_job_sync(job_db_id: int) -> None:
     try:
         job = db.get(PredictionJob, job_db_id)
         if not job:
+            logger.warning("run_prediction_job_sync: prediction_jobs.id=%s not found (skipping)", job_db_id)
             return
         job.status = JobStatus.running
         db.commit()

@@ -4,8 +4,8 @@ import { useEffect } from 'react';
 
 import { usePathname } from 'src/routes/hooks';
 
-import { AppSnackbarProvider } from 'src/contexts/app-snackbar-context';
 import { ThemeProvider } from 'src/theme/theme-provider';
+import { AppSnackbarProvider } from 'src/contexts/app-snackbar-context';
 
 // ----------------------------------------------------------------------
 

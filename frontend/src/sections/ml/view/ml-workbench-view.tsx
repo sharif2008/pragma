@@ -1,18 +1,18 @@
 import type { IconifyName } from 'src/components/iconify';
 import type { PredictionJobListItem } from 'src/services/predictions.service';
 import type {
+  JobStatus,
   KBQueryHit,
+  AgenticJobOut,
   ManagedFileOut,
   TrainingJobOut,
   ModelVersionOut,
   RAGTemplateItem,
   PredictionJobOut,
+  AgenticReportOut,
   DatasetPreviewOut,
   PredictionResultsJson,
   KBRAGLatestPredictionResponse,
-  AgenticReportOut,
-  AgenticJobOut,
-  JobStatus,
 } from 'src/api/types';
 
 import { useId, useRef, useMemo, Fragment, useState, useEffect, useCallback, type ReactNode } from 'react';
@@ -27,9 +27,8 @@ import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Paper from '@mui/material/Paper';
 import Button from '@mui/material/Button';
-import Tooltip from '@mui/material/Tooltip';
-import IconButton from '@mui/material/IconButton';
 import Dialog from '@mui/material/Dialog';
+import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
 import Checkbox from '@mui/material/Checkbox';
 import MenuItem from '@mui/material/MenuItem';
@@ -40,6 +39,7 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TextField from '@mui/material/TextField';
 import Accordion from '@mui/material/Accordion';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -53,6 +53,7 @@ import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 
 import { fDateTime } from 'src/utils/format-time';
+import { sortByTime, type TimeSortOrder } from 'src/utils/table-time-sort';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import {
@@ -63,7 +64,6 @@ import {
   getHealth,
   listModels,
   agentDecide,
-  agentDecidePromptPreview,
   kbListFiles,
   deleteModel,
   listDatasets,
@@ -73,35 +73,37 @@ import {
   startTraining,
   uploadDataset,
   getTrainingJob,
+  getAgentReport,
   rebuildTraining,
   startPrediction,
   getPredictionJob,
   listTrainingJobs,
+  createAgenticJob,
   deleteTrainingJob,
   getDatasetPreview,
-  listAllPredictionJobs,
-  deletePredictionJob,
-  deleteAllPendingPredictionJobs,
-  listPredictionInputs,
-  uploadPredictionInput,
-  kbRagTemplatesPredictionJob,
-  kbLlmShapRetrievalQuery,
-  listAllAgentReports,
   deleteAgentReport,
-  getAgentReport,
-  createAgenticJob,
   listAllAgenticJobs,
+  deletePredictionJob,
+  listAllAgentReports,
+  listPredictionInputs,
+  listAllPredictionJobs,
+  uploadPredictionInput,
+  kbLlmShapRetrievalQuery,
+  agentDecidePromptPreview,
+  kbRagTemplatesPredictionJob,
+  deleteAllPendingPredictionJobs,
 } from 'src/services';
 
 import { Iconify } from 'src/components/iconify';
+import { TimeSortHeadCell } from 'src/components/table-sort/time-sort-head-cell';
 import { ModelVersionDetailDialog } from 'src/components/run-monitoring/detail-dialogs';
 
 import {
-  AGENTIC_PREP_UPDATED_EVENT,
   readAgenticPrep,
-  upsertAgenticJobHandoff,
   writeAgenticPrep,
+  upsertAgenticJobHandoff,
   type AgenticPrepPayload,
+  AGENTIC_PREP_UPDATED_EVENT,
 } from 'src/sections/ml/agentic-prep-storage';
 
 // ----------------------------------------------------------------------
@@ -1137,13 +1139,19 @@ function DatasetsPanel({ onNotify }: PanelProps) {
   const [previewRow, setPreviewRow] = useState<ManagedFileOut | null>(null);
   const [previewData, setPreviewData] = useState<DatasetPreviewOut | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [datasetTimeOrder, setDatasetTimeOrder] = useState<TimeSortOrder>('desc');
+
+  const rowsSorted = useMemo(
+    () => sortByTime(rows, (r) => r.created_at, datasetTimeOrder),
+    [rows, datasetTimeOrder]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
     onNotify(null);
     try {
       const list = await listDatasets();
-      setRows([...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      setRows(list);
     } catch (e) {
       onNotify({ severity: 'error', text: formatError(e) });
     } finally {
@@ -1241,7 +1249,7 @@ function DatasetsPanel({ onNotify }: PanelProps) {
               <TableCell>public_id</TableCell>
               <TableCell>Parent</TableCell>
               <TableCell>Size</TableCell>
-              <TableCell>Uploaded</TableCell>
+              <TimeSortHeadCell label="Uploaded" order={datasetTimeOrder} onOrderChange={setDatasetTimeOrder} />
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -1255,7 +1263,7 @@ function DatasetsPanel({ onNotify }: PanelProps) {
                 </TableCell>
               </TableRow>
             )}
-            {rows.map((r) => (
+            {rowsSorted.map((r) => (
               <TableRow key={r.public_id} hover>
                 <TableCell sx={{ whiteSpace: 'nowrap' }}>{r.original_name}</TableCell>
                 <TableCell>
@@ -1388,11 +1396,28 @@ function TrainingPanel({ onNotify }: PanelProps) {
   const [jobs, setJobs] = useState<TrainingJobOut[]>([]);
   const [models, setModels] = useState<Awaited<ReturnType<typeof listModels>>>([]);
   const [modelDetail, setModelDetail] = useState<ModelVersionOut | null>(null);
+  const [jobsTimeOrder, setJobsTimeOrder] = useState<TimeSortOrder>('desc');
+  const [modelsTimeOrder, setModelsTimeOrder] = useState<TimeSortOrder>('desc');
+
+  const datasetsForSelect = useMemo(
+    () => sortByTime(datasets, (d) => d.created_at, 'desc'),
+    [datasets]
+  );
+
+  const jobsSorted = useMemo(
+    () => sortByTime(jobs, (j) => j.updated_at, jobsTimeOrder),
+    [jobs, jobsTimeOrder]
+  );
+
+  const modelsSorted = useMemo(
+    () => sortByTime(models, (m) => m.created_at, modelsTimeOrder),
+    [models, modelsTimeOrder]
+  );
 
   const loadDatasets = useCallback(async () => {
     try {
       const list = await listDatasets();
-      setDatasets([...list].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      setDatasets(list);
     } catch (e) {
       onNotify({ severity: 'error', text: formatError(e) });
     }
@@ -1459,7 +1484,7 @@ function TrainingPanel({ onNotify }: PanelProps) {
               No datasets
             </MenuItem>
           )}
-          {datasets.map((d) => (
+          {datasetsForSelect.map((d) => (
             <MenuItem key={d.public_id} value={d.public_id}>
               {d.original_name} · v{d.version} · {d.public_id.slice(0, 8)}…
             </MenuItem>
@@ -1512,7 +1537,7 @@ function TrainingPanel({ onNotify }: PanelProps) {
               <TableCell>Target</TableCell>
               <TableCell>Algorithm</TableCell>
               <TableCell>Model</TableCell>
-              <TableCell>Updated</TableCell>
+              <TimeSortHeadCell label="Updated" order={jobsTimeOrder} onOrderChange={setJobsTimeOrder} />
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
@@ -1526,7 +1551,7 @@ function TrainingPanel({ onNotify }: PanelProps) {
                 </TableCell>
               </TableRow>
             )}
-            {jobs.map((j) => (
+            {jobsSorted.map((j) => (
               <TableRow key={j.public_id} hover>
                 <TableCell>
                   <Chip size="small" label={j.status} color={trainingStatusColor(j.status)} variant="outlined" />
@@ -1629,6 +1654,7 @@ function TrainingPanel({ onNotify }: PanelProps) {
             <TableCell>public_id</TableCell>
             <TableCell>algorithm</TableCell>
             <TableCell>version</TableCell>
+            <TimeSortHeadCell label="Registered" order={modelsTimeOrder} onOrderChange={setModelsTimeOrder} />
             <TableCell>metrics</TableCell>
             <TableCell align="right">View</TableCell>
             <TableCell align="right">Actions</TableCell>
@@ -1637,18 +1663,19 @@ function TrainingPanel({ onNotify }: PanelProps) {
         <TableBody>
           {models.length === 0 && (
             <TableRow>
-              <TableCell colSpan={6}>
+              <TableCell colSpan={7}>
                 <Typography variant="body2" color="text.secondary">
                   No registered models yet.
                 </Typography>
               </TableCell>
             </TableRow>
           )}
-          {models.map((m) => (
+          {modelsSorted.map((m) => (
             <TableRow key={m.public_id}>
               <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{m.public_id}</TableCell>
               <TableCell>{m.algorithm}</TableCell>
               <TableCell>{m.version_number}</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap', typography: 'caption' }}>{fDateTime(m.created_at)}</TableCell>
               <TableCell sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {m.metrics_json ? JSON.stringify(m.metrics_json) : '—'}
               </TableCell>
@@ -1728,6 +1755,22 @@ function PredictionsPanel({ onNotify }: PanelProps) {
   const [viewJobLoading, setViewJobLoading] = useState(false);
   const lastStatusRef = useRef<string | null>(null);
   const failureNotifiedForId = useRef<string>('');
+  const [predJobsTimeOrder, setPredJobsTimeOrder] = useState<TimeSortOrder>('desc');
+
+  const predictionJobsSorted = useMemo(
+    () => sortByTime(predictionJobsList, (j) => j.created_at, predJobsTimeOrder),
+    [predictionJobsList, predJobsTimeOrder]
+  );
+
+  const modelsForPredSelect = useMemo(
+    () => sortByTime(models, (m) => m.created_at, 'desc'),
+    [models]
+  );
+
+  const inputsForPredSelect = useMemo(
+    () => sortByTime(inputs, (f) => f.created_at, 'desc'),
+    [inputs]
+  );
 
   const refreshPredictionJobsList = useCallback(async () => {
     setJobsListLoading(true);
@@ -1768,7 +1811,8 @@ function PredictionsPanel({ onNotify }: PanelProps) {
       setInputs(inp);
       setModelId((prev) => {
         if (prev && m.some((x) => x.public_id === prev)) return prev;
-        return m[0]?.public_id ?? '';
+        const newest = sortByTime(m, (x) => x.created_at, 'desc')[0];
+        return newest?.public_id ?? '';
       });
       // Do not auto-pick an input: user chooses runtime scoring CSV (separate from training data).
       setInputId((prev) => {
@@ -1936,7 +1980,7 @@ function PredictionsPanel({ onNotify }: PanelProps) {
               No models
             </MenuItem>
           )}
-          {models.map((m) => (
+          {modelsForPredSelect.map((m) => (
             <MenuItem key={m.public_id} value={m.public_id}>
               v{m.version_number} · {m.algorithm} · {m.public_id.slice(0, 8)}…
             </MenuItem>
@@ -1994,7 +2038,7 @@ function PredictionsPanel({ onNotify }: PanelProps) {
             <MenuItem value="">
               <em>Select input for this run…</em>
             </MenuItem>
-            {inputs.map((f) => (
+            {inputsForPredSelect.map((f) => (
               <MenuItem key={f.public_id} value={f.public_id}>
                 {f.original_name} · v{f.version} · {f.public_id.slice(0, 8)}…
               </MenuItem>
@@ -2073,7 +2117,7 @@ function PredictionsPanel({ onNotify }: PanelProps) {
                   <TableCell>public_id</TableCell>
                   <TableCell>status</TableCell>
                   <TableCell align="right">rows</TableCell>
-                  <TableCell>created</TableCell>
+                  <TimeSortHeadCell label="Created" order={predJobsTimeOrder} onOrderChange={setPredJobsTimeOrder} />
                   <TableCell align="right">actions</TableCell>
                 </TableRow>
               </TableHead>
@@ -2087,7 +2131,7 @@ function PredictionsPanel({ onNotify }: PanelProps) {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  predictionJobsList.map((j) => (
+                  predictionJobsSorted.map((j) => (
                     <TableRow key={j.public_id} hover>
                       <TableCell sx={{ fontFamily: 'monospace', fontSize: 12, maxWidth: 220, wordBreak: 'break-all' }}>
                         {j.public_id}
@@ -2328,7 +2372,7 @@ function PredictionsPanel({ onNotify }: PanelProps) {
               <em>Select or clear…</em>
             </MenuItem>
             {renderPredictionJobOrphanMenuItem(predJobId, predictionJobsList)}
-            {predictionJobsList.map((j) => (
+            {predictionJobsSorted.map((j) => (
               <MenuItem key={j.public_id} value={j.public_id}>
                 <Stack spacing={0.25} alignItems="flex-start" sx={{ py: 0.5, maxWidth: 1 }}>
                   <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>
@@ -2450,6 +2494,12 @@ function PredictionsPanel({ onNotify }: PanelProps) {
 function KbPanel({ onNotify }: PanelProps) {
   const [rows, setRows] = useState<Awaited<ReturnType<typeof kbListFiles>>>([]);
   const [kbUploading, setKbUploading] = useState(false);
+  const [kbTimeOrder, setKbTimeOrder] = useState<TimeSortOrder>('desc');
+
+  const kbRowsSorted = useMemo(
+    () => sortByTime(rows, (r) => r.created_at, kbTimeOrder),
+    [rows, kbTimeOrder]
+  );
 
   const load = useCallback(async () => {
     try {
@@ -2498,15 +2548,17 @@ function KbPanel({ onNotify }: PanelProps) {
             <TableCell>public_id</TableCell>
             <TableCell>chunks</TableCell>
             <TableCell>embedding</TableCell>
+            <TimeSortHeadCell label="Indexed" order={kbTimeOrder} onOrderChange={setKbTimeOrder} />
             <TableCell align="right">actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((r) => (
+          {kbRowsSorted.map((r) => (
             <TableRow key={r.public_id}>
               <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{r.public_id}</TableCell>
               <TableCell>{r.chunk_count}</TableCell>
               <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.embedding_model}</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap', typography: 'caption' }}>{fDateTime(r.created_at)}</TableCell>
               <TableCell align="right">
                 <Button
                   size="small"
@@ -2714,20 +2766,6 @@ function formatAgentReportsLineSummary(
   return `${lineReports.length} agent reports for this ${scopeNoun} · latest ${fDateTime(latest)}`;
 }
 
-/** List-row fields: inference job status plus batch flag counts (no per-row label without full results). */
-function predictionJobBatchCaption(j: PredictionJobListItem): string {
-  const parts = [`job ${j.status}`];
-  if (j.rows_total != null && j.rows_total >= 0) {
-    const fg = j.rows_flagged;
-    parts.push(
-      fg != null && fg >= 0 ? `${fg} flagged / ${j.rows_total} rows` : `${j.rows_total} rows`
-    );
-  }
-  const mk = formatPredictionModelKind(j.results_model_kind);
-  if (mk) parts.push(mk);
-  return parts.join(' · ');
-}
-
 /** Keeps MUI Select valid when ``currentId`` is set but not present in ``jobs`` (e.g. after refresh). */
 function renderPredictionJobOrphanMenuItem(
   currentId: string,
@@ -2859,6 +2897,11 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
   const [shapRetrievalLlmLoading, setShapRetrievalLlmLoading] = useState(false);
   const [prepSavedForAgenticAlert, setPrepSavedForAgenticAlert] = useState<string | null>(null);
 
+  const jobRowsSorted = useMemo(
+    () => sortByTime(jobRows, (j) => j.created_at, 'desc'),
+    [jobRows]
+  );
+
   const loadJobList = useCallback(async () => {
     setListLoading(true);
     try {
@@ -2945,7 +2988,7 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
 
   const selectedTemplate: RAGTemplateItem | undefined = predCtx?.templates?.find((t) => t.id === templateId);
   const summaryRagLine = ragSummaryQueryFromTemplates(predCtx?.templates);
-  const completedJobs = jobRows.filter((j) => j.status === 'completed');
+  const completedJobs = jobRowsSorted.filter((j) => j.status === 'completed');
   const resultRows = loadedJob?.results_json?.rows;
 
   useEffect(() => {
@@ -3134,13 +3177,13 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
           void loadJobById(v);
         }}
         SelectProps={{ displayEmpty: true, MenuProps: PRED_JOB_SELECT_MENU_PROPS }}
-        helperText={`${jobRows.length} prediction job(s) (${completedJobs.length} completed) · choosing a job loads full results_json (all rows) for batch or row-level RAG`}
+        helperText={`${jobRows.length} prediction job(s) (${completedJobs.length} completed) · dropdown: newest first · choosing a job loads full results_json (all rows) for batch or row-level RAG`}
       >
         <MenuItem value="">
           <em>Select a prediction job</em>
         </MenuItem>
         {renderPredictionJobOrphanMenuItem(selectedJobId, jobRows)}
-        {jobRows.map((j) => (
+        {jobRowsSorted.map((j) => (
           <MenuItem key={j.public_id} value={j.public_id}>
             <Stack spacing={0.25} alignItems="flex-start" sx={{ py: 0.5, maxWidth: 1 }}>
               <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: 12, wordBreak: 'break-all' }}>
@@ -3762,6 +3805,7 @@ function AgenticActionsPanel({ onNotify }: PanelProps) {
   const [runningTrust, setRunningTrust] = useState(false);
   const [orchestrationPrompt, setOrchestrationPrompt] = useState('');
   const [orchestrationPromptLoading, setOrchestrationPromptLoading] = useState(false);
+  const [reportsTableTimeOrder, setReportsTableTimeOrder] = useState<TimeSortOrder>('desc');
 
   const loadAgenticJobsList = useCallback(async () => {
     setAgenticJobsLoading(true);
@@ -3834,6 +3878,11 @@ function AgenticActionsPanel({ onNotify }: PanelProps) {
     if (!sel) return agentReportsList;
     return agentReportsList.filter((r) => r.agentic_job_public_id?.trim() === sel);
   }, [agentReportsList, selectedAgenticJobPublicId]);
+
+  const agentReportsTableSorted = useMemo(
+    () => sortByTime(agentReportsForTable, (r) => r.created_at, reportsTableTimeOrder),
+    [agentReportsForTable, reportsTableTimeOrder]
+  );
 
   const completedAgenticJobCount = useMemo(
     () => agenticJobsRows.filter((j) => j.prediction_status === 'completed').length,
@@ -4387,12 +4436,17 @@ function AgenticActionsPanel({ onNotify }: PanelProps) {
                     <TableCell>Row</TableCell>
                     <TableCell>Recommended action</TableCell>
                     <TableCell>Summary</TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>Created</TableCell>
+                    <TimeSortHeadCell
+                      label="Created"
+                      order={reportsTableTimeOrder}
+                      onOrderChange={setReportsTableTimeOrder}
+                      sx={{ whiteSpace: 'nowrap' }}
+                    />
                     <TableCell align="right">Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {agentReportsForTable.map((r) => (
+                  {agentReportsTableSorted.map((r) => (
                     <TableRow
                       key={r.public_id}
                       hover

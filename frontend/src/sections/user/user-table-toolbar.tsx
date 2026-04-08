@@ -19,10 +19,13 @@ export function UserTableToolbar({ numSelected, filterName, onFilterName }: User
   return (
     <Toolbar
       sx={{
-        height: 96,
+        minHeight: 52,
+        height: 52,
         display: 'flex',
         justifyContent: 'space-between',
-        p: (theme) => theme.spacing(0, 1, 0, 3),
+        gap: 1,
+        px: { xs: 1.5, sm: 2 },
+        py: 0.75,
         ...(numSelected > 0 && {
           color: 'primary.main',
           bgcolor: 'primary.lighter',
@@ -30,34 +33,35 @@ export function UserTableToolbar({ numSelected, filterName, onFilterName }: User
       }}
     >
       {numSelected > 0 ? (
-        <Typography component="div" variant="subtitle1">
+        <Typography component="div" variant="body2" sx={{ fontWeight: 600 }}>
           {numSelected} selected
         </Typography>
       ) : (
         <OutlinedInput
+          size="small"
           fullWidth
           value={filterName}
           onChange={onFilterName}
           placeholder="Search user..."
           startAdornment={
             <InputAdornment position="start">
-              <Iconify width={20} icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+              <Iconify width={18} icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
             </InputAdornment>
           }
-          sx={{ maxWidth: 320 }}
+          sx={{ maxWidth: 280, '& .MuiInputBase-input': { py: 0.75, fontSize: '0.8125rem' } }}
         />
       )}
 
       {numSelected > 0 ? (
         <Tooltip title="Delete">
-          <IconButton>
-            <Iconify icon="solar:trash-bin-trash-bold" />
+          <IconButton size="small" sx={{ p: 0.5 }}>
+            <Iconify icon="solar:trash-bin-trash-bold" width={20} />
           </IconButton>
         </Tooltip>
       ) : (
         <Tooltip title="Filter list">
-          <IconButton>
-            <Iconify icon="ic:round-filter-list" />
+          <IconButton size="small" sx={{ p: 0.5 }}>
+            <Iconify icon="ic:round-filter-list" width={20} />
           </IconButton>
         </Tooltip>
       )}

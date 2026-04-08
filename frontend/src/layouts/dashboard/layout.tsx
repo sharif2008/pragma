@@ -2,7 +2,7 @@ import type { Breakpoint } from '@mui/material/styles';
 
 import { merge } from 'es-toolkit';
 import { useBoolean } from 'minimal-shared/hooks';
-import { useCallback, useEffect, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
@@ -20,8 +20,8 @@ import { AccountPopover } from '../components/account-popover';
 import { ThemePresetSelect } from '../components/theme-preset-select';
 import {
   dashboardLayoutVars,
-  DASHBOARD_NAV_WIDTH_COLLAPSED,
   DASHBOARD_NAV_WIDTH_EXPANDED,
+  DASHBOARD_NAV_WIDTH_COLLAPSED,
 } from './css-vars';
 
 import type { MainSectionProps } from '../core/main-section';

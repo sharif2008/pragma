@@ -20,7 +20,7 @@ export function TableEmptyRows({ emptyRows, height, sx, ...other }: TableEmptyRo
       sx={[height && { height: height * emptyRows }, ...(Array.isArray(sx) ? sx : [sx])]}
       {...other}
     >
-      <TableCell colSpan={9} />
+      <TableCell colSpan={7} />
     </TableRow>
   );
 }

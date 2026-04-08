@@ -31,8 +31,9 @@ export function UserTableHead({
   return (
     <TableHead>
       <TableRow>
-        <TableCell padding="checkbox">
+        <TableCell padding="checkbox" sx={{ py: 0.5 }}>
           <Checkbox
+            size="small"
             indeterminate={numSelected > 0 && numSelected < rowCount}
             checked={rowCount > 0 && numSelected === rowCount}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
@@ -53,6 +54,7 @@ export function UserTableHead({
               active={orderBy === headCell.id}
               direction={orderBy === headCell.id ? order : 'asc'}
               onClick={() => onSort(headCell.id)}
+              sx={{ '& .MuiTableSortLabel-icon': { fontSize: 18 } }}
             >
               {headCell.label}
               {orderBy === headCell.id ? (

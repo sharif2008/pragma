@@ -78,6 +78,10 @@ class RunSummaryOut(BaseModel):
     duration_ms: int | None = None
     last_step: str | None = None
     predictions: RunPredictionOut | None = None
+    predictions_payload: dict[str, Any] | None = Field(
+        default=None,
+        description="Full agent_runs.predictions_json (job id, batch counts, model_kind, etc.).",
+    )
     rag: RunRagOut | None = None
     actions: list[dict[str, Any]] | None = None
     error: RunErrorOut | None = None
