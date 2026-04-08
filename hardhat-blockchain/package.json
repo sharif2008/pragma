@@ -6,7 +6,7 @@
     "compile": "hardhat compile",
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
-    "interact:local": "hardhat run scripts/interact.js --network localhost"
+    "anchor:local": "hardhat run scripts/interact.js --network localhost"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
