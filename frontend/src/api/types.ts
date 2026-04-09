@@ -239,6 +239,46 @@ export type AgenticReportOut = {
   trust_anchor?: Record<string, unknown> | null;
 };
 
+export type TrustAnchorListItemOut = {
+  id: number;
+  agentic_report_public_id: string;
+  prediction_job_public_id: string;
+  agentic_job_public_id?: string | null;
+  summary_preview: string;
+  recommended_action: string;
+  tx_hash: string;
+  chain_id: number;
+  contract_address: string;
+  commitment_sha256: string;
+  payload_version: string;
+  anchored_at: IsoDateString;
+  anchor_error?: string | null;
+};
+
+export type TrustAnchorOverallIntegrity = 'valid' | 'invalid' | 'unknown' | 'anchor_failed';
+
+export type TrustAnchorVerifyOut = {
+  anchor_id: number;
+  agentic_report_public_id: string;
+  prediction_job_public_id: string;
+  agentic_job_public_id?: string | null;
+  summary_preview: string;
+  recommended_action: string;
+  tx_hash: string;
+  chain_id: number;
+  contract_address: string;
+  rpc_url: string;
+  rpc_connected: boolean;
+  db_commitment_sha256: string;
+  on_chain_commitment_hex?: string | null;
+  chain_integrity_valid?: boolean | null;
+  chain_integrity_detail?: string | null;
+  recomputed_commitment_sha256?: string | null;
+  payload_integrity_valid?: boolean | null;
+  payload_integrity_detail?: string | null;
+  overall_integrity: TrustAnchorOverallIntegrity;
+};
+
 export type KBQueryResponse = {
   hits: KBQueryHit[];
 };

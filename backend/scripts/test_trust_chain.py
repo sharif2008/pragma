@@ -8,7 +8,6 @@ Usage (from backend/):
 from __future__ import annotations
 
 import argparse
-import os
 import secrets
 import sys
 from pathlib import Path
@@ -52,6 +51,20 @@ def _b32() -> str:
     return "0x" + secrets.token_hex(32)
 
 
+def _bytes32_hex(v: bytes | str) -> str:
+    """Normalize web3 bytes32 (bytes or 0x hex str) to lowercase 0x-prefixed hex."""
+    if isinstance(v, str):
+        return v.lower()
+    return Web3.to_hex(v).lower()
+
+
+def _strip_opt(s: str | None) -> str | None:
+    if s is None:
+        return None
+    t = s.strip()
+    return t or None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument(
@@ -62,19 +75,27 @@ def main() -> int:
     args = ap.parse_args()
 
     settings = get_settings()
+    contract = _strip_opt(settings.trust_chain_contract_address)
+    private_key = _strip_opt(settings.trust_chain_private_key)
+
     print("TRUST_CHAIN_ENABLED:", settings.trust_chain_enabled)
     print("TRUST_CHAIN_RPC_URL:", settings.trust_chain_rpc_url)
     print("TRUST_CHAIN_CHAIN_ID:", settings.trust_chain_chain_id)
-    print("TRUST_CHAIN_CONTRACT_ADDRESS:", settings.trust_chain_contract_address)
-    print("TRUST_CHAIN_PRIVATE_KEY set:", bool(settings.trust_chain_private_key))
+    print("TRUST_CHAIN_CONTRACT_ADDRESS:", contract or "(not set)")
+    print("TRUST_CHAIN_PRIVATE_KEY:", private_key or "(not set)")
+    if private_key:
+        print(
+            "  (local Hardhat only — do not use real keys; avoid sharing this output)",
+            file=sys.stderr,
+        )
 
     if not settings.trust_chain_enabled:
         print("ERROR: TRUST_CHAIN_ENABLED is false.")
         return 2
-    if not settings.trust_chain_contract_address:
+    if not contract:
         print("ERROR: TRUST_CHAIN_CONTRACT_ADDRESS is missing.")
         return 2
-    if args.anchor_test and not settings.trust_chain_private_key:
+    if args.anchor_test and not private_key:
         print("ERROR: TRUST_CHAIN_PRIVATE_KEY is missing (required for --anchor-test).")
         return 2
 
@@ -88,7 +109,7 @@ def main() -> int:
     if chain_id != int(settings.trust_chain_chain_id):
         print("WARN: RPC chain_id != TRUST_CHAIN_CHAIN_ID")
 
-    addr = Web3.to_checksum_address(settings.trust_chain_contract_address)
+    addr = Web3.to_checksum_address(contract)
     code = w3.eth.get_code(addr)
     print("Contract code bytes:", len(code))
     if not code or code == b"\x00":
@@ -103,12 +124,19 @@ def main() -> int:
     got = c.functions.getCommitment(agent_key, report_key).call()
     print("Read test getCommitment() ->", got)
 
+    signer = None
+    if private_key:
+        signer = w3.eth.account.from_key(private_key)
+        bal_wei = w3.eth.get_balance(signer.address)
+        print("Signer address:", signer.address)
+        print("Signer balance:", w3.from_wei(bal_wei, "ether"), "ETH (", bal_wei, "wei)")
+
     if not args.anchor_test:
         print("OK: Connected + contract readable. (Use --anchor-test to send a tx.)")
         return 0
 
-    acct = w3.eth.account.from_key(settings.trust_chain_private_key)
-    print("Signer address:", acct.address)
+    assert signer is not None
+    acct = signer
 
     commitment = _b32()
     nonce = w3.eth.get_transaction_count(acct.address)
@@ -131,7 +159,7 @@ def main() -> int:
 
     got2 = c.functions.getCommitment(agent_key, report_key).call()
     print("After anchor getCommitment() ->", got2)
-    if got2.lower() != commitment.lower():
+    if _bytes32_hex(got2) != commitment.lower():
         print("ERROR: commitment mismatch")
         return 5
 

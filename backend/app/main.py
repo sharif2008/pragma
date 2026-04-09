@@ -18,7 +18,7 @@ from app.routers import agent, datasets, files, health, kb, meta, predictions, r
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
-    setup_logging(settings.debug)
+    setup_logging(settings.debug, log_dir=settings.log_dir)
     ensure_storage_dirs(settings)
     init_db()
     yield

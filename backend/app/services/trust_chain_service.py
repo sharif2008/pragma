@@ -150,3 +150,36 @@ def anchor_report_commitment_on_chain(
     )
     return hex_hash, contract_addr, agent_key_hex, report_key_hex
 
+
+def read_commitment_from_chain(
+    settings: Settings,
+    *,
+    contract_address: str,
+    agent_key_sha256_hex: str,
+    report_key_sha256_hex: str,
+) -> tuple[bool, str | None, str | None]:
+    """
+    Call getCommitment on the registry. Returns (rpc_ok, commitment_hex_lowercase_64chars, error_message).
+    """
+    if not settings.trust_chain_rpc_url:
+        return False, None, "TRUST_CHAIN_RPC_URL missing"
+    try:
+        w3 = Web3(Web3.HTTPProvider(settings.trust_chain_rpc_url))
+        if not w3.is_connected():
+            return False, None, "could not connect to TRUST_CHAIN_RPC_URL"
+        addr = Web3.to_checksum_address(contract_address.strip())
+        contract = w3.eth.contract(address=addr, abi=_REGISTRY_ABI)
+        agent_b32 = _bytes32_hex_from_hex(agent_key_sha256_hex)
+        report_b32 = _bytes32_hex_from_hex(report_key_sha256_hex)
+        raw = contract.functions.getCommitment(agent_b32, report_b32).call()
+        if isinstance(raw, (bytes, bytearray)):
+            h = raw.hex()
+        else:
+            h = str(raw).removeprefix("0x")
+        h = h.lower()
+        if len(h) != 64:
+            return True, None, f"unexpected bytes32 length from RPC: {len(h)}"
+        return True, h, None
+    except Exception as e:
+        return False, None, str(e)[:500]
+
