@@ -18,6 +18,7 @@ export const MonitorPage = lazy(() => import('src/pages/monitor'));
 export const AgenticLayoutPage = lazy(() => import('src/pages/agentic-layout'));
 export const AgenticIndexPage = lazy(() => import('src/pages/agentic-index'));
 export const AgenticReportDetailPage = lazy(() => import('src/pages/agentic-report-detail'));
+export const AgenticTrustAnchorsPage = lazy(() => import('src/pages/agentic-trust-anchors'));
 export const UserPage = lazy(() => import('src/pages/user'));
 export const SignInPage = lazy(() => import('src/pages/sign-in'));
 export const Page404 = lazy(() => import('src/pages/page-not-found'));
@@ -60,6 +61,7 @@ export const routesSection: RouteObject[] = [
         element: <AgenticLayoutPage />,
         children: [
           { index: true, element: <AgenticIndexPage /> },
+          { path: 'trust-anchors', element: <AgenticTrustAnchorsPage /> },
           { path: 'report/:publicId', element: <AgenticReportDetailPage /> },
         ],
       },

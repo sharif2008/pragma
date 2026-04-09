@@ -2,6 +2,8 @@ import type {
   AgenticJobOut,
   AgenticReportOut,
   AgenticDecideRequest,
+  TrustAnchorVerifyOut,
+  TrustAnchorListItemOut,
   AgenticPromptPreviewOut,
   AgenticJobCreateRequest,
 } from 'src/api/types';
@@ -85,4 +87,13 @@ export async function getAgentReport(publicId: string): Promise<AgenticReportOut
 
 export async function deleteAgentReport(publicId: string): Promise<void> {
   return requestVoid(paths.agent.reportByPublicId(publicId), { method: 'DELETE' });
+}
+
+export async function listTrustAnchors(limit = 100, offset = 0): Promise<TrustAnchorListItemOut[]> {
+  const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return requestJson<TrustAnchorListItemOut[]>(`${paths.agent.trustAnchors}?${q}`);
+}
+
+export async function verifyTrustAnchor(anchorId: number): Promise<TrustAnchorVerifyOut> {
+  return requestJson<TrustAnchorVerifyOut>(paths.agent.trustAnchorVerify(anchorId));
 }

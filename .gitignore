@@ -97,3 +97,6 @@ backend/storage/vector_db/**
 !backend/storage/vector_db/.gitkeep
 backend/storage/training_datasets/**
 !backend/storage/training_datasets/.gitkeep
+
+# Backend file logs
+backend/logs/

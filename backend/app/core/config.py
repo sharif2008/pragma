@@ -34,6 +34,9 @@ class Settings(BaseSettings):
         alias="STORAGE_ROOT",
     )
 
+    # Application log directory (default: backend/logs/)
+    log_dir: Path = Field(default=_BACKEND_DIR / "logs", alias="LOG_DIR")
+
     openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
 
@@ -81,6 +84,8 @@ def ensure_storage_dirs(settings: Settings) -> None:
     )
     for d in subdirs:
         d.mkdir(parents=True, exist_ok=True)
+
+    settings.log_dir.mkdir(parents=True, exist_ok=True)
 
     # Ensure a stable local HuggingFace cache directory.
     settings.hf_home.mkdir(parents=True, exist_ok=True)

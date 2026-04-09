@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,7 +19,12 @@ from app.models.domain import (
     JobStatus,
     PredictionJob,
 )
-from app.schemas.prediction import AgenticJobOut, AgenticReportOut
+from app.schemas.prediction import (
+    AgenticJobOut,
+    AgenticReportOut,
+    TrustAnchorListItemOut,
+    TrustAnchorVerifyOut,
+)
 from app.services import prediction_service
 from app.services import trust_chain_service
 from app.utils.file_utils import remove_path
@@ -284,3 +289,198 @@ def delete_agentic_report(db: Session, settings: Settings, public_id: str) -> No
             remove_path(out_abs)
     db.delete(row)
     db.commit()
+
+
+def _structured_plan_from_saved_payload(data: dict[str, Any]) -> Any:
+    sp = data.get("structured_plan")
+    if sp is not None:
+        return sp
+    raw_llm = data.get("raw_llm_response")
+    if isinstance(raw_llm, str) and raw_llm.strip():
+        m = re.search(r"\{[\s\S]*\}", raw_llm)
+        if m:
+            try:
+                return json.loads(m.group())
+            except json.JSONDecodeError:
+                pass
+    return None
+
+
+def list_trust_anchor_rows(
+    db: Session, *, limit: int = 100, offset: int = 0
+) -> list[TrustAnchorListItemOut]:
+    q = (
+        select(AgenticReportTrustAnchor, AgenticReport, PredictionJob, AgenticJob)
+        .join(AgenticReport, AgenticReportTrustAnchor.agentic_report_id == AgenticReport.id)
+        .join(PredictionJob, AgenticReport.prediction_job_id == PredictionJob.id)
+        .outerjoin(AgenticJob, AgenticReport.agentic_job_id == AgenticJob.id)
+        .order_by(AgenticReportTrustAnchor.anchored_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    out: list[TrustAnchorListItemOut] = []
+    for anchor, report, pj, aj in db.execute(q).all():
+        summ = (report.summary or "").strip()
+        preview = summ if len(summ) <= 160 else summ[:157] + "…"
+        out.append(
+            TrustAnchorListItemOut(
+                id=anchor.id,
+                agentic_report_public_id=report.public_id,
+                prediction_job_public_id=pj.public_id,
+                agentic_job_public_id=(aj.public_id if aj else None),
+                summary_preview=preview,
+                recommended_action=(report.recommended_action or "")[:512],
+                tx_hash=anchor.tx_hash or "",
+                chain_id=anchor.chain_id,
+                contract_address=anchor.contract_address or "",
+                commitment_sha256=anchor.commitment_sha256 or "",
+                payload_version=anchor.payload_version,
+                anchored_at=anchor.anchored_at,
+                anchor_error=anchor.error,
+            )
+        )
+    return out
+
+
+def get_trust_anchor_bundle(
+    db: Session, anchor_id: int
+) -> tuple[AgenticReportTrustAnchor, AgenticReport, PredictionJob, AgenticJob | None] | None:
+    q = (
+        select(AgenticReportTrustAnchor, AgenticReport, PredictionJob, AgenticJob)
+        .join(AgenticReport, AgenticReportTrustAnchor.agentic_report_id == AgenticReport.id)
+        .join(PredictionJob, AgenticReport.prediction_job_id == PredictionJob.id)
+        .outerjoin(AgenticJob, AgenticReport.agentic_job_id == AgenticJob.id)
+        .where(AgenticReportTrustAnchor.id == anchor_id)
+        .limit(1)
+    )
+    row = db.execute(q).first()
+    if not row:
+        return None
+    return row[0], row[1], row[2], row[3]
+
+
+def verify_trust_anchor_row(db: Session, settings: Settings, anchor_id: int) -> TrustAnchorVerifyOut | None:
+    bundle = get_trust_anchor_bundle(db, anchor_id)
+    if not bundle:
+        return None
+    anchor, report, pj, aj = bundle
+    summ = (report.summary or "").strip()
+    preview = summ if len(summ) <= 160 else summ[:157] + "…"
+    aj_pub = aj.public_id if aj else None
+    db_commit = (anchor.commitment_sha256 or "").strip().lower()
+    tx_ok = bool(anchor.tx_hash and anchor.tx_hash.strip() and not anchor.error)
+    anchor_failed = bool(anchor.error) or not anchor.tx_hash.strip() or len(db_commit) != 64
+
+    chain_valid: bool | None = None
+    chain_detail: str | None = None
+    on_chain_hex: str | None = None
+
+    payload_valid: bool | None = None
+    payload_detail: str | None = None
+    recomputed: str | None = None
+
+    if not anchor_failed and anchor.contract_address.strip():
+        rpc_ok, oc_hex, err = trust_chain_service.read_commitment_from_chain(
+            settings,
+            contract_address=anchor.contract_address,
+            agent_key_sha256_hex=anchor.agent_key_sha256,
+            report_key_sha256_hex=anchor.report_key_sha256,
+        )
+        if not rpc_ok:
+            chain_valid = None
+            chain_detail = err or "RPC error"
+        elif oc_hex is None:
+            chain_valid = None
+            chain_detail = err or "no commitment returned"
+        else:
+            on_chain_hex = oc_hex
+            chain_valid = oc_hex == db_commit
+            chain_detail = None if chain_valid else "on-chain commitment does not match database record"
+            if oc_hex == "0" * 64:
+                chain_valid = False
+                chain_detail = "on-chain commitment is empty (wrong keys or never anchored)"
+    elif not anchor_failed:
+        chain_detail = "missing contract_address"
+
+    if report.report_path:
+        path = settings.storage_root / report.report_path
+        if path.is_file():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    payload_valid = None
+                    payload_detail = "report file is not a JSON object"
+                else:
+                    structured = _structured_plan_from_saved_payload(data)
+                    recomputed, _pl = trust_chain_service.compute_trust_commitment_sha256(
+                        payload_version=anchor.payload_version,
+                        agentic_report_public_id=report.public_id,
+                        prediction_job_public_id=pj.public_id,
+                        results_row_index=report.results_row_index,
+                        created_at=report.created_at,
+                        raw_llm_response=report.raw_llm_response,
+                        rag_context_used=report.rag_context_used,
+                        structured_plan=structured,
+                    )
+                    recomputed = recomputed.lower()
+                    if len(db_commit) == 64:
+                        payload_valid = recomputed == db_commit
+                        payload_detail = (
+                            None
+                            if payload_valid
+                            else "recomputed hash from report file does not match anchored commitment"
+                        )
+                    else:
+                        payload_valid = None
+                        payload_detail = "database has no commitment to compare"
+            except (OSError, json.JSONDecodeError, TypeError, ValueError) as e:
+                payload_valid = None
+                payload_detail = f"could not read or parse report file: {e}"[:500]
+        else:
+            payload_valid = None
+            payload_detail = "report file missing on disk"
+    else:
+        payload_valid = None
+        payload_detail = "no report_path on agentic report"
+
+    overall_lit: Literal["valid", "invalid", "unknown", "anchor_failed"]
+    if anchor_failed:
+        overall_lit = "anchor_failed"
+    elif chain_valid is False or payload_valid is False:
+        overall_lit = "invalid"
+    elif chain_valid is True and payload_valid is True:
+        overall_lit = "valid"
+    else:
+        overall_lit = "unknown"
+
+    rpc_connected = False
+    if settings.trust_chain_rpc_url:
+        try:
+            from web3 import Web3
+
+            w3 = Web3(Web3.HTTPProvider(settings.trust_chain_rpc_url))
+            rpc_connected = bool(w3.is_connected())
+        except Exception:
+            rpc_connected = False
+
+    return TrustAnchorVerifyOut(
+        anchor_id=anchor.id,
+        agentic_report_public_id=report.public_id,
+        prediction_job_public_id=pj.public_id,
+        agentic_job_public_id=aj_pub,
+        summary_preview=preview,
+        recommended_action=(report.recommended_action or "")[:512],
+        tx_hash=anchor.tx_hash or "",
+        chain_id=anchor.chain_id,
+        contract_address=anchor.contract_address or "",
+        rpc_url=settings.trust_chain_rpc_url,
+        rpc_connected=rpc_connected,
+        db_commitment_sha256=db_commit or anchor.commitment_sha256,
+        on_chain_commitment_hex=on_chain_hex,
+        chain_integrity_valid=chain_valid,
+        chain_integrity_detail=chain_detail,
+        recomputed_commitment_sha256=recomputed,
+        payload_integrity_valid=payload_valid,
+        payload_integrity_detail=payload_detail,
+        overall_integrity=overall_lit,
+    )

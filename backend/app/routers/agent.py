@@ -12,13 +12,15 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
 from app.db.session import get_db
-from app.models.domain import AgenticJob
+from app.models.domain import AgenticJob, AgenticReport
 from app.schemas.prediction import (
     AgenticDecideRequest,
     AgenticJobCreate,
     AgenticJobOut,
     AgenticPromptPreviewOut,
     AgenticReportOut,
+    TrustAnchorListItemOut,
+    TrustAnchorVerifyOut,
 )
 from app.services import agent_service, kb_service, llm_service, prediction_service
 from app.services.agentic_llm_prompt import (
@@ -255,6 +257,29 @@ def delete_agent_report(
 ) -> None:
     """Remove an agentic report row and its on-disk JSON (if under storage_root)."""
     agent_service.delete_agentic_report(db, settings, public_id)
+
+
+@router.get("/trust-anchors", response_model=list[TrustAnchorListItemOut])
+def list_trust_anchors(
+    db: Annotated[Session, Depends(get_db)],
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> list[TrustAnchorListItemOut]:
+    """List `agentic_report_trust_anchors` rows with linked agentic report identifiers."""
+    return agent_service.list_trust_anchor_rows(db, limit=limit, offset=offset)
+
+
+@router.get("/trust-anchors/{anchor_id}/verify", response_model=TrustAnchorVerifyOut)
+def verify_trust_anchor(
+    anchor_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> TrustAnchorVerifyOut:
+    """Read on-chain commitment via RPC and recompute hash from the saved report file."""
+    out = agent_service.verify_trust_anchor_row(db, settings, anchor_id)
+    if out is None:
+        raise HTTPException(404, "Trust anchor not found")
+    return out
 
 
 @router.post("/decide", response_model=AgenticReportOut)

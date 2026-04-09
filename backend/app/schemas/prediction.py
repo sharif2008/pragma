@@ -171,3 +171,54 @@ class AgenticReportOut(ORMModel):
         default=None,
         description="If configured, contains local-chain tx metadata for the trust anchoring commitment.",
     )
+
+
+class TrustAnchorListItemOut(BaseModel):
+    """Row for `agentic_report_trust_anchors` joined to the parent report."""
+
+    id: int
+    agentic_report_public_id: str
+    prediction_job_public_id: str
+    agentic_job_public_id: str | None = None
+    summary_preview: str = Field(description="Short text from agentic_reports.summary")
+    recommended_action: str
+    tx_hash: str
+    chain_id: int
+    contract_address: str
+    commitment_sha256: str
+    payload_version: str
+    anchored_at: datetime
+    anchor_error: str | None = Field(default=None, description="Set when anchoring failed but a row was stored.")
+
+
+class TrustAnchorVerifyOut(BaseModel):
+    """Blockchain + payload checks for one trust anchor row."""
+
+    anchor_id: int
+    agentic_report_public_id: str
+    prediction_job_public_id: str
+    agentic_job_public_id: str | None = None
+    summary_preview: str
+    recommended_action: str
+    tx_hash: str
+    chain_id: int
+    contract_address: str
+    rpc_url: str
+    rpc_connected: bool
+    db_commitment_sha256: str
+    on_chain_commitment_hex: str | None = None
+    chain_integrity_valid: bool | None = Field(
+        default=None,
+        description="True if on-chain commitment matches DB; False if mismatch; None if not checkable.",
+    )
+    chain_integrity_detail: str | None = None
+    recomputed_commitment_sha256: str | None = None
+    payload_integrity_valid: bool | None = Field(
+        default=None,
+        description="True if recomputing from report file matches DB commitment; None if file missing.",
+    )
+    payload_integrity_detail: str | None = None
+    overall_integrity: Literal["valid", "invalid", "unknown", "anchor_failed"] = Field(
+        description="valid: chain+payload both OK when both checkable; invalid: any failed check; "
+        "unknown: could not reach chain or read file; anchor_failed: no successful anchor tx."
+    )

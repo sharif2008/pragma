@@ -28,6 +28,11 @@ export const navData = [
     icon: icon('ic-blog'),
   },
   {
+    title: 'Trust anchors',
+    path: '/agentic/trust-anchors',
+    icon: icon('ic-lock'),
+  },
+  {
     title: 'ML & RAG',
     path: '/ml',
     icon: icon('ic-cart'),

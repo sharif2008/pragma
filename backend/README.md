@@ -157,6 +157,8 @@ Optional **`notebooks/*.ipynb`** — install Jupyter separately if needed.
 | `OPENAI_API_KEY` | If unset, agent and RAG-LLM paths use mock responses |
 | `OPENAI_MODEL` | Chat model id when using OpenAI |
 | `EMBEDDING_MODEL` | SentenceTransformers model id for embeddings/RAG |
+| `LOG_DIR` | Directory for `app.log` (default `backend/logs`) |
+| `HF_HOME` | HuggingFace cache (default `backend/storage/hf_home`) |
 | `TRUST_CHAIN_ENABLED` | If true, anchor a hash-only trust commitment on local chain after each agentic report is saved |
 | `TRUST_CHAIN_RPC_URL` | JSON-RPC URL (default `http://127.0.0.1:8545`) |
 | `TRUST_CHAIN_PRIVATE_KEY` | Deployer/signer private key (Hardhat dev key) |
