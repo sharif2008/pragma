@@ -33,6 +33,11 @@ export const navData = [
     icon: icon('ic-lock'),
   },
   {
+    title: 'Execution reports',
+    path: '/agentic/execution-reports',
+    icon: icon('ic-lock'),
+  },
+  {
     title: 'ML & RAG',
     path: '/ml',
     icon: icon('ic-cart'),

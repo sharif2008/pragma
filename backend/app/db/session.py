@@ -106,6 +106,7 @@ def init_db() -> None:
     _ensure_agentic_reports_results_row_index()
     _ensure_agentic_reports_agentic_job_id()
     _ensure_agentic_report_trust_anchors_table()
+    _ensure_agentic_report_execution_reports_table()
 
 
 def _ensure_agentic_report_trust_anchors_table() -> None:
@@ -137,6 +138,44 @@ def _ensure_agentic_report_trust_anchors_table() -> None:
                     "error TEXT NULL,"
                     "INDEX(agentic_report_id),"
                     "CONSTRAINT fk_anchor_report FOREIGN KEY (agentic_report_id) "
+                    "REFERENCES agentic_reports(id) ON DELETE CASCADE"
+                    ")"
+                )
+            )
+
+
+def _ensure_agentic_report_execution_reports_table() -> None:
+    """Create execution reports table for existing MySQL DBs if missing."""
+    if engine.dialect.name != "mysql":
+        return
+    with engine.begin() as conn:
+        cnt = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM information_schema.TABLES "
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'agentic_report_execution_reports'"
+            )
+        ).scalar_one()
+        if int(cnt) == 0:
+            conn.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS agentic_report_execution_reports ("
+                    "id INT AUTO_INCREMENT PRIMARY KEY,"
+                    "agentic_report_id INT NOT NULL UNIQUE,"
+                    "status VARCHAR(32) NOT NULL DEFAULT 'failed',"
+                    "applied_at DATETIME(6) NULL,"
+                    "integrity_overall VARCHAR(32) NOT NULL DEFAULT 'unknown',"
+                    "chain_integrity_valid TINYINT(1) NULL,"
+                    "chain_detail TEXT NULL,"
+                    "payload_integrity_valid TINYINT(1) NULL,"
+                    "payload_detail TEXT NULL,"
+                    "actions_core_json JSON NULL,"
+                    "actions_edge_json JSON NULL,"
+                    "actions_ran_json JSON NULL,"
+                    "error_reason VARCHAR(128) NULL,"
+                    "error_detail TEXT NULL,"
+                    "created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),"
+                    "INDEX(agentic_report_id),"
+                    "CONSTRAINT fk_exec_report_report FOREIGN KEY (agentic_report_id) "
                     "REFERENCES agentic_reports(id) ON DELETE CASCADE"
                     ")"
                 )

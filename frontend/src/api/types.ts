@@ -237,6 +237,8 @@ export type AgenticReportOut = {
   report_artifact?: Record<string, unknown> | null;
   /** Optional on-chain trust anchor metadata (local Hardhat). */
   trust_anchor?: Record<string, unknown> | null;
+  /** Apply/execution status summary when present. */
+  execution_report?: Record<string, unknown> | null;
 };
 
 export type TrustAnchorListItemOut = {
@@ -277,6 +279,40 @@ export type TrustAnchorVerifyOut = {
   payload_integrity_valid?: boolean | null;
   payload_integrity_detail?: string | null;
   overall_integrity: TrustAnchorOverallIntegrity;
+};
+
+export type ExecutionReportStatus = 'applied' | 'failed';
+
+export type ExecutionReportListItemOut = {
+  id: number;
+  agentic_report_public_id: string;
+  prediction_job_public_id: string;
+  agentic_job_public_id?: string | null;
+  status: ExecutionReportStatus;
+  applied_at?: IsoDateString | null;
+  integrity_overall: TrustAnchorOverallIntegrity;
+  error_reason?: string | null;
+  created_at: IsoDateString;
+};
+
+export type ExecutionReportDetailOut = {
+  id: number;
+  agentic_report_public_id: string;
+  prediction_job_public_id: string;
+  agentic_job_public_id?: string | null;
+  status: ExecutionReportStatus;
+  applied_at?: IsoDateString | null;
+  integrity_overall: TrustAnchorOverallIntegrity;
+  chain_integrity_valid?: boolean | null;
+  chain_detail?: string | null;
+  payload_integrity_valid?: boolean | null;
+  payload_detail?: string | null;
+  actions_core_json?: Record<string, unknown> | null;
+  actions_edge_json?: Record<string, unknown> | null;
+  actions_ran_json?: Record<string, unknown> | null;
+  error_reason?: string | null;
+  error_detail?: string | null;
+  created_at: IsoDateString;
 };
 
 export type KBQueryResponse = {

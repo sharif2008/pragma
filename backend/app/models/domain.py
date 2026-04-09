@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     Enum as SAEnum,
     ForeignKey,
@@ -265,6 +266,39 @@ class AgenticReportTrustAnchor(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    agentic_report = relationship("AgenticReport")
+
+
+class AgenticReportExecutionReport(Base):
+    """Execution record for a (stubbed) application of an agentic report's actions."""
+
+    __tablename__ = "agentic_report_execution_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    agentic_report_id: Mapped[int] = mapped_column(
+        ForeignKey("agentic_reports.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
+
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="failed")  # applied | failed
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    integrity_overall: Mapped[str] = mapped_column(String(32), nullable=False, default="unknown")
+    chain_integrity_valid: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    chain_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    payload_integrity_valid: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    payload_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    actions_core_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    actions_edge_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    actions_ran_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    error_reason: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     agentic_report = relationship("AgenticReport")
 

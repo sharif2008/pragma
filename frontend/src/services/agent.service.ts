@@ -6,6 +6,8 @@ import type {
   TrustAnchorListItemOut,
   AgenticPromptPreviewOut,
   AgenticJobCreateRequest,
+  ExecutionReportDetailOut,
+  ExecutionReportListItemOut,
 } from 'src/api/types';
 
 import { paths } from './paths';
@@ -96,4 +98,17 @@ export async function listTrustAnchors(limit = 100, offset = 0): Promise<TrustAn
 
 export async function verifyTrustAnchor(anchorId: number): Promise<TrustAnchorVerifyOut> {
   return requestJson<TrustAnchorVerifyOut>(paths.agent.trustAnchorVerify(anchorId));
+}
+
+export async function applyAgenticReport(publicId: string): Promise<ExecutionReportDetailOut> {
+  return requestJson<ExecutionReportDetailOut>(paths.agent.applyReport(publicId), { method: 'POST' });
+}
+
+export async function listExecutionReports(limit = 100, offset = 0): Promise<ExecutionReportListItemOut[]> {
+  const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return requestJson<ExecutionReportListItemOut[]>(`${paths.agent.executionReports}?${q}`);
+}
+
+export async function getExecutionReport(id: number): Promise<ExecutionReportDetailOut> {
+  return requestJson<ExecutionReportDetailOut>(paths.agent.executionReportById(id));
 }

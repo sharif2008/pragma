@@ -1,4 +1,4 @@
-import type { AgenticReportOut } from 'src/api/types';
+import type { AgenticReportOut, TrustAnchorVerifyOut } from 'src/api/types';
 
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useRef, useMemo, useState, useEffect, useCallback, type SyntheticEvent } from 'react';
@@ -14,6 +14,7 @@ import Alert from '@mui/material/Alert';
 import Table from '@mui/material/Table';
 import Timeline from '@mui/lab/Timeline';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
 import Divider from '@mui/material/Divider';
 import { alpha } from '@mui/material/styles';
 import TableRow from '@mui/material/TableRow';
@@ -24,19 +25,30 @@ import TableHead from '@mui/material/TableHead';
 import Accordion from '@mui/material/Accordion';
 import Typography from '@mui/material/Typography';
 import CardHeader from '@mui/material/CardHeader';
+import DialogTitle from '@mui/material/DialogTitle';
 import TimelineContent from '@mui/lab/TimelineContent';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
 import TimelineConnector from '@mui/lab/TimelineConnector';
 import TimelineSeparator from '@mui/lab/TimelineSeparator';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
+import CircularProgress from '@mui/material/CircularProgress';
 import TimelineOppositeContent from '@mui/lab/TimelineOppositeContent';
 import TimelineItem, { timelineItemClasses } from '@mui/lab/TimelineItem';
 
 import { sortByTime, type TimeSortOrder, toggleTimeSortOrder } from 'src/utils/table-time-sort';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { ApiError, getAgentReport, listAllAgentReports } from 'src/services';
+import {
+  ApiError,
+  getAgentReport,
+  verifyTrustAnchor,
+  applyAgenticReport,
+  getExecutionReport,
+  listAllAgentReports,
+} from 'src/services';
 
 import { Iconify } from 'src/components/iconify';
 import { TimeSortHeadCell } from 'src/components/table-sort/time-sort-head-cell';
@@ -101,6 +113,31 @@ function collectTieredActions(plan: Record<string, unknown> | null): {
   if (Array.isArray(prim)) prim.forEach(push);
   if (Array.isArray(sup)) sup.forEach(push);
   return out;
+}
+
+function trustAnchorId(report: AgenticReportOut): number | null {
+  const ta = report.trust_anchor;
+  if (!ta || typeof ta !== 'object') return null;
+  // Backend trust anchor list rows use id; report trust_anchor dict currently does not.
+  // We resolve by calling verify endpoint via list view button (see apply dialog logic).
+  const id = (ta as { id?: unknown }).id;
+  if (typeof id === 'number' && Number.isFinite(id)) return id;
+  return null;
+}
+
+function isApplied(report: AgenticReportOut): boolean {
+  const ex = report.execution_report;
+  if (!ex || typeof ex !== 'object') return false;
+  return String((ex as { status?: unknown }).status ?? '') === 'applied';
+}
+
+function executionChip(report: AgenticReportOut) {
+  const ex = report.execution_report;
+  if (!ex || typeof ex !== 'object') return null;
+  const status = String((ex as { status?: unknown }).status ?? '');
+  if (status === 'applied') return <Chip size="small" color="success" variant="outlined" label="Applied" />;
+  if (status === 'failed') return <Chip size="small" color="error" variant="outlined" label="Apply failed" />;
+  return null;
 }
 
 function ActionColumn({
@@ -185,6 +222,12 @@ export function AgenticActionsView() {
   const [detailById, setDetailById] = useState<Record<string, AgenticReportOut>>({});
   const [detailLoading, setDetailLoading] = useState<Record<string, boolean>>({});
   const [dialogId, setDialogId] = useState<string | null>(null);
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [applyId, setApplyId] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string>('');
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [applyVerify, setApplyVerify] = useState<TrustAnchorVerifyOut | null>(null);
+  const [applyExec, setApplyExec] = useState<Record<string, unknown> | null>(null);
   const [reportTimeOrder, setReportTimeOrder] = useState<TimeSortOrder>('desc');
   const fetchStartedRef = useRef<Set<string>>(new Set());
 
@@ -213,6 +256,15 @@ export function AgenticActionsView() {
       { replace: true }
     );
   }, [setSearchParams]);
+
+  const closeApply = () => {
+    setApplyOpen(false);
+    setApplyId(null);
+    setApplyError('');
+    setApplyLoading(false);
+    setApplyVerify(null);
+    setApplyExec(null);
+  };
 
   useEffect(() => {
     const d = searchParams.get('dialog')?.trim();
@@ -271,6 +323,60 @@ export function AgenticActionsView() {
       setDetailLoading((s) => ({ ...s, [publicId]: false }));
     }
   }, [detailById]);
+
+  const openApply = async (publicId: string) => {
+    const id = publicId.trim();
+    if (!id) return;
+    setApplyOpen(true);
+    setApplyId(id);
+    setApplyError('');
+    setApplyVerify(null);
+    setApplyExec(null);
+    setApplyLoading(true);
+    try {
+      const full = await getAgentReport(id);
+      setDetailById((prev) => ({ ...prev, [id]: full }));
+
+      const ex = full.execution_report;
+      if (ex && typeof ex === 'object') {
+        const exId = (ex as { id?: unknown }).id;
+        if (typeof exId === 'number') {
+          const det = await getExecutionReport(exId);
+          setApplyExec(det as unknown as Record<string, unknown>);
+          setApplyLoading(false);
+          return;
+        }
+      }
+
+      const taId = trustAnchorId(full);
+      if (taId == null) {
+        setApplyError('Missing trust anchor id for this report (cannot verify).');
+        return;
+      }
+      const v = await verifyTrustAnchor(taId);
+      setApplyVerify(v);
+    } catch (e) {
+      setApplyError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : String(e));
+    } finally {
+      setApplyLoading(false);
+    }
+  };
+
+  const confirmApply = async () => {
+    if (!applyId) return;
+    setApplyLoading(true);
+    setApplyError('');
+    try {
+      const out = await applyAgenticReport(applyId);
+      setApplyExec(out as unknown as Record<string, unknown>);
+      await loadList();
+    } catch (e) {
+      setApplyError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : String(e));
+      await loadList();
+    } finally {
+      setApplyLoading(false);
+    }
+  };
 
   const handleAccordion = (_event: unknown, expanded: boolean, publicId: string) => {
     if (expanded) void ensureDetail(publicId);
@@ -414,7 +520,6 @@ export function AgenticActionsView() {
                   <TableCell sx={{ fontWeight: 700 }}>Recommended action</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Summary</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Prediction job</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Row</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>
                     Actions
                   </TableCell>
@@ -447,13 +552,31 @@ export function AgenticActionsView() {
                           : r.prediction_job_public_id
                         : '—'}
                     </TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                      {typeof r.results_row_index === 'number' ? r.results_row_index : '—'}
-                    </TableCell>
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                       <Button size="small" variant="contained" color="primary" onClick={() => openDialog(r.public_id)} sx={{ mr: 0.5 }}>
                         View
                       </Button>
+                      {!isApplied(r) ? (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="success"
+                          onClick={() => void openApply(r.public_id)}
+                          sx={{ mr: 0.5 }}
+                        >
+                          Apply
+                        </Button>
+                      ) : (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="success"
+                          onClick={() => void openApply(r.public_id)}
+                          sx={{ mr: 0.5 }}
+                        >
+                          Applied
+                        </Button>
+                      )}
                       <Button
                         size="small"
                         variant="outlined"
@@ -612,6 +735,15 @@ export function AgenticActionsView() {
                               >
                                 Quick view
                               </Button>
+                              {!isApplied(r) ? (
+                                <Button size="small" variant="contained" color="success" onClick={() => void openApply(r.public_id)}>
+                                  Apply
+                                </Button>
+                              ) : (
+                                <Button size="small" variant="outlined" color="success" onClick={() => void openApply(r.public_id)}>
+                                  Applied
+                                </Button>
+                              )}
                               <Button
                                 size="small"
                                 variant="outlined"
@@ -713,6 +845,139 @@ export function AgenticActionsView() {
       )}
 
       <AgentReportDetailDialog open={Boolean(dialogId)} publicId={dialogId} onClose={closeDialog} />
+
+      <Dialog open={applyOpen} onClose={closeApply} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800 }}>Apply agentic actions</DialogTitle>
+        <DialogContent dividers>
+          {applyError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {applyError}
+            </Alert>
+          )}
+
+          {applyLoading && (
+            <Stack alignItems="center" justifyContent="center" sx={{ py: 4 }}>
+              <CircularProgress />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                Loading integrity and report details…
+              </Typography>
+            </Stack>
+          )}
+
+          {!applyLoading && applyId && (
+            (() => {
+              const full = detailById[applyId];
+              const plan = full ? parseStructuredPlan(full) : null;
+              const tiers = collectTieredActions(plan);
+              const verifyOk = applyVerify?.overall_integrity === 'valid';
+
+              return (
+                <Stack spacing={2}>
+                  {full ? (
+                    <>
+                      <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center">
+                        <Chip size="small" variant="outlined" label={`Report ${full.public_id.slice(0, 8)}…`} />
+                        {executionChip(full)}
+                      </Stack>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                        {full.summary || '—'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Recommended: <strong>{full.recommended_action || '—'}</strong>
+                      </Typography>
+                    </>
+                  ) : (
+                    <Alert severity="warning">Report details not loaded.</Alert>
+                  )}
+
+                  {applyExec ? (
+                    <>
+                      <Divider />
+                      <Alert
+                        severity={
+                          String((applyExec as { status?: unknown }).status ?? '') === 'applied' ? 'success' : 'error'
+                        }
+                      >
+                        Execution status: <strong>{String((applyExec as { status?: unknown }).status ?? '—')}</strong>
+                        {' · '}
+                        Integrity: <strong>{String((applyExec as { integrity_overall?: unknown }).integrity_overall ?? '—')}</strong>
+                      </Alert>
+                      <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700, letterSpacing: 0.6 }}>
+                        Execution details (stubbed)
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontFamily: 'monospace',
+                          fontSize: 12,
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          border: 1,
+                          borderColor: 'divider',
+                          borderRadius: 1,
+                          p: 1.25,
+                          bgcolor: (theme) => alpha(theme.palette.grey[500], 0.06),
+                        }}
+                      >
+                        {JSON.stringify(applyExec, null, 2)}
+                      </Typography>
+                    </>
+                  ) : (
+                    <>
+                      <Divider />
+                      <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700, letterSpacing: 0.6 }}>
+                        Integrity (blockchain + report file)
+                      </Typography>
+                      {applyVerify ? (
+                        <Alert severity={verifyOk ? 'success' : 'error'}>
+                          Overall: <strong>{applyVerify.overall_integrity}</strong>
+                          {applyVerify.tx_hash ? ` · tx ${applyVerify.tx_hash.slice(0, 10)}…` : ''}
+                        </Alert>
+                      ) : (
+                        <Alert severity="warning">Integrity not available.</Alert>
+                      )}
+
+                      <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700, letterSpacing: 0.6 }}>
+                        Actions by network tier
+                      </Typography>
+                      <Grid container spacing={1.5}>
+                        <Grid size={{ xs: 12, md: 6, xl: 4 }} sx={{ display: 'flex' }}>
+                          <ActionColumn title="Core plane" tierKey="Core" actions={tiers.core} color="primary" />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6, xl: 4 }} sx={{ display: 'flex' }}>
+                          <ActionColumn title="Edge plane" tierKey="Edge" actions={tiers.edge} color="info" />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6, xl: 4 }} sx={{ display: 'flex' }}>
+                          <ActionColumn title="Radio access" tierKey="RAN" actions={tiers.ran} color="warning" />
+                        </Grid>
+                      </Grid>
+
+                      {!verifyOk && (
+                        <Alert severity="error">
+                          Apply is blocked: integrity is not <strong>valid</strong>. Fix trust anchor / report integrity first.
+                        </Alert>
+                      )}
+                    </>
+                  )}
+                </Stack>
+              );
+            })()
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeApply}>Close</Button>
+          {!applyExec && (
+            <Button
+              variant="contained"
+              color="success"
+              disabled={applyLoading || applyVerify?.overall_integrity !== 'valid'}
+              onClick={() => void confirmApply()}
+            >
+              Confirm apply
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
     </DashboardContent>
   );
 }

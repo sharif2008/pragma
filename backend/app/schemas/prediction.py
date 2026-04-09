@@ -172,6 +172,11 @@ class AgenticReportOut(ORMModel):
         description="If configured, contains local-chain tx metadata for the trust anchoring commitment.",
     )
 
+    execution_report: dict[str, Any] | None = Field(
+        default=None,
+        description="If Apply workflow has run, contains a small summary (status, applied_at, integrity, error).",
+    )
+
 
 class TrustAnchorListItemOut(BaseModel):
     """Row for `agentic_report_trust_anchors` joined to the parent report."""
@@ -222,3 +227,38 @@ class TrustAnchorVerifyOut(BaseModel):
         description="valid: chain+payload both OK when both checkable; invalid: any failed check; "
         "unknown: could not reach chain or read file; anchor_failed: no successful anchor tx."
     )
+
+
+class ExecutionReportListItemOut(BaseModel):
+    id: int
+    agentic_report_public_id: str
+    prediction_job_public_id: str
+    agentic_job_public_id: str | None = None
+    status: Literal["applied", "failed"]
+    applied_at: datetime | None = None
+    integrity_overall: Literal["valid", "invalid", "unknown", "anchor_failed"]
+    error_reason: str | None = None
+    created_at: datetime
+
+
+class ExecutionReportDetailOut(BaseModel):
+    id: int
+    agentic_report_public_id: str
+    prediction_job_public_id: str
+    agentic_job_public_id: str | None = None
+    status: Literal["applied", "failed"]
+    applied_at: datetime | None = None
+
+    integrity_overall: Literal["valid", "invalid", "unknown", "anchor_failed"]
+    chain_integrity_valid: bool | None = None
+    chain_detail: str | None = None
+    payload_integrity_valid: bool | None = None
+    payload_detail: str | None = None
+
+    actions_core_json: dict | None = None
+    actions_edge_json: dict | None = None
+    actions_ran_json: dict | None = None
+
+    error_reason: str | None = None
+    error_detail: str | None = None
+    created_at: datetime
