@@ -19,6 +19,8 @@ from app.schemas.prediction import (
     AgenticJobOut,
     AgenticPromptPreviewOut,
     AgenticReportOut,
+    ExecutionReportDetailOut,
+    ExecutionReportListItemOut,
     TrustAnchorListItemOut,
     TrustAnchorVerifyOut,
 )
@@ -279,6 +281,36 @@ def verify_trust_anchor(
     out = agent_service.verify_trust_anchor_row(db, settings, anchor_id)
     if out is None:
         raise HTTPException(404, "Trust anchor not found")
+    return out
+
+
+@router.post("/reports/{public_id}/apply", response_model=ExecutionReportDetailOut)
+def apply_agent_report(
+    public_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ExecutionReportDetailOut:
+    """Validate integrity and (stub) execute tiered actions once."""
+    return agent_service.apply_agentic_report(db, settings, public_id)
+
+
+@router.get("/execution-reports", response_model=list[ExecutionReportListItemOut])
+def list_execution_reports(
+    db: Annotated[Session, Depends(get_db)],
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> list[ExecutionReportListItemOut]:
+    return agent_service.list_execution_reports(db, limit=limit, offset=offset)
+
+
+@router.get("/execution-reports/{exec_id}", response_model=ExecutionReportDetailOut)
+def get_execution_report(
+    exec_id: int,
+    db: Annotated[Session, Depends(get_db)],
+) -> ExecutionReportDetailOut:
+    out = agent_service.get_execution_report_detail(db, exec_id)
+    if out is None:
+        raise HTTPException(404, "Execution report not found")
     return out
 
 

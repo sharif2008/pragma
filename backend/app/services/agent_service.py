@@ -15,6 +15,7 @@ from app.core.config import Settings
 from app.models.domain import (
     AgenticJob,
     AgenticReport,
+    AgenticReportExecutionReport,
     AgenticReportTrustAnchor,
     JobStatus,
     PredictionJob,
@@ -22,6 +23,8 @@ from app.models.domain import (
 from app.schemas.prediction import (
     AgenticJobOut,
     AgenticReportOut,
+    ExecutionReportDetailOut,
+    ExecutionReportListItemOut,
     TrustAnchorListItemOut,
     TrustAnchorVerifyOut,
 )
@@ -231,9 +234,15 @@ def agentic_report_out(db: Session, row: AgenticReport) -> AgenticReportOut:
     anchor = db.scalar(
         select(AgenticReportTrustAnchor).where(AgenticReportTrustAnchor.agentic_report_id == row.id)
     )
+    exec_row = db.scalar(
+        select(AgenticReportExecutionReport).where(
+            AgenticReportExecutionReport.agentic_report_id == row.id
+        )
+    )
     anchor_out = None
     if anchor:
         anchor_out = {
+            "id": anchor.id,
             "chain_id": anchor.chain_id,
             "contract_address": anchor.contract_address,
             "tx_hash": anchor.tx_hash,
@@ -244,11 +253,21 @@ def agentic_report_out(db: Session, row: AgenticReport) -> AgenticReportOut:
             "anchored_at": anchor.anchored_at.isoformat() if anchor.anchored_at else None,
             "error": anchor.error,
         }
+    exec_out = None
+    if exec_row:
+        exec_out = {
+            "id": exec_row.id,
+            "status": exec_row.status,
+            "applied_at": exec_row.applied_at.isoformat() if exec_row.applied_at else None,
+            "integrity_overall": exec_row.integrity_overall,
+            "error_reason": exec_row.error_reason,
+        }
     return AgenticReportOut.model_validate(row).model_copy(
         update={
             "prediction_job_public_id": pj.public_id if pj else None,
             "agentic_job_public_id": aj.public_id if aj else None,
             "trust_anchor": anchor_out,
+            "execution_report": exec_out,
         }
     )
 
@@ -483,4 +502,267 @@ def verify_trust_anchor_row(db: Session, settings: Settings, anchor_id: int) -> 
         payload_integrity_valid=payload_valid,
         payload_integrity_detail=payload_detail,
         overall_integrity=overall_lit,
+    )
+
+
+def _normalize_tier_actions_from_structured_plan(structured: Any) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = {"Core": [], "Edge": [], "RAN": []}
+    if not structured or not isinstance(structured, dict):
+        return out
+
+    def push(x: Any) -> None:
+        if not x or not isinstance(x, dict):
+            return
+        tier = str(x.get("network_tier") or "").strip()
+        if tier not in out:
+            return
+        out[tier].append(
+            {
+                "action": str(x.get("action") or "—"),
+                "network_tier": tier,
+                "reasoning": str(x.get("reasoning") or ""),
+                "party_evidence_type": (
+                    str(x.get("party_evidence_type")) if x.get("party_evidence_type") is not None else None
+                ),
+                "execution_priority": (
+                    str(x.get("execution_priority")) if x.get("execution_priority") is not None else None
+                ),
+            }
+        )
+
+    prim = structured.get("primary_actions")
+    sup = structured.get("supporting_actions")
+    for block in (prim, sup):
+        if isinstance(block, list):
+            for item in block:
+                push(item)
+    return out
+
+
+def _stub_execute_actions(items: list[dict[str, Any]]) -> dict[str, Any]:
+    executed: list[dict[str, Any]] = []
+    for it in items:
+        action = str(it.get("action") or "").strip()
+        if not action or action == "—":
+            executed.append({**it, "result": "failed", "failure_reason": "empty_action"})
+        else:
+            executed.append({**it, "result": "success"})
+    return {"items": executed}
+
+
+def apply_agentic_report(db: Session, settings: Settings, report_public_id: str) -> ExecutionReportDetailOut:
+    report = get_agentic_report(db, report_public_id)
+    existing = db.scalar(
+        select(AgenticReportExecutionReport).where(
+            AgenticReportExecutionReport.agentic_report_id == report.id
+        )
+    )
+    if existing and existing.status == "applied":
+        from fastapi import HTTPException
+
+        raise HTTPException(409, "Report already applied")
+
+    pj = db.get(PredictionJob, report.prediction_job_id)
+    aj = db.get(AgenticJob, report.agentic_job_id) if report.agentic_job_id else None
+
+    anchor = db.scalar(
+        select(AgenticReportTrustAnchor).where(AgenticReportTrustAnchor.agentic_report_id == report.id)
+    )
+    if not anchor:
+        out = AgenticReportExecutionReport(
+            agentic_report_id=report.id,
+            status="failed",
+            applied_at=None,
+            integrity_overall="unknown",
+            chain_integrity_valid=None,
+            chain_detail="missing trust anchor row",
+            payload_integrity_valid=None,
+            payload_detail=None,
+            actions_core_json=None,
+            actions_edge_json=None,
+            actions_ran_json=None,
+            error_reason="integrity_validation_error",
+            error_detail="Trust anchor row missing for this report",
+        )
+        db.add(out)
+        db.commit()
+        db.refresh(out)
+        return ExecutionReportDetailOut(
+            id=out.id,
+            agentic_report_public_id=report.public_id,
+            prediction_job_public_id=pj.public_id if pj else "",
+            agentic_job_public_id=aj.public_id if aj else None,
+            status="failed",
+            applied_at=None,
+            integrity_overall="unknown",
+            chain_integrity_valid=None,
+            chain_detail=out.chain_detail,
+            payload_integrity_valid=None,
+            payload_detail=None,
+            actions_core_json=None,
+            actions_edge_json=None,
+            actions_ran_json=None,
+            error_reason=out.error_reason,
+            error_detail=out.error_detail,
+            created_at=out.created_at,
+        )
+
+    verify = verify_trust_anchor_row(db, settings, anchor.id)
+    integrity_overall = verify.overall_integrity if verify else "unknown"
+
+    # Always record an execution report attempt (success or failure), but only apply when integrity is valid.
+    structured: Any = None
+    if report.report_path:
+        path = settings.storage_root / report.report_path
+        if path.is_file():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    structured = _structured_plan_from_saved_payload(data)
+            except Exception:
+                structured = None
+
+    tiers = _normalize_tier_actions_from_structured_plan(structured)
+    core_exec = _stub_execute_actions(tiers["Core"])
+    edge_exec = _stub_execute_actions(tiers["Edge"])
+    ran_exec = _stub_execute_actions(tiers["RAN"])
+
+    chain_ok = verify.chain_integrity_valid if verify else None
+    payload_ok = verify.payload_integrity_valid if verify else None
+
+    if integrity_overall != "valid":
+        out = existing or AgenticReportExecutionReport(agentic_report_id=report.id)
+        out.status = "failed"
+        out.applied_at = None
+        out.integrity_overall = integrity_overall
+        out.chain_integrity_valid = chain_ok
+        out.chain_detail = verify.chain_integrity_detail if verify else "verification unavailable"
+        out.payload_integrity_valid = payload_ok
+        out.payload_detail = verify.payload_integrity_detail if verify else None
+        out.actions_core_json = core_exec
+        out.actions_edge_json = edge_exec
+        out.actions_ran_json = ran_exec
+        out.error_reason = "integrity_validation_error"
+        out.error_detail = f"overall_integrity={integrity_overall}"
+        db.add(out)
+        db.commit()
+        db.refresh(out)
+        return ExecutionReportDetailOut(
+            id=out.id,
+            agentic_report_public_id=report.public_id,
+            prediction_job_public_id=pj.public_id if pj else "",
+            agentic_job_public_id=aj.public_id if aj else None,
+            status="failed",
+            applied_at=None,
+            integrity_overall=integrity_overall,  # type: ignore[arg-type]
+            chain_integrity_valid=chain_ok,
+            chain_detail=out.chain_detail,
+            payload_integrity_valid=payload_ok,
+            payload_detail=out.payload_detail,
+            actions_core_json=core_exec,
+            actions_edge_json=edge_exec,
+            actions_ran_json=ran_exec,
+            error_reason=out.error_reason,
+            error_detail=out.error_detail,
+            created_at=out.created_at,
+        )
+
+    from datetime import datetime, timezone
+
+    out = existing or AgenticReportExecutionReport(agentic_report_id=report.id)
+    out.status = "applied"
+    out.applied_at = datetime.now(timezone.utc)
+    out.integrity_overall = integrity_overall
+    out.chain_integrity_valid = chain_ok
+    out.chain_detail = verify.chain_integrity_detail if verify else None
+    out.payload_integrity_valid = payload_ok
+    out.payload_detail = verify.payload_integrity_detail if verify else None
+    out.actions_core_json = core_exec
+    out.actions_edge_json = edge_exec
+    out.actions_ran_json = ran_exec
+    out.error_reason = None
+    out.error_detail = None
+    db.add(out)
+    db.commit()
+    db.refresh(out)
+    return ExecutionReportDetailOut(
+        id=out.id,
+        agentic_report_public_id=report.public_id,
+        prediction_job_public_id=pj.public_id if pj else "",
+        agentic_job_public_id=aj.public_id if aj else None,
+        status="applied",
+        applied_at=out.applied_at,
+        integrity_overall=integrity_overall,  # type: ignore[arg-type]
+        chain_integrity_valid=chain_ok,
+        chain_detail=out.chain_detail,
+        payload_integrity_valid=payload_ok,
+        payload_detail=out.payload_detail,
+        actions_core_json=core_exec,
+        actions_edge_json=edge_exec,
+        actions_ran_json=ran_exec,
+        error_reason=None,
+        error_detail=None,
+        created_at=out.created_at,
+    )
+
+
+def list_execution_reports(db: Session, *, limit: int = 100, offset: int = 0) -> list[ExecutionReportListItemOut]:
+    q = (
+        select(AgenticReportExecutionReport, AgenticReport, PredictionJob, AgenticJob)
+        .join(AgenticReport, AgenticReportExecutionReport.agentic_report_id == AgenticReport.id)
+        .join(PredictionJob, AgenticReport.prediction_job_id == PredictionJob.id)
+        .outerjoin(AgenticJob, AgenticReport.agentic_job_id == AgenticJob.id)
+        .order_by(AgenticReportExecutionReport.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    out: list[ExecutionReportListItemOut] = []
+    for er, report, pj, aj in db.execute(q).all():
+        out.append(
+            ExecutionReportListItemOut(
+                id=er.id,
+                agentic_report_public_id=report.public_id,
+                prediction_job_public_id=pj.public_id,
+                agentic_job_public_id=(aj.public_id if aj else None),
+                status=er.status,  # type: ignore[arg-type]
+                applied_at=er.applied_at,
+                integrity_overall=er.integrity_overall,  # type: ignore[arg-type]
+                error_reason=er.error_reason,
+                created_at=er.created_at,
+            )
+        )
+    return out
+
+
+def get_execution_report_detail(db: Session, exec_id: int) -> ExecutionReportDetailOut | None:
+    q = (
+        select(AgenticReportExecutionReport, AgenticReport, PredictionJob, AgenticJob)
+        .join(AgenticReport, AgenticReportExecutionReport.agentic_report_id == AgenticReport.id)
+        .join(PredictionJob, AgenticReport.prediction_job_id == PredictionJob.id)
+        .outerjoin(AgenticJob, AgenticReport.agentic_job_id == AgenticJob.id)
+        .where(AgenticReportExecutionReport.id == exec_id)
+        .limit(1)
+    )
+    row = db.execute(q).first()
+    if not row:
+        return None
+    er, report, pj, aj = row[0], row[1], row[2], row[3]
+    return ExecutionReportDetailOut(
+        id=er.id,
+        agentic_report_public_id=report.public_id,
+        prediction_job_public_id=pj.public_id,
+        agentic_job_public_id=(aj.public_id if aj else None),
+        status=er.status,  # type: ignore[arg-type]
+        applied_at=er.applied_at,
+        integrity_overall=er.integrity_overall,  # type: ignore[arg-type]
+        chain_integrity_valid=er.chain_integrity_valid,
+        chain_detail=er.chain_detail,
+        payload_integrity_valid=er.payload_integrity_valid,
+        payload_detail=er.payload_detail,
+        actions_core_json=er.actions_core_json,
+        actions_edge_json=er.actions_edge_json,
+        actions_ran_json=er.actions_ran_json,
+        error_reason=er.error_reason,
+        error_detail=er.error_detail,
+        created_at=er.created_at,
     )
