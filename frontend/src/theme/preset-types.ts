@@ -7,6 +7,7 @@ import type { PaletteColorNoChannels } from './core/palette';
 export type AppThemePresetId =
   | 'shamrock'
   | 'sage'
+  | 'forest'
   | 'earth'
   | 'midnight'
   | 'light'
