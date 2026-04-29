@@ -10,7 +10,9 @@
 [![Ethereum](https://img.shields.io/badge/Ethereum-Blockchain-3c3c3d.svg)](https://ethereum.org/)
 [![Solidity](https://img.shields.io/badge/Solidity-Smart%20Contracts-black.svg)](https://soliditylang.org/)
 
-A comprehensive implementation of **agentic AI for next-generation 5G networking**, featuring **Vertical Federated Learning (VFL)** for privacy-aware network intrusion detection, **SHAP-based explainability**, and **agentic reasoning** for automated mitigation recommendations. PRAGMA also includes a **blockchain trust layer** (hash-only anchoring) that makes agentic reports tamper-evident and blocks execution when integrity checks fail.
+PRAGMA is an implementation of an **agentic AI pipeline for enterprise network intrusion detection**, combining **Vertical Federated Learning (VFL)** for privacy-preserving cross-domain detection, **SHAP-based explainability** to attribute alerts, and **RAG-grounded reasoning** to generate mitigation recommendations from retrieved policy context.
+
+To address accountability, PRAGMA includes a **blockchain trust layer** implemented as **hash-only anchoring**: after an agentic report is produced and persisted, the backend computes a deterministic SHA-256 commitment over a canonical JSON payload and anchors only the resulting `bytes32` digest on an Ethereum smart contract. Before applying any report-derived actions, the backend verifies the on-chain commitment against the database record and the saved report artifact; execution is blocked if integrity verification fails.
 
 ## Overview
 
