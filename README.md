@@ -1,8 +1,20 @@
 # PRAGMA
 
-End-to-end system for **VFL-driven detection** + **RAG-assisted agentic decisions** with a **blockchain trust layer** (hash-only anchoring) to make agentic reports tamper-evident over time.
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-orange.svg)](https://pytorch.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](frontend/LICENSE.md)
+[![Dataset](https://img.shields.io/badge/dataset-IEEE%20DataPort-red.svg)](https://ieee-dataport.org/documents/unified-multimodal-network-intrusion-detection-systems-dataset)
+[![Jupyter](https://img.shields.io/badge/Jupyter-Notebook-orange.svg)](https://jupyter.org/)
+[![SHAP](https://img.shields.io/badge/SHAP-Explainability-purple.svg)](https://github.com/slundberg/shap)
+[![LangChain](https://img.shields.io/badge/LangChain-RAG-blue.svg)](https://www.langchain.com/)
+[![Ethereum](https://img.shields.io/badge/Ethereum-Blockchain-3c3c3d.svg)](https://ethereum.org/)
+[![Solidity](https://img.shields.io/badge/Solidity-Smart%20Contracts-black.svg)](https://soliditylang.org/)
 
-**Keywords:** Python (backend), PyTorch, SHAP, LangChain, Jupyter, FAISS, Solidity, Hardhat, Web3 JSON-RPC
+A comprehensive implementation of **agentic AI for next-generation 5G networking**, featuring **Vertical Federated Learning (VFL)** for privacy-aware network intrusion detection, **SHAP-based explainability**, and **agentic reasoning** for automated mitigation recommendations. PRAGMA also includes a **blockchain trust layer** (hash-only anchoring) that makes agentic reports tamper-evident and blocks execution when integrity checks fail.
+
+## Overview
+
+PRAGMA is organized into three components that together support an operator-facing workflow from detection to decision to integrity-verified execution:
 
 This repository contains three main components:
 
@@ -50,7 +62,7 @@ flowchart TD
 ## Technologies used
 
 - **Backend**
-  - Python 3.11+ (recommended; see `backend/README.md`)
+  - Python 3.8+ (recommended: 3.11+; see `backend/README.md`)
   - FastAPI + Uvicorn
   - SQLAlchemy + MySQL (PyMySQL)
   - PyTorch (`torch`) + SHAP (`shap`) for model explainability workflows
