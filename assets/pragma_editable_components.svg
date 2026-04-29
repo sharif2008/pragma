@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <style><![CDATA[
+      .title{font-family:Arial, Helvetica, sans-serif;font-weight:700;font-size:20px;fill:#fff}
+      .smalltitle{font-family:Arial, Helvetica, sans-serif;font-weight:700;font-size:17px;fill:#111}
+      .text{font-family:Arial, Helvetica, sans-serif;font-size:15px;fill:#111}
+      .small{font-family:Arial, Helvetica, sans-serif;font-size:13px;fill:#111}
+      .tiny{font-family:Arial, Helvetica, sans-serif;font-size:12px;fill:#111}
+      .caption{font-family:Times New Roman, serif;font-size:18px;fill:#111}
+      .layer{fill:#fff;stroke-width:2;rx:16;ry:16}
+      .box{fill:#fff;stroke-width:1.5;rx:9;ry:9}
+      .blue{stroke:#0b60bd}.purple{stroke:#6a2dbf}.orange{stroke:#d45522}.green{stroke:#2a7a36}.red{stroke:#d62828}
+      .blueFill{fill:#0b60bd}.purpleFill{fill:#6a2dbf}.orangeFill{fill:#d45522}.greenFill{fill:#1f6b30}.redFill{fill:#d62828}
+      .softBlue{fill:#eef6ff}.softPurple{fill:#f7f1ff}.softOrange{fill:#fff3ed}.softGreen{fill:#f0fff4}.softRed{fill:#fff2f2}
+      .arrowBlue{stroke:#0b60bd}.arrowPurple{stroke:#6a2dbf}.arrowOrange{stroke:#d45522}.arrowGreen{stroke:#2a7a36}.dash{stroke-dasharray:8 7}
+      .line{fill:none;stroke-width:3}
+    ]]></style>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#0b60bd"/></marker>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#6a2dbf"/></marker>
+    <marker id="arrowOrange" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#d45522"/></marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#2a7a36"/></marker>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#ffffff"/>
+
+  <!-- Headers -->
+  <g id="header-detection"><rect x="30" y="30" width="360" height="50" rx="8" class="blueFill"/><text x="80" y="62" class="title">① DETECTION (VFL LAYER)</text></g>
+  <g id="header-reasoning"><rect x="580" y="30" width="360" height="50" rx="8" class="purpleFill"/><text x="627" y="62" class="title">② REASONING (RAG + LLM LAYER)</text></g>
+  <g id="header-blockchain"><rect x="955" y="30" width="370" height="50" rx="8" class="orangeFill"/><text x="985" y="62" class="title">③ BLOCKCHAIN ENFORCEMENT LAYER</text></g>
+  <g id="header-outcome"><rect x="1340" y="30" width="230" height="72" rx="8" class="greenFill"/><text x="1355" y="58" class="title">④ EXECUTION OUTCOME</text><text x="1382" y="85" class="title">LAYER</text></g>
+
+  <!-- Layer panels -->
+  <g id="layer-detection"><rect x="30" y="105" width="570" height="710" class="layer blue" fill="#fbfdff"/></g>
+  <g id="layer-reasoning"><rect x="620" y="105" width="310" height="710" class="layer purple" fill="#fffcff"/></g>
+  <g id="layer-blockchain"><rect x="950" y="105" width="375" height="710" class="layer orange" fill="#fffcfa"/></g>
+  <g id="layer-outcome"><rect x="1335" y="120" width="240" height="695" class="layer green" fill="#fbfffb"/></g>
+
+  <!-- Detection components -->
+  <g id="component-domain-agent-d1" class="editable-component">
+    <rect x="50" y="135" width="200" height="170" class="box blue softBlue"/>
+    <circle cx="94" cy="230" r="26" fill="#0b60bd"/>
+    <text x="80" y="238" font-size="28" fill="#fff">↔</text>
+    <text x="80" y="170" class="smalltitle">Domain Agent D₁</text>
+    <text x="78" y="195" class="smalltitle">(Access / ISP)</text>
+    <text x="140" y="228" class="text">Local data</text>
+    <text x="140" y="252" class="text">(23 features)</text>
+  </g>
+
+  <g id="component-domain-agent-d2" class="editable-component">
+    <rect x="50" y="340" width="200" height="185" class="box blue softBlue"/>
+    <path d="M75 440 L95 428 L125 436 L125 475 L100 488 L75 475 Z" fill="#0b60bd"/>
+    <text x="92" y="465" font-size="28" fill="#fff">+</text>
+    <text x="77" y="374" class="smalltitle">Domain Agent D₂</text>
+    <text x="76" y="400" class="smalltitle">(Perimeter / IDS)</text>
+    <text x="140" y="452" class="text">Local data</text>
+    <text x="140" y="476" class="text">(32 features)</text>
+  </g>
+
+  <g id="component-domain-agent-d3" class="editable-component">
+    <rect x="50" y="565" width="200" height="180" class="box blue softBlue"/>
+    <rect x="73" y="662" width="55" height="38" rx="3" fill="none" stroke="#0b60bd" stroke-width="5"/>
+    <path d="M62 715 H140 L128 700 H75 Z" fill="#0b60bd"/>
+    <text x="77" y="600" class="smalltitle">Domain Agent D₃</text>
+    <text x="75" y="626" class="smalltitle">(Endpoint / EDR)</text>
+    <text x="140" y="676" class="text">Local data</text>
+    <text x="140" y="700" class="text">(42 features)</text>
+  </g>
+
+  <g id="component-vfl-aggregator" class="editable-component">
+    <rect x="280" y="355" width="155" height="295" class="box blue softBlue"/>
+    <text x="300" y="392" class="smalltitle">VFL Aggregator</text>
+    <text x="312" y="418" class="text">(Shared space)</text>
+    <circle cx="358" cy="510" r="8" fill="none" stroke="#0b60bd" stroke-width="3"/>
+    <circle cx="328" cy="545" r="8" fill="none" stroke="#0b60bd" stroke-width="3"/>
+    <circle cx="388" cy="545" r="8" fill="none" stroke="#0b60bd" stroke-width="3"/>
+    <circle cx="328" cy="590" r="8" fill="none" stroke="#0b60bd" stroke-width="3"/>
+    <circle cx="388" cy="590" r="8" fill="none" stroke="#0b60bd" stroke-width="3"/>
+    <line x1="358" y1="510" x2="328" y2="545" stroke="#0b60bd" stroke-width="3"/><line x1="358" y1="510" x2="388" y2="545" stroke="#0b60bd" stroke-width="3"/><line x1="328" y1="545" x2="388" y2="590" stroke="#0b60bd" stroke-width="3"/><line x1="388" y1="545" x2="328" y2="590" stroke="#0b60bd" stroke-width="3"/><line x1="328" y1="545" x2="388" y2="545" stroke="#0b60bd" stroke-width="3"/>
+    <text x="307" y="617" class="text">Aggregated</text>
+    <text x="303" y="642" class="text">embedding h</text>
+    <text x="324" y="667" class="text">(64-dim)</text>
+  </g>
+
+  <g id="component-shap-attribution" class="editable-component">
+    <rect x="465" y="365" width="135" height="180" class="box blue softBlue"/>
+    <text x="505" y="400" class="smalltitle">SHAP</text><text x="487" y="425" class="smalltitle">Attribution</text>
+    <rect x="505" y="490" width="14" height="35" fill="#0b60bd" opacity="0.6"/><rect x="526" y="465" width="14" height="60" fill="#0b60bd" opacity="0.6"/><rect x="547" y="505" width="14" height="20" fill="#0b60bd" opacity="0.6"/>
+    <line x1="495" y1="525" x2="573" y2="525" stroke="#0b60bd" stroke-width="3"/>
+    <text x="482" y="580" class="text">Contributing</text><text x="491" y="605" class="text">attributes</text><text x="490" y="630" class="text">per domain</text>
+  </g>
+
+  <!-- Reasoning components -->
+  <g id="component-rag-pipeline" class="editable-component">
+    <rect x="650" y="165" width="250" height="175" class="box purple softPurple"/>
+    <text x="720" y="205" class="smalltitle">RAG Pipeline</text>
+    <ellipse cx="700" cy="250" rx="21" ry="9" fill="#666"/><rect x="679" y="250" width="42" height="35" fill="#666"/><ellipse cx="700" cy="285" rx="21" ry="9" fill="#555"/>
+    <text x="742" y="270" font-size="32" fill="#6a2dbf">→</text><circle cx="780" cy="265" r="18" fill="none" stroke="#555" stroke-width="5"/><line x1="794" y1="279" x2="810" y2="295" stroke="#555" stroke-width="5"/>
+    <text x="825" y="270" font-size="32" fill="#6a2dbf">→</text><path d="M850 230 H890 L910 250 V300 H850 Z" fill="none" stroke="#555" stroke-width="4"/><path d="M890 230 V250 H910" fill="none" stroke="#555" stroke-width="4"/>
+    <text x="662" y="320" class="text">(Retrieve → Rerank → Context)</text>
+  </g>
+
+  <g id="component-llm-agent" class="editable-component">
+    <rect x="650" y="405" width="250" height="145" class="box purple softPurple"/>
+    <text x="735" y="445" class="smalltitle">LLM Agent</text><text x="720" y="470" class="text">(GPT-4o mini)</text>
+    <text x="680" y="515" font-size="50" fill="#6a2dbf">♙</text>
+  </g>
+
+  <g id="component-mitigation-plan" class="editable-component">
+    <rect x="650" y="615" width="250" height="205" class="box purple softPurple"/>
+    <text x="715" y="655" class="smalltitle">Mitigation Plan</text><text x="717" y="680" class="text">(Structured JSON)</text>
+    <rect x="680" y="705" width="44" height="55" fill="none" stroke="#6a2dbf" stroke-width="4" rx="3"/><text x="689" y="728" class="text" fill="#6a2dbf">✓</text><text x="689" y="748" class="text" fill="#6a2dbf">✓</text>
+    <text x="740" y="760" class="text">Tier-assigned actions</text><text x="740" y="786" class="text">+ Evidence + Confidence</text>
+  </g>
+
+  <!-- Blockchain components -->
+  <g id="component-smart-contract-validation" class="editable-component">
+    <rect x="1005" y="150" width="245" height="190" class="box orange softOrange"/>
+    <text x="1065" y="190" class="smalltitle">Smart Contract</text><text x="1083" y="215" class="smalltitle">Validation</text>
+    <rect x="1030" y="260" width="42" height="55" fill="none" stroke="#d45522" stroke-width="4" rx="3"/><text x="1039" y="283" class="text" fill="#d45522">✓</text><text x="1039" y="303" class="text" fill="#d45522">✓</text>
+    <text x="1090" y="280" class="text">Policy, schema,</text><text x="1090" y="305" class="text">&amp; rules validation</text>
+  </g>
+
+  <g id="component-consensus-gate" class="editable-component">
+    <rect x="1005" y="385" width="245" height="235" class="box orange softOrange"/>
+    <text x="1065" y="425" class="smalltitle">Consensus Gate</text><text x="1050" y="450" class="text">(Multi-party Approval)</text>
+    <circle cx="1128" cy="500" r="13" fill="#d45522"/><circle cx="1088" cy="543" r="13" fill="#d45522"/><circle cx="1168" cy="543" r="13" fill="#d45522"/><line x1="1128" y1="500" x2="1088" y2="543" stroke="#d45522" stroke-width="4"/><line x1="1128" y1="500" x2="1168" y2="543" stroke="#d45522" stroke-width="4"/>
+    <text x="1055" y="565" class="text">Domain operator</text><text x="1035" y="590" class="text">consensus for critical</text><text x="1085" y="615" class="text">actions</text>
+  </g>
+
+  <g id="component-audit-log" class="editable-component">
+    <rect x="1005" y="655" width="245" height="230" class="box orange softOrange"/>
+    <text x="1085" y="695" class="smalltitle">Audit Log</text><text x="1064" y="720" class="text">(On-chain Record)</text>
+    <path d="M1032 765 H1072 L1092 785 V835 H1032 Z" fill="none" stroke="#d45522" stroke-width="4"/><path d="M1072 765 V785 H1092" fill="none" stroke="#d45522" stroke-width="4"/><rect x="1090" y="815" width="24" height="24" fill="none" stroke="#d45522" stroke-width="4"/>
+    <text x="1075" y="812" class="text">Immutable record of</text><text x="1063" y="837" class="text">events, plan, decision,</text><text x="1090" y="862" class="text">timestamps, outputs</text>
+  </g>
+
+  <!-- Outcome components -->
+  <g id="component-success-outcome" class="editable-component">
+    <rect x="1370" y="170" width="170" height="345" class="box green softGreen"/>
+    <circle cx="1455" cy="225" r="28" fill="#2a7a36"/><text x="1438" y="244" font-size="48" fill="#fff">✓</text>
+    <text x="1413" y="290" class="smalltitle" fill="#2a7a36">SUCCESS</text>
+    <text x="1398" y="325" class="text">Plan Validated</text><text x="1410" y="350" class="text">&amp; Approved</text>
+    <line x1="1400" y1="375" x2="1515" y2="375" stroke="#2a7a36" stroke-width="1"/>
+    <text x="1413" y="425" class="smalltitle">Action Executed</text><text x="1400" y="450" class="text">on the Network</text><text x="1390" y="490" class="text">(Automated Response)</text>
+  </g>
+
+  <g id="component-exception-outcome" class="editable-component">
+    <rect x="1370" y="560" width="170" height="340" class="box red softRed"/>
+    <circle cx="1455" cy="615" r="28" fill="#d62828"/><text x="1440" y="633" font-size="44" fill="#fff">×</text>
+    <text x="1406" y="680" class="smalltitle" fill="#d62828">EXCEPTION</text>
+    <text x="1405" y="715" class="text">Plan Rejected</text><text x="1420" y="740" class="text">or Invalid</text>
+    <line x1="1400" y1="770" x2="1515" y2="770" stroke="#d62828" stroke-width="1"/>
+    <path d="M1455 800 L1500 875 H1410 Z" fill="#d62828"/><text x="1446" y="856" font-size="42" fill="#fff">!</text>
+    <text x="1400" y="815" class="smalltitle">Blocked / Rejected</text><text x="1400" y="840" class="text">(No Action Taken)</text><text x="1415" y="890" class="text">Alert to Operators</text>
+  </g>
+
+  <!-- Arrows -->
+  <g id="arrows-data-flow">
+    <path d="M250 220 H355 V355" class="line arrowBlue" marker-end="url(#arrowBlue)"/>
+    <path d="M250 435 H280" class="line arrowBlue" marker-end="url(#arrowBlue)"/>
+    <path d="M250 680 H355 V650" class="line arrowBlue" marker-end="url(#arrowBlue)"/>
+    <path d="M435 505 H465" class="line arrowBlue" marker-end="url(#arrowBlue)"/>
+    <path d="M600 455 H650" class="line arrowPurple" marker-end="url(#arrowPurple)"/>
+    <path d="M775 340 V405" class="line arrowPurple" marker-end="url(#arrowPurple)"/>
+    <path d="M775 550 V615" class="line arrowPurple" marker-end="url(#arrowPurple)"/>
+    <path d="M900 725 H1005" class="line arrowOrange" marker-end="url(#arrowOrange)"/>
+    <path d="M1128 340 V385" class="line arrowOrange" marker-end="url(#arrowOrange)"/>
+    <path d="M1128 620 V655" class="line arrowOrange" marker-end="url(#arrowOrange)"/>
+    <path d="M1250 270 H1315 V335 H1370" class="line arrowGreen" marker-end="url(#arrowGreen)"/>
+    <path d="M1250 770 H1315 V690 H1370" class="line arrowGreen" marker-end="url(#arrowGreen)"/>
+  </g>
+
+  <!-- Feedback -->
+  <g id="feedback-reputation-loop">
+    <path d="M1128 885 V930 H130 V745" class="line arrowOrange dash" marker-end="url(#arrowOrange)"/>
+    <text x="730" y="915" class="text" fill="#d45522">Reputation update (from on-chain outcomes)</text>
+    <path d="M100 745 V815" class="line arrowBlue dash" marker-end="url(#arrowBlue)"/>
+    <text x="250" y="805" class="text" fill="#0b60bd">Reputation scoring (feedback loop)</text>
+  </g>
+
+  <!-- Legend -->
+  <g id="legend">
+    <rect x="45" y="930" width="1510" height="45" rx="5" fill="#fff" stroke="#888" stroke-dasharray="4 3"/>
+    <path d="M70 952 H125" class="line arrowBlue" marker-end="url(#arrowBlue)"/><text x="140" y="958" class="text">Data / Embedding Flow</text>
+    <path d="M380 952 H435" class="line arrowPurple" marker-end="url(#arrowPurple)"/><text x="450" y="958" class="text">Reasoning Flow</text>
+    <path d="M690 952 H745" class="line arrowOrange" marker-end="url(#arrowOrange)"/><text x="760" y="958" class="text">Validation Flow</text>
+    <path d="M980 952 H1035" class="line arrowGreen" marker-end="url(#arrowGreen)"/><text x="1050" y="958" class="text">Execution Outcome</text>
+    <path d="M1220 952 H1275" class="line arrowOrange dash" marker-end="url(#arrowOrange)"/><text x="1290" y="958" class="text">Feedback / Reputation Loop</text>
+  </g>
+
+  <text x="245" y="995" class="caption">Fig. 1. Four-stage PRAGMA architecture: detection (VFL), reasoning (RAG + LLM), blockchain enforcement, and execution outcome.</text>
+</svg>
