@@ -14,9 +14,12 @@ from app.notebook_runtime.rag_utils import (
 )
 from app.notebook_runtime.storage_paths import AGENTIC_FEATURES_JSON, ATTACK_OPTIONS_JSON
 from app.notebook_runtime.vfl_utils import FIXED_AGENT_NAMES
+from app.services.prediction_shap import limit_shap_per_feature_by_abs
 from app.services.rag_templates_row_context import top_shap_features_by_agent
 
 _LLM_RAG_SECTIONS_IN_PROMPT = 5
+# Top |attribution| features included in orchestration LLM ``sample_data.prediction_row.shap.per_feature``.
+LLM_ORCHESTRATION_TOP_SHAP_FEATURES = 5
 
 # Canonical user prompt for POST /agent/decide (and notebook parity). Use .format(...) with:
 # sample_id, predicted_label, confidence (float 0–1 for {confidence:.1%}),
@@ -39,8 +42,9 @@ AGENTIC_ORCHESTRATION_LLM_USER_PROMPT_TEMPLATE = """You are a cybersecurity deci
         - Party-level contributions and dominance:
         {network_tier_info}
 
-        - Feature-level evidence (full sample_data JSON below). prediction_row mirrors the scored result row;
-          prediction_row.shap keeps method/status/model metadata and per_feature = top 10 features by |attribution| only.
+        - Feature-level evidence (JSON below). Contains prediction outcome and **top feature attributions only**
+          (φ / contribution shares). If ``orchestration_llm_payload`` was supplied by the caller, that slim JSON is shown;
+          otherwise the full ``sample_data`` record may appear for backward compatibility.
         {sample_data}
 
         Allowed actions (STRICT CONSTRAINT):
@@ -217,33 +221,18 @@ def row_to_shap_explanation(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _shap_cell_for_prompt(shap_cell: Any, *, top_per_feature: int = 10) -> dict[str, Any]:
+def _shap_cell_for_prompt(shap_cell: Any, *, top_per_feature: int = LLM_ORCHESTRATION_TOP_SHAP_FEATURES) -> dict[str, Any]:
     """Copy SHAP cell for the LLM: all scalar keys, ``per_feature`` reduced to top-N by |value|."""
     if not isinstance(shap_cell, dict):
         return {}
-    out: dict[str, Any] = {}
-    for k, v in shap_cell.items():
-        if k == "per_feature":
-            continue
-        out[k] = v
-    pf = shap_cell.get("per_feature")
-    if not isinstance(pf, dict):
-        if pf is not None:
-            out["per_feature"] = pf
-        return out
-    scored: list[tuple[str, float]] = []
-    for name, val in pf.items():
-        try:
-            fv = float(val)
-        except (TypeError, ValueError):
-            continue
-        scored.append((str(name), fv))
-    scored.sort(key=lambda x: abs(x[1]), reverse=True)
-    out["per_feature"] = {k: v for k, v in scored[:top_per_feature]}
-    return out
+    return limit_shap_per_feature_by_abs(shap_cell, top_per_feature)
 
 
-def _prediction_row_for_prompt(row: dict[str, Any], *, top_per_feature: int = 10) -> dict[str, Any]:
+def _prediction_row_for_prompt(
+    row: dict[str, Any],
+    *,
+    top_per_feature: int = LLM_ORCHESTRATION_TOP_SHAP_FEATURES,
+) -> dict[str, Any]:
     pr = dict(row)
     shp = pr.get("shap")
     if isinstance(shp, dict):
@@ -312,7 +301,7 @@ def build_sample_from_prediction_job(
         except (TypeError, ValueError):
             confidence = 0.0
         shap_expl = row_to_shap_explanation(row)
-        prediction_row = _prediction_row_for_prompt(row, top_per_feature=10)
+        prediction_row = _prediction_row_for_prompt(row)
         return {
             "sample_id": row_idx,
             "predicted_label": str(row.get("predicted_label") or "UNKNOWN"),
@@ -454,7 +443,11 @@ def create_agentic_orchestration_prompt(
         if dominant_party:
             network_tier_info += f"\n- Dominant party: {dominant_party}"
 
-    sample_data_json = json.dumps(sample_data, indent=2, ensure_ascii=False, default=str)
+    slim = sample_data.get("orchestration_llm_payload")
+    if isinstance(slim, dict) and slim:
+        sample_data_json = json.dumps(slim, indent=2, ensure_ascii=False, default=str)
+    else:
+        sample_data_json = json.dumps(sample_data, indent=2, ensure_ascii=False, default=str)
 
     return AGENTIC_ORCHESTRATION_LLM_USER_PROMPT_TEMPLATE.format(
         sample_id=sample_id,

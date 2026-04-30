@@ -5,6 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
+import subprocess
+from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 
@@ -90,6 +93,110 @@ def _agent_key_sha256(agentic_job_public_id: str | None) -> str:
 
 def _report_key_sha256(agentic_report_public_id: str) -> str:
     return _sha256_hex(agentic_report_public_id.strip())
+
+
+def _repo_root() -> Path:
+    """Repository root (parent of ``backend``)."""
+    return Path(__file__).resolve().parent.parent.parent.parent
+
+
+def _hardhat_blockchain_dir() -> Path:
+    return _repo_root() / "hardhat-blockchain"
+
+
+def _deploy_registry_from_artifact(settings: Settings, artifact_path: Path) -> str:
+    """Deploy using compiled Hardhat artifact (bytecode + ABI)."""
+    data = json.loads(artifact_path.read_text(encoding="utf-8"))
+    abi = data.get("abi")
+    bytecode = data.get("bytecode") or ""
+    if not abi or not bytecode or bytecode == "0x":
+        raise RuntimeError(
+            "Artifact missing bytecode. Run: cd hardhat-blockchain && npx hardhat compile"
+        )
+
+    w3 = Web3(Web3.HTTPProvider(settings.trust_chain_rpc_url))
+    if not w3.is_connected():
+        raise RuntimeError("could not connect to TRUST_CHAIN_RPC_URL")
+    acct = w3.eth.account.from_key(settings.trust_chain_private_key)
+
+    factory = w3.eth.contract(abi=abi, bytecode=bytecode)
+    nonce = w3.eth.get_transaction_count(acct.address)
+    tx = factory.constructor().build_transaction(
+        {
+            "from": acct.address,
+            "nonce": nonce,
+            "chainId": int(settings.trust_chain_chain_id),
+        }
+    )
+    tx.setdefault("gas", 2_000_000)
+    tx.setdefault("maxFeePerGas", w3.to_wei(100, "gwei"))
+    tx.setdefault("maxPriorityFeePerGas", w3.to_wei(10, "gwei"))
+
+    signed = acct.sign_transaction(tx)
+    tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
+    addr = getattr(receipt, "contractAddress", None) or getattr(receipt, "contract_address", None)
+    if addr is None and isinstance(receipt, dict):
+        addr = receipt.get("contractAddress") or receipt.get("contract_address")
+    if not addr:
+        raise RuntimeError("deploy receipt missing contractAddress")
+    return Web3.to_checksum_address(addr)
+
+
+def _deploy_registry_via_npm(settings: Settings) -> str:
+    """Run ``npm run deploy:local`` in ``hardhat-blockchain`` and parse the deployed address."""
+    hh = _hardhat_blockchain_dir()
+    pkg = hh / "package.json"
+    if not pkg.is_file():
+        raise RuntimeError(f"hardhat-blockchain not found or missing package.json: {hh}")
+
+    proc = subprocess.run(
+        ["npm", "run", "deploy:local"],
+        cwd=str(hh),
+        capture_output=True,
+        text=True,
+        timeout=300,
+        encoding="utf-8",
+        errors="replace",
+    )
+    out = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    if proc.returncode != 0:
+        raise RuntimeError(f"npm deploy failed (exit {proc.returncode}):\n{out[-6000:]}")
+
+    m = re.search(r"AgenticTrustRegistry deployed to:\s*(0x[a-fA-F0-9]{40})", out)
+    if not m:
+        raise RuntimeError(f"Could not parse deployed contract address from npm output:\n{out[-4000:]}")
+    return Web3.to_checksum_address(m.group(1))
+
+
+def deploy_fresh_registry(settings: Settings) -> str:
+    """
+    Deploy a new AgenticTrustRegistry so each run starts with an empty commitment mapping.
+
+    Uses the compiled artifact + JSON-RPC when available; otherwise runs ``npm run deploy:local``.
+    Requires ``TRUST_CHAIN_PRIVATE_KEY`` and a reachable ``TRUST_CHAIN_RPC_URL``.
+    """
+    if not settings.trust_chain_private_key:
+        raise RuntimeError("TRUST_CHAIN_PRIVATE_KEY missing")
+
+    art = (
+        _hardhat_blockchain_dir()
+        / "artifacts"
+        / "contracts"
+        / "AgenticTrustRegistry.sol"
+        / "AgenticTrustRegistry.json"
+    )
+    if art.is_file():
+        try:
+            addr = _deploy_registry_from_artifact(settings, art)
+            logger.info("deployed AgenticTrustRegistry via artifact at %s", addr)
+            return addr
+        except Exception as e:
+            logger.warning("artifact deploy failed (%s); trying npm run deploy:local", e)
+
+    addr = _deploy_registry_via_npm(settings)
+    logger.info("deployed AgenticTrustRegistry via npm at %s", addr)
+    return addr
 
 
 def anchor_report_commitment_on_chain(

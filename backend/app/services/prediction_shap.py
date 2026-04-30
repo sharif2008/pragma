@@ -10,6 +10,37 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+# Maximum features kept in ``shap.per_feature`` when persisting prediction results (by |SHAP|).
+RESULTS_JSON_TOP_SHAP_FEATURES = 10
+
+
+def limit_shap_per_feature_by_abs(shap_cell: dict[str, Any], top_n: int) -> dict[str, Any]:
+    """
+    Copy a row-level ``shap`` dict, reducing ``per_feature`` to the top ``top_n`` keys by absolute value.
+    Preserves method/status/model metadata and other scalar keys.
+    """
+    if not isinstance(shap_cell, dict):
+        return {}
+    if top_n < 1:
+        out = {k: v for k, v in shap_cell.items() if k != "per_feature"}
+        return out
+    out: dict[str, Any] = {k: v for k, v in shap_cell.items() if k != "per_feature"}
+    pf = shap_cell.get("per_feature")
+    if not isinstance(pf, dict):
+        if "per_feature" in shap_cell:
+            out["per_feature"] = pf
+        return out
+    scored: list[tuple[str, float]] = []
+    for name, val in pf.items():
+        try:
+            fv = float(val)
+        except (TypeError, ValueError):
+            continue
+        scored.append((str(name), fv))
+    scored.sort(key=lambda x: abs(x[1]), reverse=True)
+    out["per_feature"] = {k: v for k, v in scored[:top_n]}
+    return out
+
 
 def compute_sklearn_tree_shap_per_row(pipe: Any, X: pd.DataFrame) -> list[dict[str, Any] | None] | None:
     """
