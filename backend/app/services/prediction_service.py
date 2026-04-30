@@ -16,7 +16,11 @@ from app.models.domain import JobStatus, ManagedFile, ModelVersion, PredictionJo
 from app.utils.file_utils import remove_path
 from app.services import file_service
 from app.services.ml_training import load_model_bundle
-from app.services.prediction_shap import compute_sklearn_tree_shap_per_row
+from app.services.prediction_shap import (
+    RESULTS_JSON_TOP_SHAP_FEATURES,
+    compute_sklearn_tree_shap_per_row,
+    limit_shap_per_feature_by_abs,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -308,6 +312,9 @@ def run_prediction_job_sync(job_db_id: int) -> None:
                         "status": shap_meta.get("status", "skipped"),
                         "note": shap_meta.get("detail"),
                     }
+
+                if isinstance(shap_cell, dict) and isinstance(shap_cell.get("per_feature"), dict):
+                    shap_cell = limit_shap_per_feature_by_abs(shap_cell, RESULTS_JSON_TOP_SHAP_FEATURES)
 
                 rows_json.append(
                     {
