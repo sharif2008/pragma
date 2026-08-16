@@ -4219,7 +4219,7 @@ function AgenticActionsPanel({ onNotify }: PanelProps) {
                 {orchestrationPromptLoading ? 'Loading prompt…' : 'Refresh prompt preview'}
               </Button>
               <Typography variant="caption" color="text.secondary">
-                Orchestration prompt: prediction summary, <code>sample_data</code> (prediction_row.shap.per_feature = top 10 |value|),
+                Orchestration prompt: prediction summary, <code>sample_data</code> (prediction_row.shap.per_feature = top 5 |value|; stored rows keep top 10),
                 allowed actions, agentic tiers, KB excerpts from prep citations. RAG template / prep narrative is not injected into the
                 agent LLM.
               </Typography>

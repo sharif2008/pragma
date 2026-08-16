@@ -12,6 +12,8 @@
 
 PRAGMA is an implementation of an **agentic AI pipeline for enterprise network intrusion detection**, combining **Vertical Federated Learning (VFL)** for privacy-preserving cross-domain detection, **SHAP-based explainability** to attribute alerts, and **RAG-grounded reasoning** to generate mitigation recommendations from retrieved policy context.
 
+This codebase (**ChainAgentVFL**) implements the same conceptual stack—**blockchain enforcement** for integrity-backed agent outputs plus **orchestration** (API + optional LangChain-style agent flows)—for experiments and demos. A related reference tree is maintained at [`github.com/sharif2008/pragma`](https://github.com/sharif2008/pragma). You can drive workflows from the **React UI** or **terminal** (e.g. `backend/scripts/trust_anchor_benchmark.py` for CSV→RAG→LLM→on-chain timing reports without using the UI).
+
 To address accountability, PRAGMA includes a **blockchain trust layer** implemented as **hash-only anchoring**: after an agentic report is produced and persisted, the backend computes a deterministic SHA-256 commitment over a canonical JSON payload and anchors only the resulting `bytes32` digest on an Ethereum smart contract. Before applying any report-derived actions, the backend verifies the on-chain commitment against the database record and the saved report artifact; execution is blocked if integrity verification fails.
 
 ## Overview
