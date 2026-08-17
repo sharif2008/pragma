@@ -29,9 +29,10 @@ Each invocation creates one **flat** run folder (no per-row subfolders):
 
 ```
 run/output/run_20250817_100530_a1b2c3d4/
-  report.json      # summary totals (rows, actions, failures, whitelist fails)
-  report.txt       # same summary, human-readable
-  ledger.json      # full batch detail — all rows in one file
+  report.json         # summary totals (rows, actions, failures, whitelist fails)
+  report.txt          # same summary, human-readable
+  report.html         # attack-wise Table 2 (count + %; auto-generated; per-row detail in ledger.json)
+  ledger.json         # full batch detail — all rows in one file
 ```
 
 **`report.json`** fields:
