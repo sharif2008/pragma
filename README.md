@@ -73,9 +73,13 @@ flowchart LR
   - React + Vite
   - Material UI-based admin template
 
+## Operator UI (Setting)
+
+![Setting page — Overview tab with workflow shortcuts](assets/agentic_setting.png)
+
 ## Dataset and notebooks
 
-- **Dataset (CSV)**: `sample.csv` (and any CSVs you upload/use through the backend workflows).
+- **Dataset (CSV)**: `backend/run/data/sample.csv` (and any CSVs you upload through the backend workflows).
 - **Jupyter**: notebooks are under `backend/notebooks/` (install separately: `pip install notebook ipykernel`).
 
 ## License
