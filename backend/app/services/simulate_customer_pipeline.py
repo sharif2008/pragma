@@ -12,7 +12,6 @@ import time
 from typing import Any
 from urllib.parse import urlparse
 
-from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
@@ -200,34 +199,6 @@ async def run_simulated_customer_message(
             force_step = sim.get("force_error_step")
         if isinstance(force_step, str) and force_step.strip() == "prediction":
             raise RuntimeError("Forced error at step=prediction")
-
-        # Step: rag_write (store message as a KB document using existing kb_service)
-        t_rag = StepTimer()
-        emit_event(db, run_id=run_id, trace_id=trace_id, step_name="rag_write", level="info", message="started")
-        content = message.strip().encode("utf-8", errors="replace")
-        up = UploadFile(filename=f"customer_message_{run_id}.txt", file=None)  # type: ignore[arg-type]
-        # UploadFile requires a file-like; set after construction for compatibility across Starlette versions.
-        import io
-
-        up.file = io.BytesIO(content)  # type: ignore[assignment]
-        up.content_type = "text/plain"  # type: ignore[assignment]
-        kb = await kb_service.ingest_kb_document(db, settings, up)
-        rag_info = {
-            "stored": True,
-            "kb_public_ids": [kb.public_id],
-            "managed_file_public_ids": [kb.managed_file.public_id] if kb.managed_file else [],
-        }
-        emit_event(
-            db,
-            run_id=run_id,
-            trace_id=trace_id,
-            step_name="rag_write",
-            level="info",
-            message="completed",
-            payload=rag_info,
-            duration_ms=t_rag.ms(),
-        )
-        update_run(db, run_id, rag_json=rag_info)
 
         if isinstance(force_step, str) and force_step.strip() == "rag_write":
             raise RuntimeError("Forced error at step=rag_write")
