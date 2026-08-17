@@ -14,6 +14,8 @@ Usage (from backend/, API + trained model + Hardhat chain recommended):
   python run/file_batch_demo.py --input-file ../data/sample_1000.csv --max-rows 10
   python run/file_batch_demo.py --no-apply
   python run/file_batch_demo.py --apply-mode per-action
+  python run/file_batch_demo.py --tamper          # substitute whitelisted actions ≠ plan
+  python run/file_batch_demo.py --no-tamper       # default: apply planned actions as-is
 
 Each run writes one folder under run/output/ with report.json, report.txt, and ledger.json (all rows inside ledger).
 
@@ -39,10 +41,18 @@ RUN_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = RUN_DIR.parent
 
 try:
-    from app.notebook_runtime.vfl_utils import canonical_attack_type, load_attack_option_keys
+    from app.notebook_runtime.vfl_utils import (
+        canonical_attack_type,
+        load_attack_option_keys,
+        pick_allowed_alternate_action,
+    )
 except ImportError:
     sys.path.insert(0, str(BACKEND_DIR))
-    from app.notebook_runtime.vfl_utils import canonical_attack_type, load_attack_option_keys
+    from app.notebook_runtime.vfl_utils import (
+        canonical_attack_type,
+        load_attack_option_keys,
+        pick_allowed_alternate_action,
+    )
 
 TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "partial", "needs_input"})
 
@@ -76,6 +86,7 @@ class RowPipelineRecord:
     agentic_job_public_id: str | None = None
     report_public_id: str | None = None
     planned_actions: list[PlannedAction] = field(default_factory=list)
+    action_overrides: dict[int, str] = field(default_factory=dict)
     pipeline_error: str | None = None
     apply_results: list[dict[str, Any]] = field(default_factory=list)
     execution_report_id: int | None = None
@@ -84,6 +95,8 @@ class RowPipelineRecord:
     def to_dict(self) -> dict[str, Any]:
         out = asdict(self)
         out["planned_actions"] = [a.to_dict() if isinstance(a, PlannedAction) else a for a in self.planned_actions]
+        if self.action_overrides:
+            out["action_overrides"] = {str(k): v for k, v in self.action_overrides.items()}
         return out
 
 
@@ -98,6 +111,9 @@ class BatchRunSummary:
     other_action_failures: int = 0
     rows_without_apply: int = 0
     labels_mapped_to_others: int = 0
+    actions_modified_before_apply: int = 0
+    tamper_rejected_on_chain: int = 0
+    tamper_accepted_on_chain: int = 0
 
     @property
     def failed_actions(self) -> int:
@@ -118,6 +134,9 @@ class BatchRunSummary:
             "other_fail_actions": self.other_action_failures,
             "rows_without_apply": self.rows_without_apply,
             "labels_mapped_to_others": self.labels_mapped_to_others,
+            "actions_modified_before_apply": self.actions_modified_before_apply,
+            "tamper_rejected_on_chain": self.tamper_rejected_on_chain,
+            "tamper_accepted_on_chain": self.tamper_accepted_on_chain,
         }
 
 
@@ -337,8 +356,56 @@ def planned_actions_from_report(report: dict[str, Any]) -> list[PlannedAction]:
     return []
 
 
-def apply_all_detection_actions(client: httpx.Client, report_public_id: str) -> dict[str, Any]:
-    response = client.post(f"/agent/reports/{report_public_id}/apply")
+def auto_tamper_overrides(
+    planned: list[PlannedAction],
+    attack_type: str | None,
+    *,
+    file_row: int = 0,
+) -> dict[int, str]:
+    """Substitute 1–2 whitelisted actions per row (not the full plan)."""
+    if not planned:
+        return {}
+    # Alternate 1 vs 2 tampered actions by row (row 0 → 1, row 1 → 2, row 2 → 1, …).
+    tamper_count = min(len(planned), 2, 1 + (file_row % 2))
+    used: set[str] = set()
+    overrides: dict[int, str] = {}
+    for act in planned[:tamper_count]:
+        alt = pick_allowed_alternate_action(act.action, attack_type, exclude=frozenset(used))
+        if not alt:
+            continue
+        if alt.strip().lower() == act.action.strip().lower():
+            continue
+        overrides[act.index] = alt
+        used.add(alt)
+    return overrides
+
+
+def chain_item_was_tampered(item: dict[str, Any]) -> bool:
+    return bool(item.get("action_modified_before_apply")) or bool(item.get("planned_action"))
+
+
+def chain_item_tamper_rejected(item: dict[str, Any]) -> bool:
+    if not chain_item_was_tampered(item):
+        return False
+    return str(item.get("result") or "") != "success"
+
+
+def chain_item_tamper_accepted(item: dict[str, Any]) -> bool:
+    if not chain_item_was_tampered(item):
+        return False
+    return str(item.get("result") or "") == "success"
+
+
+def apply_all_detection_actions(
+    client: httpx.Client,
+    report_public_id: str,
+    *,
+    action_overrides: dict[int, str] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    if action_overrides:
+        payload["action_overrides"] = {str(k): v for k, v in action_overrides.items()}
+    response = client.post(f"/agent/reports/{report_public_id}/apply", json=payload)
     response.raise_for_status()
     return response.json()
 
@@ -347,10 +414,15 @@ def apply_one_detection_action(
     client: httpx.Client,
     report_public_id: str,
     action_index: int,
+    *,
+    action_override: str | None = None,
 ) -> dict[str, Any]:
+    body: dict[str, Any] = {"action_index": action_index}
+    if action_override:
+        body["action_override"] = action_override
     response = client.post(
         f"/agent/reports/{report_public_id}/apply-action",
-        json={"action_index": action_index},
+        json=body,
     )
     response.raise_for_status()
     return response.json()
@@ -378,6 +450,8 @@ def summarize_chain_item(item: dict[str, Any]) -> dict[str, Any]:
         "failure_reason": item.get("failure_reason"),
         "apply_tx_hash": item.get("apply_tx_hash"),
         "apply_error": item.get("apply_error"),
+        "planned_action": item.get("planned_action"),
+        "action_modified_before_apply": item.get("action_modified_before_apply"),
     }
 
 
@@ -386,10 +460,15 @@ def chain_items_from_record(record: RowPipelineRecord) -> list[dict[str, Any]]:
     for block in record.apply_results:
         if block.get("error"):
             continue
-        if block.get("mode") == "bulk":
-            for item in block.get("items") or []:
-                if isinstance(item, dict):
-                    items.append(item)
+        elif block.get("mode") == "bulk":
+            exec_report = block.get("exec")
+            if isinstance(exec_report, dict):
+                for item in chain_items_from_exec(exec_report):
+                    items.append(summarize_chain_item(item))
+            else:
+                for item in block.get("items") or []:
+                    if isinstance(item, dict):
+                        items.append(item)
         elif block.get("mode") == "per-action":
             item = block.get("item")
             if isinstance(item, dict):
@@ -400,7 +479,7 @@ def chain_items_from_record(record: RowPipelineRecord) -> list[dict[str, Any]]:
 WHITELIST_FAILURE_REASONS = frozenset(
     {"action_not_whitelisted", "whitelist_unavailable", "missing_attack_type"}
 )
-INTEGRITY_FAILURE_REASONS = frozenset({"integrity_validation_error"})
+INTEGRITY_FAILURE_REASONS = frozenset({"integrity_validation_error", "action_plan_mismatch"})
 
 
 def classify_action_item(item: dict[str, Any]) -> str:
@@ -418,6 +497,56 @@ def classify_action_item(item: dict[str, Any]) -> str:
     if item.get("result") == "failed":
         return "other"
     return "unknown"
+
+
+def accumulate_tamper_metrics(
+    record: RowPipelineRecord,
+    chain_items: list[dict[str, Any]],
+    summary: BatchRunSummary,
+) -> None:
+    """Count tamper from client overrides + chain results (plan mismatch must not apply)."""
+    overrides = record.action_overrides or {}
+    if not overrides:
+        for item in chain_items:
+            if chain_item_was_tampered(item):
+                summary.actions_modified_before_apply += 1
+            if chain_item_tamper_rejected(item):
+                summary.tamper_rejected_on_chain += 1
+            if chain_item_tamper_accepted(item):
+                summary.tamper_accepted_on_chain += 1
+        return
+
+    for idx, override in overrides.items():
+        summary.actions_modified_before_apply += 1
+        planned = next((a.action for a in record.planned_actions if a.index == idx), "")
+        item = next((x for x in chain_items if x.get("index") == idx), None)
+        if not item:
+            summary.tamper_rejected_on_chain += 1
+            continue
+
+        result = str(item.get("result") or "")
+        reason = str(item.get("failure_reason") or "")
+        applied = str(item.get("action") or "").strip().lower()
+        planned_norm = str(planned or "").strip().lower()
+        override_norm = str(override or "").strip().lower()
+
+        if item.get("action_modified_before_apply") or reason == "action_plan_mismatch":
+            summary.tamper_rejected_on_chain += 1
+            continue
+
+        if result == "success" and applied == override_norm and override_norm != planned_norm:
+            summary.tamper_accepted_on_chain += 1
+            continue
+
+        if result == "success" and applied == planned_norm and override_norm != planned_norm:
+            # Override sent but anchored plan was applied — treat as blocked in the report.
+            summary.tamper_rejected_on_chain += 1
+            summary.integrity_failures += 1
+            summary.actions_applied = max(0, summary.actions_applied - 1)
+            continue
+
+        if result != "success":
+            summary.tamper_rejected_on_chain += 1
 
 
 def compute_batch_summary(
@@ -456,6 +585,8 @@ def compute_batch_summary(
             elif bucket == "other":
                 summary.other_action_failures += 1
 
+        accumulate_tamper_metrics(record, chain_items, summary)
+
         for block in record.apply_results:
             if block.get("error"):
                 summary.other_action_failures += 1
@@ -486,6 +617,9 @@ def format_report_text(
                 f"Actions applied OK:      {summary.actions_applied}",
                 f"Integrity fail actions:  {summary.integrity_failures}",
                 f"Other fail actions:      {summary.other_action_failures}",
+                f"Actions modified:        {summary.actions_modified_before_apply}",
+                f"Tamper rejected (chain): {summary.tamper_rejected_on_chain}",
+                f"Tamper accepted (chain): {summary.tamper_accepted_on_chain}",
             ]
         )
     lines.append(f"Pipeline row failures:   {summary.pipeline_failures}")
@@ -515,6 +649,12 @@ def print_batch_report(
         print(f"Applied OK:     {summary.actions_applied}")
         print(f"Integrity fail: {summary.integrity_failures}  (modified / unauthorized plan)")
         print(f"Other fail:     {summary.other_action_failures}")
+        if summary.actions_modified_before_apply:
+            print(f"Modified:       {summary.actions_modified_before_apply}")
+        if summary.tamper_rejected_on_chain:
+            print(f"Tamper reject:  {summary.tamper_rejected_on_chain}")
+        if summary.tamper_accepted_on_chain:
+            print(f"Tamper accept:  {summary.tamper_accepted_on_chain}")
         if summary.rows_without_apply:
             print(f"Rows no apply:  {summary.rows_without_apply}")
     if summary.labels_mapped_to_others:
@@ -550,6 +690,8 @@ def print_apply_result(exec_report: dict[str, Any], *, action_index: int | None 
             f"        [{item.get('index')}] {item.get('action')} "
             f"tier={item.get('network_tier') or '—'} whitelisted={wl_txt} result={item.get('result')}"
         )
+        if item.get("planned_action"):
+            print(f"          planned={item.get('planned_action')} submitted={item.get('action')}")
         if item.get("apply_tx_hash"):
             print(f"          tx={item.get('apply_tx_hash')}")
         reason = item.get("failure_reason") or item.get("whitelist_error") or item.get("apply_error")
@@ -626,6 +768,7 @@ def apply_actions_for_record(
     *,
     apply_mode: str,
     pause_s: float,
+    tamper: bool,
 ) -> None:
     if not record.report_public_id:
         print("  (skip apply: no agentic report for this row)")
@@ -634,11 +777,33 @@ def apply_actions_for_record(
         print("  (skip apply: no planned actions on report)")
         return
 
+    overrides = (
+        auto_tamper_overrides(record.planned_actions, record.attack_type, file_row=record.file_row)
+        if tamper
+        else {}
+    )
+    record.action_overrides = overrides
+
     print(f"\n--- Apply file_row={record.file_row} report={record.report_public_id[:8]}… ---")
+    if tamper:
+        if overrides:
+            print(
+                f"  tamper on — substituting {len(overrides)} whitelisted action(s) "
+                f"different from plan (attack_type={record.attack_type or '—'}):"
+            )
+            for idx, label in sorted(overrides.items()):
+                orig = next((a.action for a in record.planned_actions if a.index == idx), "?")
+                print(f"    [{idx}] {orig!r} -> {label!r}")
+        else:
+            print("  tamper on — no alternate whitelisted action found for this plan")
 
     if apply_mode == "bulk":
         try:
-            exec_report = apply_all_detection_actions(client, record.report_public_id)
+            exec_report = apply_all_detection_actions(
+                client,
+                record.report_public_id,
+                action_overrides=overrides or None,
+            )
             record.execution_report_id = exec_report.get("id")
             record.execution_status = str(exec_report.get("status") or "")
             items = [summarize_chain_item(x) for x in chain_items_from_exec(exec_report)]
@@ -655,9 +820,16 @@ def apply_actions_for_record(
 
     for act in record.planned_actions:
         idx = act.index
-        print(f"  applying action [{idx}]: {act.action}")
+        override = overrides.get(idx)
+        submitted = override or act.action
+        print(f"  applying action [{idx}]: {submitted}" + (f" (planned {act.action})" if override else ""))
         try:
-            exec_report = apply_one_detection_action(client, record.report_public_id, idx)
+            exec_report = apply_one_detection_action(
+                client,
+                record.report_public_id,
+                idx,
+                action_override=override,
+            )
             record.execution_report_id = exec_report.get("id")
             record.execution_status = str(exec_report.get("status") or "")
             items = chain_items_from_exec(exec_report)
@@ -692,6 +864,7 @@ def save_run_outputs(
         "input_file": str(input_path),
         "apply": meta.get("apply"),
         "apply_mode": meta.get("apply_mode"),
+        "tamper": meta.get("tamper"),
         **summary.to_report_dict(),
     }
     report_json_path = run_dir / "report.json"
@@ -761,6 +934,7 @@ def run_file_batch_demo(args: argparse.Namespace) -> int:
 
     attack_keys = load_attack_option_keys()
     print(f"Attack types (attack_options.json): {', '.join(sorted(attack_keys))}")
+    print(f"Tamper before apply: {'on' if args.tamper else 'off'}")
 
     ledger: list[RowPipelineRecord] = []
     timeout = httpx.Timeout(args.timeout_s)
@@ -793,6 +967,7 @@ def run_file_batch_demo(args: argparse.Namespace) -> int:
                     record,
                     apply_mode=args.apply_mode,
                     pause_s=args.pause_between_actions_s,
+                    tamper=args.tamper,
                 )
 
     summary = compute_batch_summary(ledger, apply_enabled=args.apply, attack_keys=attack_keys)
@@ -801,6 +976,7 @@ def run_file_batch_demo(args: argparse.Namespace) -> int:
         "input_file": str(input_path),
         "apply": args.apply,
         "apply_mode": args.apply_mode,
+        "tamper": args.tamper,
         "rows_processed": len(ledger),
         "output_dir": str(run_dir) if run_dir else None,
         "attack_option_keys": sorted(attack_keys),
@@ -894,6 +1070,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=float,
         default=0.25,
         help="Sleep between per-action applies in seconds (default: 0.25; only for --apply-mode per-action)",
+    )
+    parser.add_argument(
+        "--tamper",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Before apply, substitute whitelisted actions that differ from the saved plan (default: off)",
     )
     parser.add_argument(
         "--no-output-json",

@@ -93,6 +93,26 @@ python run/file_batch_demo.py --input-file ../data/sample_1000.csv --max-rows 3
 python run/file_batch_demo.py --apply-mode per-action
 ```
 
+### Tamper demo (optional, default off)
+
+By default actions are applied **as planned** (matching the anchored report). Pass **`--tamper`** to substitute **1 or 2** whitelisted actions per row (not the full plan) before apply:
+
+```bash
+python run/file_batch_demo.py --max-rows 1 --tamper
+```
+
+The report tracks:
+
+| Metric | Meaning |
+|--------|---------|
+| **Actions modified** | Substituted labels sent to apply (1–2 per row) |
+| **Tamper rejected (chain)** | Modified actions blocked (`action_plan_mismatch`) |
+| **Tamper accepted (chain)** | Should stay **0** — substituted labels must match the anchored plan to apply |
+
+Per row: file row 0 → 1 action changed, row 1 → 2, row 2 → 1, etc. Remaining actions apply as planned.
+
+Restart the backend after updating so apply endpoints enforce plan matching.
+
 ### Batch report (printed + saved to run folder)
 
 | Metric | Meaning |
@@ -104,6 +124,9 @@ python run/file_batch_demo.py --apply-mode per-action
 | **Applied OK** | Actions successfully applied on-chain |
 | **Integrity fail** | Actions blocked due to modified or unauthorized plan |
 | **Other fail** | Chain apply errors, HTTP errors, etc. |
+| **Actions modified** | *(with `--tamper`)* Substituted whitelisted labels sent to apply |
+| **Tamper rejected (chain)** | *(with `--tamper`)* Modified actions blocked on-chain |
+| **Tamper accepted (chain)** | *(with `--tamper`)* Whitelisted substitute applied OK |
 
 ### All flags and defaults
 
@@ -120,6 +143,7 @@ python run/file_batch_demo.py --apply-mode per-action
 | `--pause-between-rows-s SEC` | `0` | Delay between pipeline rows |
 | `--apply` / `--no-apply` | **`--apply`** | After pipeline rows finish, try to apply all detection actions (default: on) |
 | `--apply-mode MODE` | **`bulk`** | How to apply: **`bulk`** = single apply call for all actions per row; **`per-action`** = one API call per action index |
+| `--tamper` / `--no-tamper` | **`--no-tamper`** | Change **1–2** actions per row to a different whitelisted label before apply |
 | `--pause-between-actions-s SEC` | `0.25` | Delay between per-action applies (only for `per-action` mode) |
 | `--no-output-json` | off | Skip writing the run output folder |
 

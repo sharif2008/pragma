@@ -38,6 +38,56 @@ def load_attack_option_keys() -> frozenset[str]:
     return frozenset({"OTHERS"})
 
 
+@lru_cache(maxsize=1)
+def load_attack_actions_by_type() -> dict[str, tuple[str, ...]]:
+    """Whitelisted action labels per attack type (attack_options.json / on-chain seed)."""
+    path = _attack_options_path()
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    attacks = data.get("attacks")
+    if not isinstance(attacks, dict):
+        return {}
+    out: dict[str, tuple[str, ...]] = {}
+    for key, values in attacks.items():
+        if isinstance(values, list):
+            out[str(key).upper()] = tuple(str(v) for v in values if str(v).strip())
+    return out
+
+
+def pick_allowed_alternate_action(
+    planned_action: str,
+    attack_type: str | None,
+    *,
+    exclude: frozenset[str] | None = None,
+) -> str | None:
+    """First whitelisted action for attack_type that differs from planned (case-insensitive)."""
+    planned_norm = str(planned_action or "").strip().lower()
+    if not planned_norm:
+        return None
+    blocked = {planned_norm}
+    if exclude:
+        blocked |= {x.strip().lower() for x in exclude if str(x).strip()}
+
+    by_type = load_attack_actions_by_type()
+    search_types = [str(attack_type or "").upper(), "OTHERS"]
+    seen_types: set[str] = set()
+    for atk in search_types:
+        if not atk or atk in seen_types:
+            continue
+        seen_types.add(atk)
+        for candidate in by_type.get(atk, ()):
+            cnorm = candidate.strip().lower()
+            if cnorm and cnorm not in blocked:
+                return candidate
+    for candidates in by_type.values():
+        for candidate in candidates:
+            cnorm = candidate.strip().lower()
+            if cnorm and cnorm not in blocked:
+                return candidate
+    return None
+
+
 def canonical_attack_type(label_str: object, *, attack_keys: frozenset[str] | None = None) -> str:
     """
     Normalize a model/dataset label to a single attack_options.json key.
