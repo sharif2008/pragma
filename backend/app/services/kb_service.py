@@ -28,10 +28,20 @@ from app.utils.file_utils import remove_path
 
 logger = logging.getLogger(__name__)
 
+# Pipeline run artifacts (traffic summaries, customer messages) are not KB documents.
+_PIPELINE_ARTIFACT_PREFIXES = ("traffic_run_", "customer_message_")
+_PIPELINE_ARTIFACT_MARKERS = ("_traffic_run_", "_customer_message_")
+
 _RRF_K = 60
 # Oversample FAISS hits before CrossEncoder so CE can pick better than bi-encoder top-k.
 _CE_OVERSAMPLE = 4
 _CE_POOL_CAP = 48
+
+
+def is_pipeline_run_artifact_name(name: str | None) -> bool:
+    """True for auto-generated run files that must not live in the knowledge base."""
+    n = Path(name or "").name.lower()
+    return n.startswith(_PIPELINE_ARTIFACT_PREFIXES) or any(m in n for m in _PIPELINE_ARTIFACT_MARKERS)
 
 
 async def ingest_kb_document(
@@ -39,6 +49,8 @@ async def ingest_kb_document(
     settings: Settings,
     upload: UploadFile,
 ) -> KnowledgeBaseFile:
+    if is_pipeline_run_artifact_name(upload.filename):
+        raise HTTPException(400, "Run artifacts are not knowledge documents; upload a PDF/TXT/MD/JSON guide instead")
     mf = await file_service.upload_file(db, settings, upload, FileKind.knowledge_doc, replace_public_id=None)
 
     src = file_service.resolved_path(settings, mf)
@@ -75,6 +87,8 @@ def list_kb_files(db: Session) -> list[dict[str, Any]]:
     )
     out: list[dict[str, Any]] = []
     for kb in rows:
+        if _kb_is_pipeline_artifact(kb):
+            continue
         mf = kb.managed_file
         out.append(
             {
@@ -111,6 +125,50 @@ def delete_kb(db: Session, settings: Settings, public_id: str) -> None:
     db.commit()
 
 
+def purge_pipeline_run_kb_artifacts(db: Session, settings: Settings) -> dict[str, Any]:
+    """Remove traffic_run_ / customer_message_ files from KB rows, vector indexes, and disk."""
+    rows = list(
+        db.scalars(
+            select(KnowledgeBaseFile).options(joinedload(KnowledgeBaseFile.managed_file))
+        )
+        .unique()
+        .all()
+    )
+    deleted_ids: list[str] = []
+    for kb in rows:
+        mf = kb.managed_file
+        names = [mf.original_name if mf else "", mf.storage_path if mf else "", kb.vector_index_dir]
+        if any(is_pipeline_run_artifact_name(n) for n in names):
+            deleted_ids.append(kb.public_id)
+
+    for pid in deleted_ids:
+        delete_kb(db, settings, pid)
+
+    orphan_files: list[str] = []
+    knowledge_dir = settings.storage_root / "knowledge"
+    if knowledge_dir.is_dir():
+        for path in knowledge_dir.iterdir():
+            if path.is_file() and is_pipeline_run_artifact_name(path.name):
+                remove_path(path)
+                orphan_files.append(path.name)
+
+    return {"deleted_kb_public_ids": deleted_ids, "deleted_orphan_files": orphan_files}
+
+
+def _kb_is_pipeline_artifact(kb: KnowledgeBaseFile) -> bool:
+    mf = kb.managed_file
+    names = [mf.original_name if mf else "", mf.storage_path if mf else ""]
+    return any(is_pipeline_run_artifact_name(n) for n in names)
+
+
+def _load_kb_rows_for_rag(db: Session, kb_public_ids: list[str] | None) -> list[KnowledgeBaseFile]:
+    q = select(KnowledgeBaseFile).options(joinedload(KnowledgeBaseFile.managed_file))
+    if kb_public_ids:
+        q = q.where(KnowledgeBaseFile.public_id.in_(kb_public_ids))
+    rows = list(db.scalars(q).unique().all())
+    return [kb for kb in rows if not _kb_is_pipeline_artifact(kb)]
+
+
 def _open_store(settings: Settings, kb: KnowledgeBaseFile) -> FaissKnowledgeIndex:
     path = settings.storage_root / kb.vector_index_dir
     store = FaissKnowledgeIndex(path, kb.embedding_model)
@@ -125,10 +183,7 @@ def query_kb(
     top_k: int,
     kb_public_ids: list[str] | None,
 ) -> list[tuple[float, dict, str]]:
-    q = select(KnowledgeBaseFile)
-    if kb_public_ids:
-        q = q.where(KnowledgeBaseFile.public_id.in_(kb_public_ids))
-    rows = list(db.scalars(q).all())
+    rows = _load_kb_rows_for_rag(db, kb_public_ids)
     if not rows:
         return []
 
@@ -415,10 +470,7 @@ def query_kb_multi_mmr(
     Multi-query retrieval: per-query FAISS hits, RRF + max-score fusion, CrossEncoder
     rerank, then optional MMR diversification on the CE-ranked pool.
     """
-    q = select(KnowledgeBaseFile)
-    if kb_public_ids:
-        q = q.where(KnowledgeBaseFile.public_id.in_(kb_public_ids))
-    rows = list(db.scalars(q).all())
+    rows = _load_kb_rows_for_rag(db, kb_public_ids)
     meta: dict[str, Any] = {
         "queries_used": queries,
         "per_query_k": per_query_k,
@@ -480,10 +532,7 @@ def fuse_per_query_hit_groups_mmr(
     Each query was retrieved separately (e.g. repeated POST /kb/query). Merge hit lists with the same
     dedupe + RRF/max fusion + CrossEncoder rerank + MMR as query_kb_multi_mmr.
     """
-    q = select(KnowledgeBaseFile)
-    if kb_public_ids:
-        q = q.where(KnowledgeBaseFile.public_id.in_(kb_public_ids))
-    rows = list(db.scalars(q).all())
+    rows = _load_kb_rows_for_rag(db, kb_public_ids)
     meta: dict[str, Any] = {
         "queries_used": queries,
         "final_k": final_k,

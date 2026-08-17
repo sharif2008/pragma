@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
-import json
 import logging
 import time
 from typing import Any
@@ -271,67 +270,6 @@ async def run_simulated_network_traffic(
 
         if isinstance(force_step, str) and force_step.strip() == "prediction":
             raise RuntimeError("Forced error at step=prediction")
-
-        # Step: rag_write — store run-linked traffic summary into KB (so later RAG queries can cite it)
-        t_ragw = StepTimer()
-        emit_event(db, run_id=run_id, trace_id=trace_id, step_name="rag_write", level="info", message="started")
-        try:
-            # Compact JSON payload (avoid massive raw feature dumps in KB; keep it useful for retrieval).
-            compact_rows: list[dict[str, Any]] = []
-            for r in rows_list[: min(len(rows_list), 200)]:
-                compact_rows.append(
-                    {
-                        "row_index": r.get("row_index"),
-                        "predicted_label": r.get("predicted_label"),
-                        "max_class_probability": r.get("max_class_probability"),
-                        "flagged_attack_or_anomaly": r.get("flagged_attack_or_anomaly"),
-                        "shap": r.get("shap") if isinstance(r.get("shap"), dict) else None,
-                    }
-                )
-            kb_doc = {
-                "kind": "network_traffic_run",
-                "run_id": run_id,
-                "trace_id": trace_id,
-                "model_version_public_id": mv_public,
-                "prediction_job_public_id": job2.public_id,
-                "summary": pred_summary,
-                "rows": compact_rows,
-            }
-            payload_bytes = (json.dumps(kb_doc, ensure_ascii=False, indent=2) + "\n").encode("utf-8", errors="replace")
-            up = _upload_file_from_bytes(
-                filename=f"traffic_run_{run_id}.json",
-                content_type="application/json",
-                data=payload_bytes,
-            )
-            kb = await kb_service.ingest_kb_document(db, settings, up)
-            rag_info = {
-                "stored": True,
-                "kb_public_ids": [kb.public_id],
-                "managed_file_public_ids": [kb.managed_file.public_id] if kb.managed_file else [],
-            }
-            update_run(db, run_id, rag_json=rag_info)
-            emit_event(
-                db,
-                run_id=run_id,
-                trace_id=trace_id,
-                step_name="rag_write",
-                level="info",
-                message="completed",
-                payload=rag_info,
-                duration_ms=t_ragw.ms(),
-            )
-        except Exception as e:
-            # RAG write is useful but not required to complete the run.
-            emit_event(
-                db,
-                run_id=run_id,
-                trace_id=trace_id,
-                step_name="rag_write",
-                level="warn",
-                message="failed (continuing)",
-                payload={"error": str(e)[:800]},
-                duration_ms=t_ragw.ms(),
-            )
 
         # For each traffic row: batch RAG (same defaults as POST /agent/decide) + SHAP-row RAG + agentic decide.
         summary = prediction_service.load_prediction_summary(settings, job2)
