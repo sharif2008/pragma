@@ -242,6 +242,19 @@ class TrustAnchorVerifyOut(BaseModel):
 
 class ApplyAgenticActionRequest(BaseModel):
     action_index: int = Field(ge=0, description="Zero-based index in primary_actions then supporting_actions order.")
+    action_override: str | None = Field(
+        default=None,
+        description="Optional substitute action label sent to on-chain whitelist (tamper / swap demo).",
+    )
+
+
+class ApplyAgenticReportRequest(BaseModel):
+    model_config = {"extra": "ignore"}
+
+    action_overrides: dict[int, str] | None = Field(
+        default=None,
+        description="Optional map of action index -> substitute label for on-chain apply (tamper demo).",
+    )
 
 
 class ExecutionReportSummaryOut(BaseModel):

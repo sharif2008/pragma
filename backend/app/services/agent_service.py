@@ -607,6 +607,39 @@ def _prediction_attack_type(job: PredictionJob | None, results_row_index: int | 
     return canonical_attack_type(label) or None
 
 
+def _normalize_action_overrides(action_overrides: dict[int, str] | None) -> dict[int, str] | None:
+    if not action_overrides:
+        return None
+    out: dict[int, str] = {}
+    for key, value in action_overrides.items():
+        try:
+            idx = int(key)
+        except (TypeError, ValueError):
+            continue
+        label = str(value or "").strip()
+        if label:
+            out[idx] = label
+    return out or None
+
+
+def _flat_actions_with_overrides(
+    flat: list[dict[str, Any]],
+    action_overrides: dict[int, str] | None,
+) -> list[dict[str, Any]]:
+    overrides = _normalize_action_overrides(action_overrides)
+    if not overrides:
+        return flat
+    out: list[dict[str, Any]] = []
+    for idx, item in enumerate(flat):
+        row = dict(item)
+        override = overrides.get(idx)
+        if override is not None:
+            row["planned_action"] = str(item.get("action") or "—")
+            row["action"] = override
+        out.append(row)
+    return out
+
+
 def _build_chain_action_items(
     settings: Settings,
     *,
@@ -619,6 +652,7 @@ def _build_chain_action_items(
     items: list[dict[str, Any]] = []
     for idx, action_item in enumerate(flat_actions):
         action = str(action_item.get("action") or "—")
+        planned_action = action_item.get("planned_action")
         item: dict[str, Any] = {
             "index": idx,
             "attack_type": attack_type,
@@ -626,6 +660,13 @@ def _build_chain_action_items(
             "network_tier": str(action_item.get("network_tier") or ""),
             "result": "skipped",
         }
+        if planned_action and str(planned_action) != action:
+            item["planned_action"] = str(planned_action)
+            item["action_modified_before_apply"] = True
+            item["result"] = "failed"
+            item["failure_reason"] = "action_plan_mismatch"
+            items.append(item)
+            continue
         if not attack_type:
             item["failure_reason"] = "missing_attack_type"
             items.append(item)
@@ -671,6 +712,26 @@ def _build_chain_action_items(
                 item["apply_error"] = apply_err
         items.append(item)
     return {"attack_type": attack_type, "items": items}
+
+
+def _chain_items_all_success(chain_action_json: Any) -> bool:
+    if not isinstance(chain_action_json, dict):
+        return False
+    items = chain_action_json.get("items")
+    if not isinstance(items, list) or not items:
+        return False
+    return all(isinstance(x, dict) and str(x.get("result") or "") == "success" for x in items)
+
+
+def _chain_has_plan_mismatch(chain_action_json: Any) -> bool:
+    if not isinstance(chain_action_json, dict):
+        return False
+    items = chain_action_json.get("items")
+    if not isinstance(items, list):
+        return False
+    return any(
+        isinstance(x, dict) and str(x.get("failure_reason") or "") == "action_plan_mismatch" for x in items
+    )
 
 
 def _normalize_tier_actions_from_structured_plan(structured: Any) -> dict[str, list[dict[str, Any]]]:
@@ -746,7 +807,7 @@ def _failed_tier_exec_from_structured(structured: Any, failure_reason: str) -> t
 
 
 def apply_agentic_report_action(
-    db: Session, settings: Settings, report_public_id: str, action_index: int
+    db: Session, settings: Settings, report_public_id: str, action_index: int, *, action_override: str | None = None
 ) -> ExecutionReportDetailOut:
     report = get_agentic_report(db, report_public_id)
     existing = db.scalar(
@@ -777,10 +838,16 @@ def apply_agentic_report_action(
     attack_type = _prediction_attack_type(pj, report.results_row_index) or (
         str(aj.label).strip() if aj and aj.label else None
     )
+    per_action_overrides = (
+        {action_index: action_override.strip()}
+        if action_override and str(action_override).strip()
+        else None
+    )
+    chain_flat = _flat_actions_with_overrides([flat[action_index]], per_action_overrides)
     chain_action_json = _build_chain_action_items(
         settings,
         attack_type=attack_type,
-        flat_actions=[flat[action_index]],
+        flat_actions=chain_flat,
         agentic_job_public_id=aj.public_id if aj else None,
         agentic_report_public_id=report.public_id,
         integrity_valid=False,
@@ -836,7 +903,7 @@ def apply_agentic_report_action(
     chain_action_json = _build_chain_action_items(
         settings,
         attack_type=attack_type,
-        flat_actions=[flat[action_index]],
+        flat_actions=_flat_actions_with_overrides([flat[action_index]], per_action_overrides),
         agentic_job_public_id=aj.public_id if aj else None,
         agentic_report_public_id=report.public_id,
         integrity_valid=integrity_overall == "valid",
@@ -953,7 +1020,13 @@ def apply_agentic_report_action(
     )
 
 
-def apply_agentic_report(db: Session, settings: Settings, report_public_id: str) -> ExecutionReportDetailOut:
+def apply_agentic_report(
+    db: Session,
+    settings: Settings,
+    report_public_id: str,
+    *,
+    action_overrides: dict[int, str] | None = None,
+) -> ExecutionReportDetailOut:
     report = get_agentic_report(db, report_public_id)
     existing = db.scalar(
         select(AgenticReportExecutionReport).where(
@@ -979,6 +1052,7 @@ def apply_agentic_report(db: Session, settings: Settings, report_public_id: str)
             except Exception:
                 structured = None
     flat = _flat_actions_from_structured_plan(structured)
+    chain_flat = _flat_actions_with_overrides(flat, action_overrides)
     attack_type = _prediction_attack_type(pj, report.results_row_index) or (
         str(aj.label).strip() if aj and aj.label else None
     )
@@ -1006,7 +1080,7 @@ def apply_agentic_report(db: Session, settings: Settings, report_public_id: str)
             actions_chain_json=_build_chain_action_items(
                 settings,
                 attack_type=attack_type,
-                flat_actions=flat,
+                flat_actions=chain_flat,
                 agentic_job_public_id=aj.public_id if aj else None,
                 agentic_report_public_id=report.public_id,
                 integrity_valid=False,
@@ -1052,7 +1126,7 @@ def apply_agentic_report(db: Session, settings: Settings, report_public_id: str)
     chain_action_json = _build_chain_action_items(
         settings,
         attack_type=attack_type,
-        flat_actions=flat,
+        flat_actions=chain_flat,
         agentic_job_public_id=aj.public_id if aj else None,
         agentic_report_public_id=report.public_id,
         integrity_valid=apply_ok,
@@ -1105,8 +1179,7 @@ def apply_agentic_report(db: Session, settings: Settings, report_public_id: str)
     from datetime import datetime, timezone
 
     out = existing or AgenticReportExecutionReport(agentic_report_id=report.id)
-    out.status = "applied"
-    out.applied_at = datetime.now(timezone.utc)
+    chain_ok_all = _chain_items_all_success(chain_action_json)
     out.integrity_overall = integrity_overall
     out.chain_integrity_valid = chain_ok
     out.chain_detail = verify.chain_integrity_detail if verify else None
@@ -1117,8 +1190,16 @@ def apply_agentic_report(db: Session, settings: Settings, report_public_id: str)
     out.actions_ran_json = ran_exec
     out.attack_type = attack_type
     out.actions_chain_json = chain_action_json
-    out.error_reason = None
-    out.error_detail = None
+    if chain_ok_all:
+        out.status = "applied"
+        out.applied_at = datetime.now(timezone.utc)
+        out.error_reason = None
+        out.error_detail = None
+    else:
+        out.status = "failed"
+        out.applied_at = None
+        out.error_reason = "action_plan_mismatch" if _chain_has_plan_mismatch(chain_action_json) else "apply_failed"
+        out.error_detail = None
     db.add(out)
     db.commit()
     db.refresh(out)
@@ -1127,7 +1208,7 @@ def apply_agentic_report(db: Session, settings: Settings, report_public_id: str)
         agentic_report_public_id=report.public_id,
         prediction_job_public_id=pj.public_id if pj else "",
         agentic_job_public_id=aj.public_id if aj else None,
-        status="applied",
+        status=out.status,  # type: ignore[arg-type]
         applied_at=out.applied_at,
         integrity_overall=integrity_overall,  # type: ignore[arg-type]
         chain_integrity_valid=chain_ok,
@@ -1139,8 +1220,8 @@ def apply_agentic_report(db: Session, settings: Settings, report_public_id: str)
         actions_ran_json=ran_exec,
         attack_type=out.attack_type,
         actions_chain_json=out.actions_chain_json,
-        error_reason=None,
-        error_detail=None,
+        error_reason=out.error_reason,
+        error_detail=out.error_detail,
         created_at=out.created_at,
     )
 

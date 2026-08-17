@@ -6,7 +6,7 @@ import re
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -20,6 +20,7 @@ from app.schemas.prediction import (
     AgenticPromptPreviewOut,
     AgenticReportOut,
     ApplyAgenticActionRequest,
+    ApplyAgenticReportRequest,
     ExecutionReportDetailOut,
     ExecutionReportListItemOut,
     TrustAnchorListItemOut,
@@ -282,22 +283,29 @@ def verify_trust_anchor(
 @router.post("/reports/{public_id}/apply", response_model=ExecutionReportDetailOut)
 def apply_agent_report(
     public_id: str,
-    db: Annotated[Session, Depends(get_db)],
-    settings: Annotated[Settings, Depends(get_settings)],
+    body: Annotated[ApplyAgenticReportRequest, Body()] = ApplyAgenticReportRequest(),
+    db: Annotated[Session, Depends(get_db)] = ...,
+    settings: Annotated[Settings, Depends(get_settings)] = ...,
 ) -> ExecutionReportDetailOut:
     """Validate integrity and (stub) execute tiered actions once."""
-    return agent_service.apply_agentic_report(db, settings, public_id)
+    return agent_service.apply_agentic_report(db, settings, public_id, action_overrides=body.action_overrides)
 
 
 @router.post("/reports/{public_id}/apply-action", response_model=ExecutionReportDetailOut)
 def apply_agent_report_action(
     public_id: str,
     body: ApplyAgenticActionRequest,
-    db: Annotated[Session, Depends(get_db)],
-    settings: Annotated[Settings, Depends(get_settings)],
+    db: Annotated[Session, Depends(get_db)] = ...,
+    settings: Annotated[Settings, Depends(get_settings)] = ...,
 ) -> ExecutionReportDetailOut:
     """Verify blockchain integrity, then apply one detection action by index."""
-    return agent_service.apply_agentic_report_action(db, settings, public_id, body.action_index)
+    return agent_service.apply_agentic_report_action(
+        db,
+        settings,
+        public_id,
+        body.action_index,
+        action_override=body.action_override,
+    )
 
 
 @router.get("/execution-reports", response_model=list[ExecutionReportListItemOut])

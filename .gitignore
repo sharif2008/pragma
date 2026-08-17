@@ -64,7 +64,9 @@ frontend/tsconfig.tsbuildinfo
 
 # --- IDE & editors ---
 .idea/
-.cursor/
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 *.swp
 *.swo
 *~
@@ -104,3 +106,6 @@ backend/logs/
 
 # Batch demo run artifacts (ledger/report JSON per run)
 backend/run/output/
+
+# HuggingFace cache / local screenshots (not repo docs)
+backend/storage/hf_home/
