@@ -46,6 +46,17 @@ export async function listModels(): Promise<ModelVersionOut[]> {
   return requestJson<ModelVersionOut[]>(paths.models.list);
 }
 
+export async function updateModelDisplayName(
+  publicId: string,
+  displayName: string | null
+): Promise<ModelVersionOut> {
+  return requestJson<ModelVersionOut>(paths.models.byPublicId(publicId), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ display_name: displayName }),
+  });
+}
+
 export async function deleteModel(publicId: string): Promise<void> {
   return requestVoid(paths.models.byPublicId(publicId), { method: 'DELETE' });
 }

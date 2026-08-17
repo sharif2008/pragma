@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,23 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 
 logger = logging.getLogger(__name__)
+
+# Process-wide embedding models — opening a new FaissKnowledgeIndex must not reload weights.
+_MODEL_LOCK = threading.Lock()
+_MODEL_CACHE: dict[str, SentenceTransformer] = {}
+
+
+def get_embedding_model(model_name: str) -> SentenceTransformer:
+    """Return a cached SentenceTransformer for ``model_name`` (load once per process)."""
+    name = (model_name or "").strip() or "sentence-transformers/all-MiniLM-L6-v2"
+    with _MODEL_LOCK:
+        cached = _MODEL_CACHE.get(name)
+        if cached is not None:
+            return cached
+        logger.info("Loading embedding model (once): %s", name)
+        model = SentenceTransformer(name)
+        _MODEL_CACHE[name] = model
+        return model
 
 
 def _normalize(vectors: np.ndarray) -> np.ndarray:
@@ -34,8 +52,7 @@ class FaissKnowledgeIndex:
     @property
     def model(self) -> SentenceTransformer:
         if self._model is None:
-            logger.info("Loading embedding model: %s", self.model_name)
-            self._model = SentenceTransformer(self.model_name)
+            self._model = get_embedding_model(self.model_name)
         return self._model
 
     def _paths(self) -> tuple[Path, Path]:

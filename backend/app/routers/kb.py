@@ -45,7 +45,7 @@ async def kb_upload(
 
 @router.get("/files", response_model=list[KnowledgeFileOut])
 def kb_list(db: Annotated[Session, Depends(get_db)]) -> list[KnowledgeFileOut]:
-    return kb_service.list_kb_files(db)
+    return [KnowledgeFileOut.model_validate(row) for row in kb_service.list_kb_files(db)]
 
 
 @router.delete("/{public_id}", status_code=204)
@@ -120,7 +120,7 @@ def kb_query_multi(
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> KBMultiQueryResponse:
-    """Fuse several retrieval queries (RRF + max-score), then MMR for diverse final documents."""
+    """Fuse several retrieval queries (RRF + max-score), CrossEncoder-rerank, optional MMR."""
     raw_hits, meta = kb_service.query_kb_multi_mmr(
         db,
         settings,
@@ -153,7 +153,7 @@ def kb_fuse_hits_mmr(
 ) -> KBMultiQueryResponse:
     """
     After one POST /kb/query per retrieval string, send all hit lists here to dedupe (chunk key),
-    fusion-rerank (RRF + max score), then MMR — same scoring as /kb/query-multi.
+    RRF + max-score fusion, CrossEncoder rerank, then optional MMR — same as /kb/query-multi.
     """
     groups = [[h.model_dump() for h in grp] for grp in body.per_query_hits]
     raw_hits, meta = kb_service.fuse_per_query_hit_groups_mmr(

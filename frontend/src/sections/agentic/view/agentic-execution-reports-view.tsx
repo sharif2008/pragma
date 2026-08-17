@@ -1,6 +1,6 @@
 import type { ExecutionReportDetailOut, ExecutionReportListItemOut } from 'src/api/types';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -22,6 +22,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
+import TablePagination from '@mui/material/TablePagination';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { RouterLink } from 'src/routes/components';
@@ -30,6 +31,10 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { ApiError, getExecutionReport, listExecutionReports } from 'src/services';
 
 import { Iconify } from 'src/components/iconify';
+import {
+  ExecutionChainSummary,
+  ExecutionChainResultsList,
+} from 'src/components/agentic/execution-chain-results';
 
 // ----------------------------------------------------------------------
 
@@ -48,6 +53,13 @@ export function AgenticExecutionReportsView() {
   const [detail, setDetail] = useState<ExecutionReportDetailOut | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const pageRows = useMemo(() => {
+    const start = page * rowsPerPage;
+    return rows.slice(start, start + rowsPerPage);
+  }, [rows, page, rowsPerPage]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,7 +106,12 @@ export function AgenticExecutionReportsView() {
     <DashboardContent maxWidth="xl">
       <Stack spacing={3}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={2}>
-          <Typography variant="h4">Execution reports</Typography>
+          <Box>
+            <Typography variant="h4">Execution reports</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              On-chain whitelist checks and per-action apply outcomes by attack type.
+            </Typography>
+          </Box>
           <Button
             size="small"
             variant="outlined"
@@ -115,8 +132,10 @@ export function AgenticExecutionReportsView() {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700 }}>Created</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Report</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Attack</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Integrity</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Chain actions</TableCell>
                   <TableCell sx={{ fontWeight: 700 }}>Error</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>
                     Actions
@@ -126,20 +145,20 @@ export function AgenticExecutionReportsView() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                    <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
                       <CircularProgress size={28} />
                     </TableCell>
                   </TableRow>
                 ) : rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={8}>
                       <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
                         No execution reports yet.
                       </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((r) => (
+                  pageRows.map((r) => (
                     <TableRow key={r.id} hover>
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleString()}</TableCell>
                       <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }} title={r.agentic_report_public_id}>
@@ -152,15 +171,28 @@ export function AgenticExecutionReportsView() {
                         </Link>
                       </TableCell>
                       <TableCell>
+                        {r.attack_type ? (
+                          <Chip size="small" variant="outlined" label={r.attack_type} sx={{ height: 22 }} />
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
+                      <TableCell>
                         <Chip
                           size="small"
                           variant="outlined"
                           color={r.status === 'applied' ? 'success' : 'error'}
-                          label={r.status}
+                          label={r.status === 'applied' ? 'Applied' : 'Not applied'}
                         />
                       </TableCell>
                       <TableCell>
                         <Chip size="small" variant="outlined" label={r.integrity_overall} />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" color="text.secondary">
+                          {r.chain_actions_applied ?? 0}/{r.chain_actions_total ?? 0} applied
+                          {(r.chain_actions_whitelisted ?? 0) > 0 ? ` · ${r.chain_actions_whitelisted} whitelisted` : ''}
+                        </Typography>
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2" color="text.secondary">
@@ -178,6 +210,20 @@ export function AgenticExecutionReportsView() {
               </TableBody>
             </Table>
           </TableContainer>
+          {!loading && rows.length > 0 && (
+            <TablePagination
+              component="div"
+              count={rows.length}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[5, 10, 25, 50]}
+            />
+          )}
         </Card>
       </Stack>
 
@@ -197,11 +243,7 @@ export function AgenticExecutionReportsView() {
           {detailError && <Alert severity="error">{detailError}</Alert>}
           {detail && !detailLoading && (
             <Stack spacing={2}>
-              <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center">
-                <Chip size="small" variant="outlined" label={`id=${detail.id}`} />
-                <Chip size="small" variant="outlined" label={`status=${detail.status}`} />
-                <Chip size="small" variant="outlined" label={`integrity=${detail.integrity_overall}`} />
-              </Stack>
+              <ExecutionChainSummary exec={detail} />
 
               {detail.error_reason && (
                 <Alert severity="error">
@@ -211,30 +253,12 @@ export function AgenticExecutionReportsView() {
               )}
 
               <Divider />
-              <Typography variant="subtitle2">Per-tier outcomes (stubbed)</Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  p: 1.25,
-                }}
-              >
-                {JSON.stringify(
-                  {
-                    core: detail.actions_core_json,
-                    edge: detail.actions_edge_json,
-                    ran: detail.actions_ran_json,
-                  },
-                  null,
-                  2
-                )}
-              </Typography>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.75 }}>
+                  Apply results
+                </Typography>
+                <ExecutionChainResultsList exec={detail} />
+              </Box>
             </Stack>
           )}
         </DialogContent>
@@ -255,4 +279,3 @@ export function AgenticExecutionReportsView() {
     </DashboardContent>
   );
 }
-

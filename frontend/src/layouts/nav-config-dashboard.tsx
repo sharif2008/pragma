@@ -38,8 +38,8 @@ export const navData = [
     icon: icon('ic-lock'),
   },
   {
-    title: 'ML & RAG',
-    path: '/ml',
+    title: 'Setting',
+    path: '/setting',
     icon: icon('ic-cart'),
   },
   {

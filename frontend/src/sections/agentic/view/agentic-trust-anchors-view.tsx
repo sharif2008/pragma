@@ -1,7 +1,7 @@
 import type { TrustAnchorVerifyOut, TrustAnchorListItemOut } from 'src/api/types';
 
 import { useNavigate } from 'react-router-dom';
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -24,6 +24,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
+import TablePagination from '@mui/material/TablePagination';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { RouterLink } from 'src/routes/components';
@@ -71,6 +72,13 @@ export function AgenticTrustAnchorsView() {
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [verify, setVerify] = useState<TrustAnchorVerifyOut | null>(null);
   const [activeAnchorId, setActiveAnchorId] = useState<number | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const pageRows = useMemo(() => {
+    const start = page * rowsPerPage;
+    return rows.slice(start, start + rowsPerPage);
+  }, [rows, page, rowsPerPage]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -169,7 +177,7 @@ export function AgenticTrustAnchorsView() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((r) => (
+                  pageRows.map((r) => (
                     <TableRow key={r.id} hover>
                       <TableCell>
                         <Link
@@ -225,6 +233,20 @@ export function AgenticTrustAnchorsView() {
               </TableBody>
             </Table>
           </TableContainer>
+          {!loading && rows.length > 0 && (
+            <TablePagination
+              component="div"
+              count={rows.length}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[5, 10, 25, 50]}
+            />
+          )}
         </Card>
       </Stack>
 

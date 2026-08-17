@@ -125,6 +125,21 @@ def list_models(db: Session) -> list[ModelVersion]:
     return list(db.scalars(select(ModelVersion).order_by(ModelVersion.created_at.desc())).all())
 
 
+def update_model_display_name(db: Session, public_id: str, display_name: str | None) -> ModelVersion:
+    from fastapi import HTTPException
+
+    mv = db.scalar(select(ModelVersion).where(ModelVersion.public_id == public_id))
+    if not mv:
+        raise HTTPException(404, "Model version not found")
+    name = (display_name or "").strip() or None
+    if name is not None and len(name) > 256:
+        raise HTTPException(400, "display_name must be at most 256 characters")
+    mv.display_name = name
+    db.commit()
+    db.refresh(mv)
+    return mv
+
+
 def delete_model_version(db: Session, settings: Settings, public_id: str) -> None:
     """Remove a model row and its artifact file. Fails if prediction jobs still reference this version."""
     from fastapi import HTTPException

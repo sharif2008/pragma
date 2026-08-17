@@ -105,8 +105,32 @@ def init_db() -> None:
     _ensure_prediction_jobs_results_json()
     _ensure_agentic_reports_results_row_index()
     _ensure_agentic_reports_agentic_job_id()
+    _ensure_model_versions_display_name()
     _ensure_agentic_report_trust_anchors_table()
     _ensure_agentic_report_execution_reports_table()
+
+
+def _ensure_model_versions_display_name() -> None:
+    """Add ``display_name`` when missing (existing MySQL DBs)."""
+    if engine.dialect.name != "mysql":
+        return
+    with engine.begin() as conn:
+        cnt = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA = DATABASE() "
+                "AND TABLE_NAME = 'model_versions' AND COLUMN_NAME = 'display_name'"
+            )
+        ).scalar_one()
+        if int(cnt) == 0:
+            conn.execute(
+                text(
+                    "ALTER TABLE model_versions "
+                    "ADD COLUMN display_name VARCHAR(256) NULL "
+                    "COMMENT 'Friendly name for Setting UI' "
+                    "AFTER algorithm"
+                )
+            )
 
 
 def _ensure_agentic_report_trust_anchors_table() -> None:
@@ -171,6 +195,8 @@ def _ensure_agentic_report_execution_reports_table() -> None:
                     "actions_core_json JSON NULL,"
                     "actions_edge_json JSON NULL,"
                     "actions_ran_json JSON NULL,"
+                    "attack_type VARCHAR(64) NULL,"
+                    "actions_chain_json JSON NULL,"
                     "error_reason VARCHAR(128) NULL,"
                     "error_detail TEXT NULL,"
                     "created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),"
@@ -178,5 +204,37 @@ def _ensure_agentic_report_execution_reports_table() -> None:
                     "CONSTRAINT fk_exec_report_report FOREIGN KEY (agentic_report_id) "
                     "REFERENCES agentic_reports(id) ON DELETE CASCADE"
                     ")"
+                )
+            )
+        cnt_attack = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA = DATABASE() "
+                "AND TABLE_NAME = 'agentic_report_execution_reports' AND COLUMN_NAME = 'attack_type'"
+            )
+        ).scalar_one()
+        if int(cnt_attack) == 0:
+            conn.execute(
+                text(
+                    "ALTER TABLE agentic_report_execution_reports "
+                    "ADD COLUMN attack_type VARCHAR(64) NULL "
+                    "COMMENT 'Predicted attack label used for on-chain whitelist checks' "
+                    "AFTER actions_ran_json"
+                )
+            )
+        cnt_chain = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA = DATABASE() "
+                "AND TABLE_NAME = 'agentic_report_execution_reports' AND COLUMN_NAME = 'actions_chain_json'"
+            )
+        ).scalar_one()
+        if int(cnt_chain) == 0:
+            conn.execute(
+                text(
+                    "ALTER TABLE agentic_report_execution_reports "
+                    "ADD COLUMN actions_chain_json JSON NULL "
+                    "COMMENT 'Per-action whitelist/apply metadata from AgenticTrustRegistry' "
+                    "AFTER attack_type"
                 )
             )

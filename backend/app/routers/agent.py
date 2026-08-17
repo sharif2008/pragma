@@ -19,6 +19,7 @@ from app.schemas.prediction import (
     AgenticJobOut,
     AgenticPromptPreviewOut,
     AgenticReportOut,
+    ApplyAgenticActionRequest,
     ExecutionReportDetailOut,
     ExecutionReportListItemOut,
     TrustAnchorListItemOut,
@@ -30,9 +31,12 @@ from app.services.agentic_llm_prompt import (
     build_sample_from_prediction_job,
     load_attack_agentic_config,
 )
-from app.services.rag_templates_from_predictions import build_rag_templates_from_summary
+from app.services.rag_templates_row_context import resolve_prediction_row
 
 router = APIRouter(prefix="/agent", tags=["agent"])
+
+# Best documents passed into the LLM / RAG details context.
+_RAG_FINAL_K = 10
 
 
 def _load_report_artifact_json(settings: Settings, row: AgenticReport) -> dict | None:
@@ -112,41 +116,26 @@ def _build_rag_context(
             mm = f" mmr={h.mmr_margin:.3f}" if h.mmr_margin is not None else ""
             src = f" [{h.source}]" if h.source else ""
             lines.append(f"[{i}] sim={h.score:.3f}{rs}{mm}{src}\n{h.text[:900]}")
-        return "\n\n".join(lines) if lines else None
+        return "\n\n".join(lines[:_RAG_FINAL_K]) if lines else None
 
-    templates = build_rag_templates_from_summary(summary)
-    queries = (
-        templates[0]["retrieval_queries"]
-        if templates
-        else [
-            "Security policy actions for network anomalies and attack classification outcomes. "
-            f"Batch stats: flagged={summary.get('rows_flagged')}, total={summary.get('rows_total')}."
-        ]
-    )
-    raw_hits, _meta = kb_service.query_kb_multi_mmr(
+    job = prediction_service.get_prediction_job(db, body.prediction_job_public_id)
+    row: dict | None = None
+    if body.results_row_index is not None:
+        rj = job.results_json if isinstance(job.results_json, dict) else {}
+        rows = rj.get("rows") if isinstance(rj, dict) else None
+        row = resolve_prediction_row(rows if isinstance(rows, list) else None, body.results_row_index)
+
+    raw_hits, _meta = kb_service.query_kb_templated_rag(
         db,
         settings,
-        queries,
-        final_k=min(max(settings.rag_top_k, 6), 12),
-        per_query_k=12,
-        mmr_lambda=0.55,
+        summary=summary,
+        row=row,
+        final_k=_RAG_FINAL_K,
         kb_public_ids=None,
     )
     if not raw_hits:
-        q = (
-            "Security policy actions for network anomalies and attack classification outcomes. "
-            f"Batch stats: flagged={summary.get('rows_flagged')}, total={summary.get('rows_total')}."
-        )
-        hits = kb_service.query_kb(db, settings, q, settings.rag_top_k, None)
-        if hits:
-            return "\n\n".join(f"- ({s:.3f}) {c.get('text', '')[:800]}" for s, c, _ in hits)
         return None
-    lines = []
-    for h in raw_hits:
-        rr = h.get("rerank_score")
-        rrs = f"{float(rr):.3f}" if rr is not None else "n/a"
-        lines.append(f"- (sim={h['score']:.3f} rerank={rrs}) {h['text'][:800]}")
-    return "\n\n".join(lines)
+    return kb_service.format_kb_hits_for_agent_context(raw_hits[:_RAG_FINAL_K])
 
 
 def _prepare_agent_decide_llm_inputs(
@@ -183,7 +172,13 @@ def agent_decide_prompt_preview(
         include_knowledge_base=body.use_rag,
         feature_notes=feature_notes,
     )
-    return AgenticPromptPreviewOut(prompt=prompt)
+    return AgenticPromptPreviewOut(
+        prompt=prompt,
+        rag_context=rag_context,
+        results_row_index=body.results_row_index,
+        predicted_label=str(sample_data.get("predicted_label") or "") or None,
+        confidence=float(sample_data.get("confidence") or 0.0) if sample_data.get("confidence") is not None else None,
+    )
 
 
 @router.get("/jobs", response_model=list[AgenticJobOut])
@@ -292,6 +287,17 @@ def apply_agent_report(
 ) -> ExecutionReportDetailOut:
     """Validate integrity and (stub) execute tiered actions once."""
     return agent_service.apply_agentic_report(db, settings, public_id)
+
+
+@router.post("/reports/{public_id}/apply-action", response_model=ExecutionReportDetailOut)
+def apply_agent_report_action(
+    public_id: str,
+    body: ApplyAgenticActionRequest,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ExecutionReportDetailOut:
+    """Verify blockchain integrity, then apply one detection action by index."""
+    return agent_service.apply_agentic_report_action(db, settings, public_id, body.action_index)
 
 
 @router.get("/execution-reports", response_model=list[ExecutionReportListItemOut])

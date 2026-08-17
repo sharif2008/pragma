@@ -487,7 +487,7 @@ def _build_single_template_rag_query(
         f"predicted_label={predicted_label}, confidence={confidence:.2f}. "
         f"{label_phi}: {bits}. "
         "Include containment, monitoring, validation, and escalation decision points. "
-        "5G/6G operator context: triangulate RAN, edge MEC, and 5GC core using these indicators."
+        "Enterprise network context: triangulate Access / ISP, Perimeter / IDS, and Endpoint / EDR using these indicators."
     )
 
 
