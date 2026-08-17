@@ -16,6 +16,7 @@ from app.models.domain import JobStatus, ManagedFile, ModelVersion, PredictionJo
 from app.utils.file_utils import remove_path
 from app.services import file_service
 from app.services.ml_training import load_model_bundle
+from app.notebook_runtime.vfl_utils import canonical_attack_type
 from app.services.prediction_shap import (
     RESULTS_JSON_TOP_SHAP_FEATURES,
     compute_sklearn_tree_shap_per_row,
@@ -26,6 +27,37 @@ logger = logging.getLogger(__name__)
 
 # TreeExplainer cost grows with rows; skip SHAP above this (per-row predictions still stored).
 MAX_ROWS_FOR_SHAP = 800
+
+# When attack_label_values is omitted, treat anything outside this set as an attack/anomaly flag.
+_DEFAULT_BENIGN_LABELS = frozenset(
+    {
+        "BENIGN",
+        "NORMAL",
+        "LEGITIMATE",
+        "0",
+        "FALSE",
+        "NO",
+        "NONE",
+        "",
+    }
+)
+
+
+def _is_default_attack_label(label: object) -> bool:
+    s = canonical_attack_type(str(label).strip()) if str(label).strip() else ""
+    return bool(s) and s not in _DEFAULT_BENIGN_LABELS
+
+
+def _canonical_predicted_label(label: object) -> str:
+    return canonical_attack_type(label)
+
+
+def _merge_probs_by_canonical_label(names: list[str], probs: np.ndarray) -> dict[str, float]:
+    merged: dict[str, float] = {}
+    for j, name in enumerate(names):
+        key = _canonical_predicted_label(name)
+        merged[key] = merged.get(key, 0.0) + float(probs[j])
+    return merged
 
 
 def get_model_version_by_public_id(db: Session, public_id: str) -> ModelVersion:
@@ -183,7 +215,10 @@ def run_prediction_job_sync(job_db_id: int) -> None:
 
                 pred_idx, max_p_arr, probs_full = predict_vfl_batch(bundle, X, return_probs=True)
                 classes: list = bundle["label_classes"]
-                labels = np.array([classes[int(i)] for i in pred_idx], dtype=object)
+                labels = np.array(
+                    [_canonical_predicted_label(classes[int(i)]) for i in pred_idx],
+                    dtype=object,
+                )
                 max_p = max_p_arr if max_p_arr is not None else np.ones(len(X))
                 proba_matrix = probs_full
                 proba_class_names = [str(c) for c in classes]
@@ -230,9 +265,10 @@ def run_prediction_job_sync(job_db_id: int) -> None:
                         raw_proba = None
 
                 if le_y is not None:
-                    labels = le_y.inverse_transform(np.asarray(pred).astype(int))
+                    raw_labels = le_y.inverse_transform(np.asarray(pred).astype(int))
                 else:
-                    labels = pred
+                    raw_labels = pred
+                labels = np.array([_canonical_predicted_label(l) for l in raw_labels], dtype=object)
 
                 if raw_proba is not None:
                     proba_matrix = np.asarray(raw_proba, dtype=float)
@@ -278,6 +314,9 @@ def run_prediction_job_sync(job_db_id: int) -> None:
                 flags |= max_p < float(threshold)
             if attack_vals:
                 flags |= out_df["predicted_label"].astype(str).isin([str(x) for x in attack_vals])
+            else:
+                # UI often omits attack_label_values; still flag non-benign predictions.
+                flags |= out_df["predicted_label"].map(_is_default_attack_label).to_numpy(dtype=bool)
 
             out_df["flagged_attack_or_anomaly"] = flags
 
@@ -292,7 +331,7 @@ def run_prediction_job_sync(job_db_id: int) -> None:
                         if len(proba_class_names) == len(pr)
                         else [str(j) for j in range(len(pr))]
                     )
-                    prob_row = {names[j]: float(pr[j]) for j in range(len(pr))}
+                    prob_row = _merge_probs_by_canonical_label(names, pr)
 
                 if bundle.get("kind") == "vfl_torch":
                     if shap_rows is not None and i < len(shap_rows) and shap_rows[i] is not None:

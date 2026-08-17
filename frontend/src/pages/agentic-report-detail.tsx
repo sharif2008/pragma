@@ -18,7 +18,7 @@ export default function AgenticReportDetailPage() {
   const { publicId } = useParams<{ publicId: string }>();
   const navigate = useNavigate();
   const id = publicId?.trim() ?? null;
-  const { report, predJob, loading, error, reload } = useAgentReportDetailLoad(id);
+  const { report, predJob, execDetail, loading, error, reload } = useAgentReportDetailLoad(id);
 
   return (
     <>
@@ -57,6 +57,7 @@ export default function AgenticReportDetailPage() {
               error={error}
               report={report}
               predJob={predJob}
+              execDetail={execDetail}
               publicId={id}
             />
           </Box>

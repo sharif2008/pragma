@@ -12,12 +12,32 @@ from app.notebook_runtime.rag_utils import (
     load_attack_and_agentic,
     tier_allowed_actions,
 )
+from app.notebook_runtime.vfl_utils import canonical_attack_type, FIXED_AGENT_NAMES
 from app.notebook_runtime.storage_paths import AGENTIC_FEATURES_JSON, ATTACK_OPTIONS_JSON
-from app.notebook_runtime.vfl_utils import FIXED_AGENT_NAMES
+from app.services.network_domains import (
+    ACCESS_ISP,
+    DOMAIN_INFRA_BLURB,
+    DOMAIN_LABELS,
+    ENDPOINT_EDR,
+    PERIMETER_IDS,
+    domain_label,
+    format_tier_for_prompt,
+    normalize_domain,
+    pragma_domain_from_tier_data,
+)
+
+# Keys still used in agentic_features.json and SHAP feature_contributions maps.
+_STORAGE_BUCKETS: tuple[str, ...] = ("RAN", "Edge", "Core")
+_STORAGE_TO_DOMAIN: dict[str, str] = {
+    "RAN": ACCESS_ISP,
+    "Edge": PERIMETER_IDS,
+    "Core": ENDPOINT_EDR,
+}
+_DOMAIN_TO_STORAGE: dict[str, str] = {v: k for k, v in _STORAGE_TO_DOMAIN.items()}
 from app.services.prediction_shap import limit_shap_per_feature_by_abs
 from app.services.rag_templates_row_context import top_shap_features_by_agent
 
-_LLM_RAG_SECTIONS_IN_PROMPT = 5
+_LLM_RAG_SECTIONS_IN_PROMPT = 10
 # Top |attribution| features included in orchestration LLM ``sample_data.prediction_row.shap.per_feature``.
 LLM_ORCHESTRATION_TOP_SHAP_FEATURES = 5
 
@@ -25,9 +45,18 @@ LLM_ORCHESTRATION_TOP_SHAP_FEATURES = 5
 # sample_id, predicted_label, confidence (float 0–1 for {confidence:.1%}),
 # network_tier_info, sample_data (JSON text of full sample_data dict),
 # attack_actions_context, agentic_context, rag_context.
-AGENTIC_ORCHESTRATION_LLM_USER_PROMPT_TEMPLATE = """You are a cybersecurity decision-making agent specialized in attack response orchestration.
+AGENTIC_ORCHESTRATION_LLM_USER_PROMPT_TEMPLATE = """You are a cybersecurity decision-making agent specialized in attack response orchestration for an enterprise network.
+
         Your role is NOT to invent mitigations, but to SELECT and ASSIGN actions from a predefined
         action set using explainability signals and agentic features.
+
+        Network domains (use these exact names everywhere — in JSON and in reasoning):
+        - Access / ISP — subscriber/ISP-edge volume and rate telemetry.
+        - Perimeter / IDS — north-south inspection, ports, WAF/scan signals.
+        - Endpoint / EDR — host-proximate bidirectional and reverse-path forensics.
+
+        The JSON field ``network_tier`` must be exactly one of:
+        "Access / ISP" | "Perimeter / IDS" | "Endpoint / EDR"
 
         =====================
         INPUT CONTEXT
@@ -39,12 +68,11 @@ AGENTIC_ORCHESTRATION_LLM_USER_PROMPT_TEMPLATE = """You are a cybersecurity deci
         - confidence: {confidence:.1%}
 
         Explainability & agentic evidence:
-        - Party-level contributions and dominance:
+        - Domain contributions and dominance:
         {network_tier_info}
 
         - Feature-level evidence (JSON below). Contains prediction outcome and **top feature attributions only**
-          (φ / contribution shares). If ``orchestration_llm_payload`` was supplied by the caller, that slim JSON is shown;
-          otherwise the full ``sample_data`` record may appear for backward compatibility.
+          (φ / contribution shares).
         {sample_data}
 
         Allowed actions (STRICT CONSTRAINT):
@@ -64,11 +92,11 @@ AGENTIC_ORCHESTRATION_LLM_USER_PROMPT_TEMPLATE = """You are a cybersecurity deci
 
         Using ONLY the information above, generate an agent-ready action plan that:
 
-        1) Interprets how {predicted_label} manifests across network tiers (RAN, Edge, Core).
-        2) Identifies which evidence party MUST trigger mitigation first.
+        1) Interprets how {predicted_label} manifests across Access / ISP, Perimeter / IDS, and Endpoint / EDR.
+        2) Identifies which domain MUST trigger mitigation first.
         3) Selects actions ONLY from the provided Allowed actions list.
-        4) Assigns each action to the MOST appropriate executing party and network tier.
-        5) Provides explicit, evidence-grounded reasoning for EACH action.
+        4) Assigns each action to the MOST appropriate domain via ``network_tier``.
+        5) Provides explicit, evidence-grounded reasoning for EACH action (use the domain names above).
         6) Adapts aggressiveness and execution priority based on confidence ({confidence:.1%}).
         7) If no allowed action is suitable, return empty action lists.
 
@@ -90,21 +118,21 @@ AGENTIC_ORCHESTRATION_LLM_USER_PROMPT_TEMPLATE = """You are a cybersecurity deci
           "primary_actions": [
             {{
               "action": "EXACT action name from Allowed actions to be taken ",
-              "network_tier": "RAN|Edge|Core",
-              "party_evidence_type": "type of evidence this party observed",
-              "reasoning": "clear explanation linking evidence + agentic signals to this action"
+              "network_tier": "Access / ISP|Perimeter / IDS|Endpoint / EDR",
+              "party_evidence_type": "type of evidence this domain observed",
+              "reasoning": "clear explanation linking evidence to this action and domain"
             }}
           ],
 
           "supporting_actions": [
             {{
               "action": "EXACT action name from Allowed actions to be taken",
-              "network_tier": "RAN|Edge|Core",
-              "party_evidence_type": "type of evidence this party observed",
-              "reasoning": "why this action supports or complements the primary action"
+              "network_tier": "Access / ISP|Perimeter / IDS|Endpoint / EDR",
+              "party_evidence_type": "type of evidence this domain observed",
+              "reasoning": "why this action supports the primary"
             }}
           ],
-          "overall_reasoning": "Concise summary explaining party prioritization, tier ordering, and action selection logic",
+          "overall_reasoning": "Concise summary of Access/ISP vs Perimeter/IDS vs Endpoint/EDR prioritization",
           "execution_priority": "Immediate|High|Standard|Low",
           "knowledge_sources_used": [
             "allowed_actions_context",
@@ -119,14 +147,33 @@ AGENTIC_ORCHESTRATION_LLM_USER_PROMPT_TEMPLATE = """You are a cybersecurity deci
         - Do NOT output text outside the JSON.
         - Do NOT generate actions not listed in Allowed actions.
         - The "all_actions" list MUST be the union of primary_actions and supporting_actions.
-        - Do NOT alter action or party names.
+        - Do NOT alter action names.
+        - ``network_tier`` MUST be exactly "Access / ISP", "Perimeter / IDS", or "Endpoint / EDR".
         - Every action MUST include explicit reasoning tied to evidence or agentic rules.
-        - Prefer dominant party and tier for primary actions unless contradicted by evidence.
+        - Prefer the dominant domain for primary actions unless contradicted by evidence.
         - If RAG context is empty, rely ONLY on explainability and agentic context.
+        - Describe the environment as an enterprise Access / Perimeter / Endpoint network only.
         """
 
-# Align VFL agent buckets with telecom tiers for party/tier narrative (same as condensed evidence UX).
-_TIER_BY_AGENT_INDEX = ("RAN", "Edge", "Core")
+def _relabel_tiers_for_llm_json(obj: Any) -> Any:
+    """Rewrite storage/SHAP bucket keys in prompt JSON to enterprise domain labels."""
+    if isinstance(obj, dict):
+        out: dict[str, Any] = {}
+        for k, v in obj.items():
+            key = str(k)
+            if key in ("dominant_agent", "dominant_tier") and isinstance(v, str):
+                out[key] = domain_label(v)
+                continue
+            nk = _STORAGE_TO_DOMAIN.get(key) or normalize_domain(key) or key
+            out[str(nk)] = _relabel_tiers_for_llm_json(v)
+        return out
+    if isinstance(obj, list):
+        return [_relabel_tiers_for_llm_json(x) for x in obj]
+    return obj
+
+
+# VFL agent index → storage bucket (agentic_features / SHAP), then mapped to domain for prompts.
+_TIER_BY_AGENT_INDEX = _STORAGE_BUCKETS
 
 
 def _top_features_for_tier(
@@ -139,6 +186,10 @@ def _top_features_for_tier(
     shap_expl = sample.get("shap_explanation", {}) or {}
     feat_contribs = shap_expl.get("feature_contributions", {}) or {}
     feats = feat_contribs.get(tier, {}) or {}
+    if not feats:
+        alt = _STORAGE_TO_DOMAIN.get(tier) or _DOMAIN_TO_STORAGE.get(tier) or normalize_domain(tier)
+        if alt:
+            feats = feat_contribs.get(alt, {}) or {}
 
     scored: list[tuple[str, float]] = []
     if isinstance(feats, dict):
@@ -154,18 +205,18 @@ def _top_features_for_tier(
 
 
 def extract_sample_summary(sample: dict[str, Any]) -> dict[str, Any]:
-    label = (sample.get("predicted_label") or sample.get("true_label") or "UNKNOWN").strip().upper()
+    raw = sample.get("predicted_label") or sample.get("true_label") or "UNKNOWN"
+    label = canonical_attack_type(str(raw).strip()) if str(raw).strip() else "UNKNOWN"
     confidence = float(sample.get("confidence", 0.0) or 0.0)
 
     shap_expl = sample.get("shap_explanation", {}) or {}
     dominant_agent = (shap_expl.get("dominant_agent") or "").strip()
-    dominant_tier = dominant_agent if dominant_agent in ("RAN", "Edge", "Core") else "Unknown"
+    dominant_tier = normalize_domain(dominant_agent) or "Unknown"
     dominant_pct = float(shap_expl.get("dominant_contribution_pct", 0.0) or 0.0) * 100.0
 
     top_features = {
-        "RAN": _top_features_for_tier(sample, "RAN", top_n=3),
-        "Edge": _top_features_for_tier(sample, "Edge", top_n=3),
-        "Core": _top_features_for_tier(sample, "Core", top_n=3),
+        _STORAGE_TO_DOMAIN[bucket]: _top_features_for_tier(sample, bucket, top_n=3)
+        for bucket in _STORAGE_BUCKETS
     }
 
     return {
@@ -199,19 +250,22 @@ def row_to_shap_explanation(row: dict[str, Any]) -> dict[str, Any]:
     if not per_feature:
         return {}
     agent_feats = top_shap_features_by_agent(per_feature, top_n=3)
-    feature_contributions: dict[str, dict[str, dict[str, float]]] = {"RAN": {}, "Edge": {}, "Core": {}}
+    feature_contributions: dict[str, dict[str, dict[str, float]]] = {
+        d: {} for d in DOMAIN_LABELS
+    }
     tier_sums: list[tuple[str, float]] = []
     for i, name in enumerate(FIXED_AGENT_NAMES):
-        tier = _TIER_BY_AGENT_INDEX[i] if i < len(_TIER_BY_AGENT_INDEX) else "Core"
+        bucket = _TIER_BY_AGENT_INDEX[i] if i < len(_TIER_BY_AGENT_INDEX) else "Core"
+        domain = _STORAGE_TO_DOMAIN.get(bucket, ENDPOINT_EDR)
         feats = agent_feats.get(name, [])
         s = sum(abs(float(f.get("shap", 0) or 0)) for f in feats)
-        tier_sums.append((tier, s))
+        tier_sums.append((domain, s))
         for f in feats:
             fn = str(f.get("feature", ""))
             if fn:
-                feature_contributions[tier][fn] = {"pct_contribution": abs(float(f.get("shap", 0) or 0))}
+                feature_contributions[domain][fn] = {"pct_contribution": abs(float(f.get("shap", 0) or 0))}
     total_abs = sum(abs(v) for v in per_feature.values()) or 1.0
-    dominant_tier = max(tier_sums, key=lambda x: x[1])[0] if tier_sums else "RAN"
+    dominant_tier = max(tier_sums, key=lambda x: x[1])[0] if tier_sums else ACCESS_ISP
     max_sum = max((x[1] for x in tier_sums), default=0.0)
     dominant_pct = min(1.0, max_sum / total_abs) if total_abs else 0.0
     return {
@@ -304,7 +358,7 @@ def build_sample_from_prediction_job(
         prediction_row = _prediction_row_for_prompt(row)
         return {
             "sample_id": row_idx,
-            "predicted_label": str(row.get("predicted_label") or "UNKNOWN"),
+            "predicted_label": canonical_attack_type(str(row.get("predicted_label") or "UNKNOWN")),
             "confidence": confidence,
             "shap_explanation": shap_expl,
             "prediction_row": prediction_row,
@@ -318,7 +372,7 @@ def build_sample_from_prediction_job(
         confidence = 0.0
     return {
         "sample_id": 0,
-        "predicted_label": str(s0.get("predicted_label") or "UNKNOWN"),
+        "predicted_label": canonical_attack_type(str(s0.get("predicted_label") or "UNKNOWN")),
         "confidence": confidence,
         "shap_explanation": {},
         "prediction_row": None,
@@ -357,7 +411,7 @@ def create_agentic_orchestration_prompt(
             sample_id = int(pr.get("row_index", sample_data.get("sample_id", 0)))
         except (TypeError, ValueError):
             sample_id = int(sample_data.get("sample_id", 0) or 0)
-        predicted_label = str(pr.get("predicted_label") or sample_data.get("predicted_label") or "UNKNOWN")
+        predicted_label = canonical_attack_type(str(pr.get("predicted_label") or sample_data.get("predicted_label") or "UNKNOWN"))
         try:
             confidence = float(pr.get("max_class_probability", sample_data.get("confidence", 0.0)) or 0.0)
         except (TypeError, ValueError):
@@ -367,7 +421,7 @@ def create_agentic_orchestration_prompt(
             sample_id = int(sample_data.get("sample_id", 0) or 0)
         except (TypeError, ValueError):
             sample_id = 0
-        predicted_label = str(sample_data.get("predicted_label") or "UNKNOWN")
+        predicted_label = canonical_attack_type(str(sample_data.get("predicted_label") or "UNKNOWN"))
         confidence = float(sample_data.get("confidence", 0.0) or 0.0)
     dominant_party, dominant_tier, dominant_pct = get_dominant_party_info(sample_data)
 
@@ -382,7 +436,7 @@ def create_agentic_orchestration_prompt(
 
     attack_actions_context = ""
     if attack_actions_data and "attacks" in attack_actions_data:
-        attack_type = str(predicted_label).upper()
+        attack_type = predicted_label
         attacks = attack_actions_data.get("attacks") or {}
         if isinstance(attacks, dict) and attack_type in attacks:
             recommended_actions = attacks[attack_type]
@@ -397,25 +451,48 @@ def create_agentic_orchestration_prompt(
             attack_actions_context = (
                 f"\n\nAttack-Specific Actions: No specific recommendations for {predicted_label}.\n"
             )
+        primary_domains = (attack_actions_data.get("primary_domains") or {}) if isinstance(attack_actions_data, dict) else {}
+        if isinstance(primary_domains, dict) and attack_type in primary_domains:
+            domains = primary_domains[attack_type]
+            if isinstance(domains, list) and domains:
+                attack_actions_context += (
+                    f"Preferred response domains for this label: {', '.join(str(d) for d in domains)}.\n"
+                )
+        evidence_cues = (attack_actions_data.get("evidence_cues") or {}) if isinstance(attack_actions_data, dict) else {}
+        if isinstance(evidence_cues, dict) and attack_type in evidence_cues:
+            cues = evidence_cues[attack_type]
+            if isinstance(cues, list) and cues:
+                attack_actions_context += (
+                    f"Typical network-flow evidence cues: {', '.join(str(c) for c in cues)}.\n"
+                )
 
     agentic_context = ""
     tiers = agentic_tiers_dict(agentic_features_data)
     if tiers:
         agentic_context = (
-            "\n\nAgentic Features and Actions by Network Tier (from agentic_features.json):\n"
-            "Use the condensed evidence (top features by tier) to GATE which tier gets priority actions.\n"
+            "\n\nAgentic Features and Actions by Network Domain (from agentic_features.json):\n"
+            f"{DOMAIN_INFRA_BLURB}\n"
+            "Use the condensed evidence (top features by domain) to GATE which domain gets priority actions.\n"
         )
         tf = condensed_evidence.get("top_features_by_tier", {}) or {}
-        for tier in ["RAN", "Edge", "Core"]:
-            if tier in tiers:
-                tier_data = tiers[tier]
-                if not isinstance(tier_data, dict):
-                    continue
-                actions = tier_allowed_actions(tier_data)
-                tier_feats = tf.get(tier, []) if isinstance(tf, dict) else []
-                agentic_context += f"\n{tier} Network Tier:\n"
-                agentic_context += f"  - Top evidence features (top 3): {', '.join(tier_feats) if tier_feats else 'none'}\n"
-                agentic_context += f"  - Allowed tier actions: {', '.join(actions)}\n"
+        for bucket in _STORAGE_BUCKETS:
+            if bucket not in tiers:
+                continue
+            tier_data = tiers[bucket]
+            if not isinstance(tier_data, dict):
+                continue
+            actions = tier_allowed_actions(tier_data)
+            domain = pragma_domain_from_tier_data(bucket, tier_data)
+            tier_feats: list[Any] = []
+            if isinstance(tf, dict):
+                raw_feats = tf.get(domain) or tf.get(bucket) or []
+                tier_feats = list(raw_feats) if isinstance(raw_feats, list) else []
+            agentic_context += f"\n{domain}:\n"
+            desc = tier_data.get("description")
+            if isinstance(desc, str) and desc.strip():
+                agentic_context += f"  - Role: {desc.strip()}\n"
+            agentic_context += f"  - Top evidence features (top 3): {', '.join(str(x) for x in tier_feats) if tier_feats else 'none'}\n"
+            agentic_context += f"  - Allowed domain actions: {', '.join(actions)}\n"
 
     if extra_agentic_notes and str(extra_agentic_notes).strip():
         agentic_context += (
@@ -438,16 +515,22 @@ def create_agentic_orchestration_prompt(
         rag_context = "\n\nKnowledge base was not included in this request.\n"
 
     network_tier_info = ""
-    if dominant_tier:
-        network_tier_info = f"\n- Dominant network tier: {dominant_tier} (contribution: {dominant_pct:.1f}%)"
-        if dominant_party:
-            network_tier_info += f"\n- Dominant party: {dominant_party}"
+    if dominant_tier or dominant_party:
+        dom = format_tier_for_prompt(str(dominant_tier or dominant_party))
+        network_tier_info = (
+            f"\n- Dominant network domain: {dom} "
+            f"(contribution: {dominant_pct:.1f}%)"
+        )
 
     slim = sample_data.get("orchestration_llm_payload")
     if isinstance(slim, dict) and slim:
-        sample_data_json = json.dumps(slim, indent=2, ensure_ascii=False, default=str)
+        sample_data_json = json.dumps(
+            _relabel_tiers_for_llm_json(slim), indent=2, ensure_ascii=False, default=str
+        )
     else:
-        sample_data_json = json.dumps(sample_data, indent=2, ensure_ascii=False, default=str)
+        sample_data_json = json.dumps(
+            _relabel_tiers_for_llm_json(sample_data), indent=2, ensure_ascii=False, default=str
+        )
 
     return AGENTIC_ORCHESTRATION_LLM_USER_PROMPT_TEMPLATE.format(
         sample_id=sample_id,

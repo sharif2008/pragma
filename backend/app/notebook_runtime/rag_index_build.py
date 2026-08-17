@@ -363,7 +363,7 @@ def generate_retrieval_title_openai(
             f"Structural heading: {section_heading}\n\n"
             f"Excerpt:\n{body}\n\n"
             "Output exactly ONE line (no quotes): a dense retrieval title, 12–20 words, "
-            "with attack types, security controls, network tiers (RAN/Edge/Core), protocols, "
+            "with attack types, security controls, network domains (Access/ISP, Perimeter/IDS, Endpoint/EDR), protocols, "
             "and mitigation verbs so a vector search matches user security queries."
         )
         r = client.chat.completions.create(

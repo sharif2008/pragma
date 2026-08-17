@@ -8,7 +8,7 @@ export default function AgenticIndexPage() {
       <title>{`Agentic actions - ${CONFIG.appName}`}</title>
       <meta
         name="description"
-        content="Timeline of agentic LLM decisions with Core and Edge actions per prediction run"
+        content="Agentic plans with attack type, network-tier actions, and on-chain whitelist apply results"
       />
 
       <AgenticActionsView />

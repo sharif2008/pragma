@@ -55,6 +55,7 @@ export const routesSection: RouteObject[] = [
     ),
     children: [
       { index: true, element: <DashboardPage /> },
+      { path: 'setting', element: <MlWorkbenchPage /> },
       { path: 'ml', element: <MlWorkbenchPage /> },
       { path: 'monitor', element: <MonitorPage /> },
       {

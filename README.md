@@ -42,25 +42,16 @@ This is **hash-only anchoring** (no sensitive data on-chain): the chain provides
 ## System diagram
 
 ```mermaid
-flowchart TD
-  OperatorUI[Frontend_Operator_UI] -->|HTTP_API| Backend[FastAPI_Backend]
+flowchart LR
+  UI[Operator UI] --> API[Backend API]
 
-  Backend -->|train_predict| VFL[VFL_Pipeline]
-  Backend -->|retrieve_context| RAG[FAISS_SentenceTransformers_RAG]
-  Backend -->|agent_decide| LLM[LLM_or_Mock_Agent]
+  API --> Detect[VFL detect + SHAP]
+  Detect --> Plan[RAG + LLM plan]
+  Plan --> Trust[Hash-only blockchain anchor]
+  Trust --> Apply[Verify then apply]
 
-  Backend -->|persist| DB[(MySQL_DB)]
-  Backend -->|write_report_artifact| Storage[(storage_reports_json)]
-
-  Backend -->|compute_SHA256_commitment| Commit[Canonical_JSON_SHA256]
-  Commit -->|anchor_bytes32| Chain[Hardhat_Local_Ethereum]
-  Chain -->|AgenticTrustRegistry_anchor_getCommitment| Contract[Solidity_Registry]
-
-  Backend -->|verify_integrity| Contract
-  Backend -->|verify_integrity| Storage
-  Backend -->|apply_if_valid| Exec[Action_Execution_Stub]
-
-  Backend -->|status_results| OperatorUI
+  API --- DB[(MySQL)]
+  API --- Files[(Reports + KB)]
 ```
 
 ## Technologies used

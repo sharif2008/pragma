@@ -1,4 +1,4 @@
-import type { AgenticReportOut, TrustAnchorVerifyOut } from 'src/api/types';
+import type { AgenticReportOut, TrustAnchorVerifyOut, ExecutionReportDetailOut } from 'src/api/types';
 
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useRef, useMemo, useState, useEffect, useCallback, type SyntheticEvent } from 'react';
@@ -32,13 +32,21 @@ import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
 import TimelineConnector from '@mui/lab/TimelineConnector';
 import TimelineSeparator from '@mui/lab/TimelineSeparator';
+import TablePagination from '@mui/material/TablePagination';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import CircularProgress from '@mui/material/CircularProgress';
 import TimelineOppositeContent from '@mui/lab/TimelineOppositeContent';
 import TimelineItem, { timelineItemClasses } from '@mui/lab/TimelineItem';
 
+import { fDateTime } from 'src/utils/format-time';
 import { sortByTime, type TimeSortOrder, toggleTimeSortOrder } from 'src/utils/table-time-sort';
+import {
+  execStatusLabel,
+  actionsFromReport,
+  parseStructuredPlan,
+  attackTypeFromReportRow,
+} from 'src/utils/agentic-plan-actions';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import {
@@ -53,6 +61,15 @@ import {
 import { Iconify } from 'src/components/iconify';
 import { TimeSortHeadCell } from 'src/components/table-sort/time-sort-head-cell';
 import { AgentReportDetailDialog } from 'src/components/run-monitoring/detail-dialogs';
+import {
+  ExecutionChainSummary,
+  ExecutionChainResultsList,
+} from 'src/components/agentic/execution-chain-results';
+import {
+  PlanIdCell,
+  ExecStatusChip,
+  DetectionActionsList,
+} from 'src/components/agentic/detection-actions-list';
 
 // ----------------------------------------------------------------------
 
@@ -63,26 +80,6 @@ type TierAction = {
   party_evidence_type?: string;
 };
 
-function parseStructuredPlan(report: AgenticReportOut): Record<string, unknown> | null {
-  const art = report.report_artifact;
-  if (art && typeof art === 'object' && art !== null) {
-    const sp = (art as { structured_plan?: unknown }).structured_plan;
-    if (sp && typeof sp === 'object' && sp !== null) {
-      return sp as Record<string, unknown>;
-    }
-  }
-  const raw = report.raw_llm_response;
-  if (!raw || typeof raw !== 'string') return null;
-  const m = raw.match(/\{[\s\S]*\}/);
-  if (!m) return null;
-  try {
-    const parsed = JSON.parse(m[0]);
-    return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
-}
-
 function collectTieredActions(plan: Record<string, unknown> | null): {
   core: TierAction[];
   edge: TierAction[];
@@ -91,6 +88,14 @@ function collectTieredActions(plan: Record<string, unknown> | null): {
 } {
   const out = { core: [] as TierAction[], edge: [] as TierAction[], ran: [] as TierAction[], other: [] as TierAction[] };
   if (!plan) return out;
+
+  const bucket = (tierRaw: string): 'core' | 'edge' | 'ran' | 'other' => {
+    const t = tierRaw.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (t === 'core' || t === 'endpoint / edr' || t === 'endpoint/edr' || t === 'd3') return 'core';
+    if (t === 'edge' || t === 'perimeter / ids' || t === 'perimeter/ids' || t === 'd2') return 'edge';
+    if (t === 'ran' || t === 'access / isp' || t === 'access/isp' || t === 'd1') return 'ran';
+    return 'other';
+  };
 
   const push = (x: unknown) => {
     if (!x || typeof x !== 'object') return;
@@ -102,9 +107,10 @@ function collectTieredActions(plan: Record<string, unknown> | null): {
       reasoning: String(o.reasoning ?? ''),
       party_evidence_type: o.party_evidence_type != null ? String(o.party_evidence_type) : undefined,
     };
-    if (tier === 'Core') out.core.push(item);
-    else if (tier === 'Edge') out.edge.push(item);
-    else if (tier === 'RAN') out.ran.push(item);
+    const b = bucket(tier);
+    if (b === 'core') out.core.push(item);
+    else if (b === 'edge') out.edge.push(item);
+    else if (b === 'ran') out.ran.push(item);
     else out.other.push(item);
   };
 
@@ -165,40 +171,48 @@ function ActionColumn({
     >
       <CardHeader
         title={
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Chip size="small" color={color} label={tierKey} sx={{ fontWeight: 700 }} />
-            <Typography variant="subtitle2">{title}</Typography>
-            <Chip size="small" variant="outlined" label={actions.length} />
+          <Stack direction="row" alignItems="center" spacing={0.75}>
+            <Chip size="small" color={color} label={title} sx={{ fontWeight: 700, height: 22 }} />
+            {tierKey ? (
+              <Typography variant="caption" color="text.secondary">
+                {tierKey}
+              </Typography>
+            ) : null}
+            <Chip size="small" variant="outlined" label={actions.length} sx={{ height: 20 }} />
           </Stack>
         }
-        sx={{ py: 1, '& .MuiCardHeader-title': { width: '100%' } }}
+        sx={{ py: 0.5, px: 1, minHeight: 0, '& .MuiCardHeader-title': { width: '100%' } }}
       />
       <Divider />
-      <Stack spacing={1} sx={{ p: 1.5, flex: 1, minHeight: 0, overflow: 'auto' }}>
+      <Stack spacing={0.75} sx={{ p: 1, flex: 1, minHeight: 0, overflow: 'auto' }}>
         {actions.length === 0 && (
           <Typography variant="caption" color="text.secondary">
-            No actions tagged for this tier.
+            No actions for this tier.
           </Typography>
         )}
         {actions.map((a, i) => (
           <Box
             key={`${a.action}-${i}`}
             sx={{
-              p: 1,
+              p: 0.75,
               borderRadius: 1,
               bgcolor: (theme) => theme.vars.palette.action.hover,
             }}
           >
-            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
               {a.action}
             </Typography>
             {a.party_evidence_type && (
-              <Typography variant="caption" color="text.secondary" display="block">
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ fontSize: 11 }}>
                 Evidence: {a.party_evidence_type}
               </Typography>
             )}
             {a.reasoning && (
-              <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 0.25, display: 'block', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.35 }}
+              >
                 {a.reasoning}
               </Typography>
             )}
@@ -227,8 +241,10 @@ export function AgenticActionsView() {
   const [applyError, setApplyError] = useState<string>('');
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyVerify, setApplyVerify] = useState<TrustAnchorVerifyOut | null>(null);
-  const [applyExec, setApplyExec] = useState<Record<string, unknown> | null>(null);
+  const [applyExec, setApplyExec] = useState<ExecutionReportDetailOut | null>(null);
   const [reportTimeOrder, setReportTimeOrder] = useState<TimeSortOrder>('desc');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const fetchStartedRef = useRef<Set<string>>(new Set());
 
   const openDialog = useCallback((publicId: string) => {
@@ -342,7 +358,7 @@ export function AgenticActionsView() {
         const exId = (ex as { id?: unknown }).id;
         if (typeof exId === 'number') {
           const det = await getExecutionReport(exId);
-          setApplyExec(det as unknown as Record<string, unknown>);
+          setApplyExec(det);
           setApplyLoading(false);
           return;
         }
@@ -368,7 +384,7 @@ export function AgenticActionsView() {
     setApplyError('');
     try {
       const out = await applyAgenticReport(applyId);
-      setApplyExec(out as unknown as Record<string, unknown>);
+      setApplyExec(out);
       await loadList();
     } catch (e) {
       setApplyError(e instanceof ApiError ? e.message : e instanceof Error ? e.message : String(e));
@@ -388,6 +404,11 @@ export function AgenticActionsView() {
     () => sortByTime(list, (r) => r.created_at, reportTimeOrder),
     [list, reportTimeOrder]
   );
+
+  const pageItems = useMemo(() => {
+    const start = page * rowsPerPage;
+    return items.slice(start, start + rowsPerPage);
+  }, [items, page, rowsPerPage]);
 
   const timelineLayout = viewTab === 'timeline';
 
@@ -411,13 +432,13 @@ export function AgenticActionsView() {
         direction={{ xs: 'column', sm: 'row' }}
         alignItems={{ xs: 'stretch', sm: 'center' }}
         justifyContent="space-between"
-        spacing={1.5}
+        spacing={1}
         sx={{
-          mb: timelineLayout ? 2 : 1.25,
+          mb: 1,
           flexShrink: 0,
           ...(timelineLayout && {
-            p: { xs: 2, sm: 2.5 },
-            borderRadius: 2,
+            p: { xs: 1, sm: 1.25 },
+            borderRadius: 1.5,
             border: 1,
             borderColor: 'divider',
             backgroundImage: (theme) =>
@@ -425,43 +446,34 @@ export function AgenticActionsView() {
           }),
         }}
       >
-        <Box sx={{ minWidth: 0 }}>
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.25 }}>
-            <Box
-              sx={{
-                width: 40,
-                height: 40,
-                borderRadius: 1.5,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'primary.main',
-                bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
-                flexShrink: 0,
-              }}
-            >
-              <Iconify icon="solar:shield-keyhole-bold-duotone" width={22} />
-            </Box>
-            <Box>
-              <Typography variant={timelineLayout ? 'h4' : 'h5'} sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-                {timelineLayout ? 'Agentic timeline' : 'Agentic actions'}
-              </Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.25 }}>
-                {timelineLayout
-                  ? 'Full-width chronological feed. Expand a card for Core / Edge / RAN actions and RAG context.'
-                  : 'Table and timeline share sort by created time (newest first by default).'}
-              </Typography>
-            </Box>
-          </Stack>
-        </Box>
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+        <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'primary.main',
+              bgcolor: (theme) => alpha(theme.palette.primary.main, 0.12),
+              flexShrink: 0,
+            }}
+          >
+            <Iconify icon="solar:shield-keyhole-bold-duotone" width={18} />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+            {timelineLayout ? 'Agentic timeline' : 'Agentic actions'}
+          </Typography>
+        </Stack>
+        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
           <Button
             size="small"
             variant="outlined"
             disabled={loading || !list.length}
             onClick={() => setReportTimeOrder((o) => toggleTimeSortOrder(o))}
           >
-            Time: {reportTimeOrder === 'desc' ? 'newest first' : 'oldest first'}
+            {reportTimeOrder === 'desc' ? 'Newest' : 'Oldest'}
           </Button>
           <Button size="small" variant="outlined" onClick={() => void loadList()} disabled={loading}>
             Refresh
@@ -473,23 +485,23 @@ export function AgenticActionsView() {
         value={viewTab}
         onChange={handleViewTabChange}
         sx={{
-          mb: 2,
-          minHeight: 44,
+          mb: 1,
+          minHeight: 36,
           flexShrink: 0,
-          '& .MuiTab-root': { minHeight: 44, py: 1, fontSize: '0.875rem', fontWeight: 600 },
+          '& .MuiTab-root': { minHeight: 36, py: 0.5, px: 1.25, fontSize: '0.8125rem', fontWeight: 600 },
         }}
       >
-        <Tab value="table" label="Table list" icon={<Iconify icon="eva:done-all-fill" width={18} />} iconPosition="start" />
+        <Tab value="table" label="Table" icon={<Iconify icon="eva:done-all-fill" width={16} />} iconPosition="start" />
         <Tab
           value="timeline"
           label="Timeline"
-          icon={<Iconify icon="solar:clock-circle-outline" width={18} />}
+          icon={<Iconify icon="solar:clock-circle-outline" width={16} />}
           iconPosition="start"
         />
       </Tabs>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 1, py: 0.5 }}>
           {error}
         </Alert>
       )}
@@ -501,95 +513,115 @@ export function AgenticActionsView() {
       )}
 
       {!loading && !items.length && (
-        <Alert severity="info">No agentic reports yet. Run Agent decide from ML & RAG after a prediction job completes.</Alert>
+        <Alert severity="info">No agentic reports yet. Run Agent decide from Setting after a prediction job completes.</Alert>
       )}
 
       {!loading && items.length > 0 && viewTab === 'table' && (
         <Card variant="outlined" sx={{ width: 1, minWidth: 0 }}>
-          <TableContainer sx={{ maxHeight: { xs: 'none', md: 'calc(100vh - 280px)' } }}>
-            <Table size="small" stickyHeader sx={{ minWidth: 720 }}>
+          <TableContainer sx={{ maxHeight: { xs: 'none', md: 'calc(100vh - 220px)' } }}>
+            <Table size="small" stickyHeader sx={{ minWidth: 900 }}>
               <TableHead>
                 <TableRow>
+                  <TableCell sx={{ fontWeight: 700, py: 0.75 }}>Plan</TableCell>
+                  <TableCell sx={{ fontWeight: 700, py: 0.75 }}>Attack</TableCell>
+                  <TableCell sx={{ fontWeight: 700, py: 0.75 }}>Detection actions</TableCell>
+                  <TableCell sx={{ fontWeight: 700, py: 0.75 }}>Status</TableCell>
                   <TimeSortHeadCell
                     label="Created"
                     order={reportTimeOrder}
                     onOrderChange={setReportTimeOrder}
-                    sx={{ fontWeight: 700 }}
+                    sx={{ fontWeight: 700, py: 0.75 }}
                   />
-                  <TableCell sx={{ fontWeight: 700 }}>Report</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Recommended action</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Summary</TableCell>
-                  <TableCell sx={{ fontWeight: 700 }}>Prediction job</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>
-                    Actions
+                  <TableCell align="right" sx={{ fontWeight: 700, py: 0.75 }}>
+                    View
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700, py: 0.75 }}>
+                    Apply
+                  </TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700, py: 0.75 }}>
+                    Details
                   </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {items.map((r) => (
-                  <TableRow key={r.public_id} hover>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(r.created_at).toLocaleString()}</TableCell>
-                    <TableCell
-                      sx={{ fontFamily: 'monospace', fontSize: 12, maxWidth: 140 }}
-                      title={r.public_id}
-                    >
-                      {r.public_id.length > 14 ? `${r.public_id.slice(0, 8)}…${r.public_id.slice(-4)}` : r.public_id}
-                    </TableCell>
-                    <TableCell sx={{ maxWidth: 160 }} title={r.recommended_action || ''}>
-                      <Typography variant="body2" noWrap>
-                        {r.recommended_action || '—'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ maxWidth: 280 }} title={r.summary}>
-                      <Typography variant="body2" noWrap>
-                        {r.summary || '—'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell sx={{ fontFamily: 'monospace', fontSize: 12, maxWidth: 120 }} title={r.prediction_job_public_id ?? ''}>
-                      {r.prediction_job_public_id
-                        ? r.prediction_job_public_id.length > 12
-                          ? `${r.prediction_job_public_id.slice(0, 6)}…${r.prediction_job_public_id.slice(-4)}`
-                          : r.prediction_job_public_id
-                        : '—'}
-                    </TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                      <Button size="small" variant="contained" color="primary" onClick={() => openDialog(r.public_id)} sx={{ mr: 0.5 }}>
-                        View
-                      </Button>
-                      {!isApplied(r) ? (
+                {pageItems.map((r) => {
+                  const full = mergedReport(r);
+                  const attackType = attackTypeFromReportRow(full);
+                  const actions = actionsFromReport(full);
+                  const applied = isApplied(full);
+                  return (
+                    <TableRow key={r.public_id} hover>
+                      <TableCell sx={{ py: 0.5, verticalAlign: 'top' }}>
+                        <PlanIdCell publicId={r.public_id} />
+                      </TableCell>
+                      <TableCell sx={{ py: 0.5, verticalAlign: 'top' }}>
+                        {attackType ? (
+                          <Chip size="small" variant="outlined" label={attackType} sx={{ height: 20 }} />
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ py: 0.5, maxWidth: 420, verticalAlign: 'top' }}>
+                        <DetectionActionsList actions={actions} compact />
+                      </TableCell>
+                      <TableCell sx={{ py: 0.5, verticalAlign: 'top' }}>
+                        <ExecStatusChip status={execStatusLabel(full)} />
+                      </TableCell>
+                      <TableCell sx={{ typography: 'caption', whiteSpace: 'nowrap', py: 0.5, verticalAlign: 'top' }}>
+                        {fDateTime(r.created_at)}
+                      </TableCell>
+                      <TableCell align="right" sx={{ py: 0.5, verticalAlign: 'top' }}>
                         <Button
                           size="small"
                           variant="contained"
-                          color="success"
-                          onClick={() => void openApply(r.public_id)}
-                          sx={{ mr: 0.5 }}
+                          color="primary"
+                          onClick={() => openDialog(r.public_id)}
+                          sx={{ minWidth: 0, px: 0.75 }}
                         >
-                          Apply
+                          View
                         </Button>
-                      ) : (
+                      </TableCell>
+                      <TableCell align="right" sx={{ py: 0.5, verticalAlign: 'top' }}>
+                        <Button
+                          size="small"
+                          color="success"
+                          variant={applied ? 'outlined' : 'contained'}
+                          disabled={applied}
+                          onClick={() => void openApply(r.public_id)}
+                          sx={{ minWidth: 0, px: 0.75 }}
+                        >
+                          {applied ? 'Applied' : 'Apply'}
+                        </Button>
+                      </TableCell>
+                      <TableCell align="right" sx={{ py: 0.5, verticalAlign: 'top' }}>
                         <Button
                           size="small"
                           variant="outlined"
-                          color="success"
-                          onClick={() => void openApply(r.public_id)}
-                          sx={{ mr: 0.5 }}
+                          onClick={() => navigate(`/agentic/report/${encodeURIComponent(r.public_id)}`)}
+                          sx={{ minWidth: 0, px: 0.75 }}
                         >
-                          Applied
+                          Details
                         </Button>
-                      )}
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        onClick={() => navigate(`/agentic/report/${encodeURIComponent(r.public_id)}`)}
-                      >
-                        Details
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            component="div"
+            count={items.length}
+            page={page}
+            onPageChange={(_, p) => setPage(p)}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(parseInt(e.target.value, 10));
+              setPage(0);
+            }}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            sx={{ minHeight: 44, '& .MuiTablePagination-toolbar': { minHeight: 44, pl: 1 } }}
+          />
         </Card>
       )}
 
@@ -621,38 +653,24 @@ export function AgenticActionsView() {
                 <TimelineItem key={r.public_id}>
                   <TimelineOppositeContent
                     sx={{
-                      flex: '0 0 152px',
-                      maxWidth: { xs: 104, sm: 152 },
-                      py: 2,
+                      flex: '0 0 120px',
+                      maxWidth: { xs: 88, sm: 120 },
+                      py: 1,
                       px: 0,
                       textAlign: 'right',
                     }}
                   >
-                    <Typography variant="overline" sx={{ color: 'text.disabled', lineHeight: 1.2, display: 'block' }}>
+                    <Typography variant="overline" sx={{ color: 'text.disabled', lineHeight: 1.1, display: 'block', fontSize: 10 }}>
                       {index === 0 ? 'Latest' : `· ${items.length - index}`}
                     </Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.35, mt: 0.35 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, lineHeight: 1.3, display: 'block' }}>
                       {new Date(r.created_at).toLocaleDateString(undefined, {
                         month: 'short',
                         day: 'numeric',
-                        year: 'numeric',
                       })}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 0.25 }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', fontSize: 11 }}>
                       {new Date(r.created_at).toLocaleTimeString()}
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontFamily: 'monospace',
-                        fontSize: 10,
-                        color: 'text.disabled',
-                        display: 'block',
-                        mt: 1,
-                        wordBreak: 'break-all',
-                      }}
-                    >
-                      {r.public_id.slice(0, 10)}…
                     </Typography>
                   </TimelineOppositeContent>
                   <TimelineSeparator>
@@ -668,14 +686,13 @@ export function AgenticActionsView() {
                       <TimelineConnector sx={{ bgcolor: (theme) => alpha(theme.palette.primary.main, 0.22) }} />
                     ) : null}
                   </TimelineSeparator>
-                  <TimelineContent sx={{ py: 2, px: 0, pl: { xs: 1, sm: 2 } }}>
+                  <TimelineContent sx={{ py: 1, px: 0, pl: { xs: 1, sm: 1.5 } }}>
                     <Card
                       variant="outlined"
                       sx={{
-                        borderRadius: 2,
+                        borderRadius: 1.5,
                         overflow: 'hidden',
                         borderColor: (theme) => alpha(theme.palette.divider, 0.95),
-                        boxShadow: (theme) => theme.shadows[2],
                       }}
                     >
                       <Accordion
@@ -691,9 +708,10 @@ export function AgenticActionsView() {
                         <AccordionSummary
                           expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}
                           sx={{
-                            px: 2,
-                            py: 1.5,
-                            '& .MuiAccordionSummary-content': { my: 1, alignItems: 'stretch' },
+                            px: 1.5,
+                            py: 0.75,
+                            minHeight: 0,
+                            '& .MuiAccordionSummary-content': { my: 0.5, alignItems: 'stretch' },
                           }}
                         >
                           <Stack direction="row" alignItems="flex-start" spacing={2} sx={{ width: 1, pr: 1 }}>
@@ -777,16 +795,16 @@ export function AgenticActionsView() {
                               </Typography>
                               <Grid container spacing={1.5} sx={{ mt: 1 }}>
                                 <Grid size={{ xs: 12, md: 6, xl: 3 }} sx={{ display: 'flex' }}>
-                                  <ActionColumn title="Core plane" tierKey="Core" actions={tiers.core} color="primary" />
-                                </Grid>
-                                <Grid size={{ xs: 12, md: 6, xl: 3 }} sx={{ display: 'flex' }}>
-                                  <ActionColumn title="Edge plane" tierKey="Edge" actions={tiers.edge} color="info" />
-                                </Grid>
-                                {tiers.ran.length > 0 && (
-                                  <Grid size={{ xs: 12, md: 6, xl: 3 }} sx={{ display: 'flex' }}>
-                                    <ActionColumn title="Radio access" tierKey="RAN" actions={tiers.ran} color="warning" />
-                                  </Grid>
-                                )}
+                          <ActionColumn title="Endpoint / EDR" tierKey="" actions={tiers.core} color="primary" />
+                        </Grid>
+                        <Grid size={{ xs: 12, md: 6, xl: 3 }} sx={{ display: 'flex' }}>
+                          <ActionColumn title="Perimeter / IDS" tierKey="" actions={tiers.edge} color="info" />
+                        </Grid>
+                        {tiers.ran.length > 0 && (
+                          <Grid size={{ xs: 12, md: 6, xl: 3 }} sx={{ display: 'flex' }}>
+                            <ActionColumn title="Access / ISP" tierKey="" actions={tiers.ran} color="warning" />
+                          </Grid>
+                        )}
                                 {tiers.other.length > 0 && (
                                   <Grid size={{ xs: 12, md: 6, xl: 3 }} sx={{ display: 'flex' }}>
                                     <ActionColumn
@@ -893,34 +911,11 @@ export function AgenticActionsView() {
                   {applyExec ? (
                     <>
                       <Divider />
-                      <Alert
-                        severity={
-                          String((applyExec as { status?: unknown }).status ?? '') === 'applied' ? 'success' : 'error'
-                        }
-                      >
-                        Execution status: <strong>{String((applyExec as { status?: unknown }).status ?? '—')}</strong>
-                        {' · '}
-                        Integrity: <strong>{String((applyExec as { integrity_overall?: unknown }).integrity_overall ?? '—')}</strong>
-                      </Alert>
+                      <ExecutionChainSummary exec={applyExec} verify={applyVerify} />
                       <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 700, letterSpacing: 0.6 }}>
-                        Execution details (stubbed)
+                        Apply results by network tier
                       </Typography>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          fontFamily: 'monospace',
-                          fontSize: 12,
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word',
-                          border: 1,
-                          borderColor: 'divider',
-                          borderRadius: 1,
-                          p: 1.25,
-                          bgcolor: (theme) => alpha(theme.palette.grey[500], 0.06),
-                        }}
-                      >
-                        {JSON.stringify(applyExec, null, 2)}
-                      </Typography>
+                      <ExecutionChainResultsList exec={applyExec} compact />
                     </>
                   ) : (
                     <>
@@ -942,13 +937,13 @@ export function AgenticActionsView() {
                       </Typography>
                       <Grid container spacing={1.5}>
                         <Grid size={{ xs: 12, md: 6, xl: 4 }} sx={{ display: 'flex' }}>
-                          <ActionColumn title="Core plane" tierKey="Core" actions={tiers.core} color="primary" />
+                          <ActionColumn title="Endpoint / EDR" tierKey="" actions={tiers.core} color="primary" />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6, xl: 4 }} sx={{ display: 'flex' }}>
-                          <ActionColumn title="Edge plane" tierKey="Edge" actions={tiers.edge} color="info" />
+                          <ActionColumn title="Perimeter / IDS" tierKey="" actions={tiers.edge} color="info" />
                         </Grid>
                         <Grid size={{ xs: 12, md: 6, xl: 4 }} sx={{ display: 'flex' }}>
-                          <ActionColumn title="Radio access" tierKey="RAN" actions={tiers.ran} color="warning" />
+                          <ActionColumn title="Access / ISP" tierKey="" actions={tiers.ran} color="warning" />
                         </Grid>
                       </Grid>
 

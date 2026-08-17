@@ -11,7 +11,46 @@ This module contains:
 
 import json
 import re
+from functools import lru_cache
 from pathlib import Path
+
+
+def _attack_options_path() -> Path:
+    try:
+        from app.notebook_runtime.storage_paths import ATTACK_OPTIONS_JSON
+
+        return ATTACK_OPTIONS_JSON
+    except ImportError:
+        backend_root = Path(__file__).resolve().parent.parent.parent
+        return backend_root / "storage" / "attack_options.json"
+
+
+@lru_cache(maxsize=1)
+def load_attack_option_keys() -> frozenset[str]:
+    """Attack type keys from attack_options.json (must match Hardhat whitelist seed)."""
+    path = _attack_options_path()
+    if not path.is_file():
+        return frozenset({"BENIGN", "DDOS", "DOS", "SSHPATATOR", "FTPPATATOR", "PORTSCAN", "WEBATTACK", "BOT", "OTHERS"})
+    data = json.loads(path.read_text(encoding="utf-8"))
+    attacks = data.get("attacks")
+    if isinstance(attacks, dict):
+        return frozenset(str(k).upper() for k in attacks.keys())
+    return frozenset({"OTHERS"})
+
+
+def canonical_attack_type(label_str: object, *, attack_keys: frozenset[str] | None = None) -> str:
+    """
+    Normalize a model/dataset label to a single attack_options.json key.
+    Unknown sub-types (e.g. INFILTRATION, Heartbleed) map to OTHERS.
+    """
+    s = str(label_str or "").strip()
+    if not s:
+        return "UNKNOWN"
+    simplified = simplify_label(s)
+    keys = attack_keys if attack_keys is not None else load_attack_option_keys()
+    if simplified.upper() in keys:
+        return simplified.upper()
+    return "OTHERS"
 
 
 # ============================================================================

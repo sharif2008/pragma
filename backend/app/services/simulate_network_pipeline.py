@@ -28,7 +28,14 @@ from app.services.agentic_llm_prompt import (
 from app.services import llm_service
 from app.services import kb_service
 from app.services.rag_templates_row_context import build_row_agent_templates
-from app.services.run_service import StepTimer, emit_event, now_utc, sanitize_error, update_run
+from app.services.run_service import (
+    StepTimer,
+    emit_event,
+    format_run_message_preview,
+    now_utc,
+    sanitize_error,
+    update_run,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +45,7 @@ _PRED_ATTACHMENT_TYPES = frozenset({"none", "image", "pdf", "audio", "text", "un
 
 def _agent_decide_rag_k(settings: Settings) -> tuple[int, int, float]:
     """Same RAG pool sizing as POST /agent/decide (``_build_rag_context``)."""
-    return min(max(settings.rag_top_k, 6), 12), 12, 0.55
+    return 10, 12, 0.75
 
 
 def _merge_batch_and_row_rag(batch_ctx: str | None, row_ctx: str | None) -> str | None:
@@ -255,7 +262,12 @@ async def run_simulated_network_traffic(
             payload=pred_summary,
             duration_ms=t_pred.ms(),
         )
-        update_run(db, run_id, predictions_json=pred_summary)
+        update_run(
+            db,
+            run_id,
+            predictions_json=pred_summary,
+            message_preview=format_run_message_preview(predictions_json=pred_summary),
+        )
 
         if isinstance(force_step, str) and force_step.strip() == "prediction":
             raise RuntimeError("Forced error at step=prediction")
@@ -371,13 +383,12 @@ async def run_simulated_network_traffic(
                 message=f"started row_index={row_idx}",
                 payload={"row_index": row_idx, "queries": len(retrieval_queries)},
             )
-            hits, meta = kb_service.query_kb_multi_mmr(
+            hits, meta = kb_service.query_kb_templated_rag(
                 db,
                 settings,
-                retrieval_queries[:6],
+                summary=summary,
+                row=row,
                 final_k=final_k,
-                per_query_k=per_qk,
-                mmr_lambda=mmr_lam,
                 kb_public_ids=None,
             )
             row_rag_ctx = kb_service.format_kb_hits_for_agent_context(hits)
@@ -474,7 +485,15 @@ async def run_simulated_network_traffic(
                 duration_ms=t_row.ms(),
             )
 
-        update_run(db, run_id, final_actions=actions_out)
+        update_run(
+            db,
+            run_id,
+            final_actions=actions_out,
+            message_preview=format_run_message_preview(
+                predictions_json=pred_summary,
+                final_actions=actions_out,
+            ),
+        )
 
         update_run(
             db,
@@ -603,7 +622,12 @@ async def run_simulated_network_event(
             payload=pred_payload,
             duration_ms=t_pred.ms(),
         )
-        update_run(db, run_id, predictions_json=pred_payload)
+        update_run(
+            db,
+            run_id,
+            predictions_json=pred_payload,
+            message_preview=format_run_message_preview(predictions_json=pred_payload),
+        )
 
         if isinstance(force_step, str) and force_step.strip() == "prediction":
             raise RuntimeError("Forced error at step=prediction")
@@ -643,13 +667,12 @@ async def run_simulated_network_event(
             message="started",
             payload={"queries": len(retrieval_queries)},
         )
-        hits, meta = kb_service.query_kb_multi_mmr(
+        hits, meta = kb_service.query_kb_templated_rag(
             db,
             settings,
-            retrieval_queries[:6],
+            summary=summary,
+            row=r0,
             final_k=final_k,
-            per_query_k=per_qk,
-            mmr_lambda=mmr_lam,
             kb_public_ids=None,
         )
         row_rag_ctx = kb_service.format_kb_hits_for_agent_context(hits)
@@ -712,7 +735,15 @@ async def run_simulated_network_event(
         if isinstance(raw, str) and raw.strip():
             actions_payload["raw_llm_response"] = raw[:20000]
 
-        update_run(db, run_id, final_actions=actions_payload)
+        update_run(
+            db,
+            run_id,
+            final_actions=actions_payload,
+            message_preview=format_run_message_preview(
+                predictions_json=pred_payload,
+                final_actions=actions_payload,
+            ),
+        )
         emit_event(
             db,
             run_id=run_id,

@@ -53,7 +53,7 @@ def list_runs(
                 updated_at=r.updated_at,
                 customer_id=r.customer_id,
                 channel=r.channel,
-                message_preview=r.message_preview,
+                message_preview=run_service.display_message_preview(r),
                 predicted_attachment_type=r.predicted_attachment_type,
                 predicted_label=pred_label,
                 flagged_attack_or_anomaly=flagged,
@@ -130,7 +130,7 @@ def get_run_summary(
         completed_at=row.completed_at,
         customer_id=row.customer_id,
         channel=row.channel,
-        message_preview=row.message_preview,
+        message_preview=run_service.display_message_preview(row),
         duration_ms=row.duration_ms,
         last_step=last,
         predictions=preds,  # type: ignore[arg-type]

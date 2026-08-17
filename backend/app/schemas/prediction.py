@@ -21,7 +21,11 @@ class PredictionStartRequest(BaseModel):
     )
     attack_label_values: list[str] | None = Field(
         default=None,
-        description="Label values treated as 'attack' for counting (case-sensitive).",
+        description=(
+            "Label values treated as 'attack' for flagging (exact string match). "
+            "When omitted or empty, any predicted label other than BENIGN/NORMAL/LEGITIMATE "
+            "(and a few aliases) is flagged."
+        ),
     )
     compute_shap: bool = Field(
         default=True,
@@ -68,6 +72,13 @@ class AgenticPromptPreviewOut(BaseModel):
     """Filled orchestration user prompt (same string the LLM receives on POST /agent/decide)."""
 
     prompt: str
+    rag_context: str | None = Field(
+        default=None,
+        description="RAG / document chunks that would be injected into the decide prompt.",
+    )
+    results_row_index: int | None = None
+    predicted_label: str | None = None
+    confidence: float | None = None
 
 
 class AgenticJobCreate(BaseModel):
@@ -229,6 +240,22 @@ class TrustAnchorVerifyOut(BaseModel):
     )
 
 
+class ApplyAgenticActionRequest(BaseModel):
+    action_index: int = Field(ge=0, description="Zero-based index in primary_actions then supporting_actions order.")
+
+
+class ExecutionReportSummaryOut(BaseModel):
+    id: int
+    status: Literal["applied", "failed"]
+    applied_at: datetime | None = None
+    integrity_overall: Literal["valid", "invalid", "unknown", "anchor_failed"]
+    error_reason: str | None = None
+    attack_type: str | None = None
+    chain_actions_total: int = 0
+    chain_actions_whitelisted: int = 0
+    chain_actions_applied: int = 0
+
+
 class ExecutionReportListItemOut(BaseModel):
     id: int
     agentic_report_public_id: str
@@ -238,6 +265,10 @@ class ExecutionReportListItemOut(BaseModel):
     applied_at: datetime | None = None
     integrity_overall: Literal["valid", "invalid", "unknown", "anchor_failed"]
     error_reason: str | None = None
+    attack_type: str | None = None
+    chain_actions_total: int = 0
+    chain_actions_whitelisted: int = 0
+    chain_actions_applied: int = 0
     created_at: datetime
 
 
@@ -258,6 +289,8 @@ class ExecutionReportDetailOut(BaseModel):
     actions_core_json: dict | None = None
     actions_edge_json: dict | None = None
     actions_ran_json: dict | None = None
+    attack_type: str | None = None
+    actions_chain_json: dict | None = None
 
     error_reason: str | None = None
     error_detail: str | None = None

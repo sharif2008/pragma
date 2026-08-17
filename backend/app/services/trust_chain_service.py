@@ -84,7 +84,133 @@ _REGISTRY_ABI = [
         "stateMutability": "view",
         "type": "function",
     },
+    {
+        "inputs": [{"internalType": "string", "name": "attackType", "type": "string"}],
+        "name": "attackKey",
+        "outputs": [{"internalType": "bytes32", "name": "", "type": "bytes32"}],
+        "stateMutability": "pure",
+        "type": "function",
+    },
+    {
+        "inputs": [{"internalType": "string", "name": "action", "type": "string"}],
+        "name": "actionKey",
+        "outputs": [{"internalType": "bytes32", "name": "", "type": "bytes32"}],
+        "stateMutability": "pure",
+        "type": "function",
+    },
+    {
+        "inputs": [
+            {"internalType": "bytes32", "name": "attackKey_", "type": "bytes32"},
+            {"internalType": "bytes32", "name": "actionKey_", "type": "bytes32"},
+        ],
+        "name": "isActionWhitelisted",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
+    {
+        "inputs": [
+            {"internalType": "bytes32", "name": "attackKey_", "type": "bytes32"},
+            {"internalType": "bytes32", "name": "actionKey_", "type": "bytes32"},
+            {"internalType": "bytes32", "name": "agentKey", "type": "bytes32"},
+            {"internalType": "bytes32", "name": "reportKey", "type": "bytes32"},
+        ],
+        "name": "applyAction",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "inputs": [
+            {"internalType": "bytes32", "name": "agentKey", "type": "bytes32"},
+            {"internalType": "bytes32", "name": "reportKey", "type": "bytes32"},
+            {"internalType": "bytes32", "name": "actionKey_", "type": "bytes32"},
+        ],
+        "name": "isActionApplied",
+        "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
 ]
+
+
+def _registry_contract(settings: Settings):
+    if not settings.trust_chain_contract_address:
+        raise RuntimeError("TRUST_CHAIN_CONTRACT_ADDRESS missing")
+    w3 = Web3(Web3.HTTPProvider(settings.trust_chain_rpc_url))
+    if not w3.is_connected():
+        raise RuntimeError("could not connect to TRUST_CHAIN_RPC_URL")
+    addr = Web3.to_checksum_address(settings.trust_chain_contract_address.strip())
+    return w3, w3.eth.contract(address=addr, abi=_REGISTRY_ABI)
+
+
+def _keccak256_utf8_key_hex64(label: str) -> str:
+    """keccak256(bytes(utf8)) — matches AgenticTrustRegistry.attackKey/actionKey."""
+    return Web3.keccak(text=(label or "").strip()).hex().removeprefix("0x").lower()
+
+
+def is_action_whitelisted_on_chain(
+    settings: Settings,
+    *,
+    attack_type: str,
+    action: str,
+) -> tuple[bool | None, str | None]:
+    """
+    Check registry whitelist for attack_type + action (attack_options.json labels).
+    Returns (allowed, error). allowed is None when the RPC call failed.
+    """
+    if not settings.trust_chain_rpc_url or not settings.trust_chain_contract_address:
+        return None, "trust chain not configured"
+    try:
+        _w3, contract = _registry_contract(settings)
+        attack_b32 = _bytes32_hex_from_hex(_keccak256_utf8_key_hex64(attack_type))
+        action_b32 = _bytes32_hex_from_hex(_keccak256_utf8_key_hex64(action))
+        allowed = contract.functions.isActionWhitelisted(attack_b32, action_b32).call()
+        return bool(allowed), None
+    except Exception as e:
+        return None, str(e)[:500]
+
+
+def apply_action_on_chain(
+    settings: Settings,
+    *,
+    attack_type: str,
+    action: str,
+    agentic_job_public_id: str | None,
+    agentic_report_public_id: str,
+) -> tuple[str | None, str | None]:
+    """
+    Submit applyAction() after anchor + whitelist check.
+    Returns (tx_hash, error_message).
+    """
+    if not settings.trust_chain_enabled:
+        return None, "trust chain disabled"
+    if not settings.trust_chain_private_key:
+        return None, "TRUST_CHAIN_PRIVATE_KEY missing"
+    try:
+        w3, contract = _registry_contract(settings)
+        acct = w3.eth.account.from_key(settings.trust_chain_private_key)
+        attack_b32 = _bytes32_hex_from_hex(_keccak256_utf8_key_hex64(attack_type))
+        action_b32 = _bytes32_hex_from_hex(_keccak256_utf8_key_hex64(action))
+        agent_b32 = _bytes32_hex_from_hex(_agent_key_sha256(agentic_job_public_id))
+        report_b32 = _bytes32_hex_from_hex(_report_key_sha256(agentic_report_public_id))
+
+        nonce = w3.eth.get_transaction_count(acct.address)
+        tx = contract.functions.applyAction(attack_b32, action_b32, agent_b32, report_b32).build_transaction(
+            {
+                "from": acct.address,
+                "nonce": nonce,
+                "chainId": int(settings.trust_chain_chain_id),
+            }
+        )
+        tx.setdefault("gas", 250_000)
+        tx.setdefault("maxFeePerGas", w3.to_wei(2, "gwei"))
+        tx.setdefault("maxPriorityFeePerGas", w3.to_wei(1, "gwei"))
+        signed = acct.sign_transaction(tx)
+        tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
+        return tx_hash.hex(), None
+    except Exception as e:
+        return None, str(e)[:500]
 
 
 def _agent_key_sha256(agentic_job_public_id: str | None) -> str:
