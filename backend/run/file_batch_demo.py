@@ -17,7 +17,7 @@ Usage (from backend/, API + trained model + Hardhat chain recommended):
   python run/file_batch_demo.py --tamper          # substitute whitelisted actions ≠ plan
   python run/file_batch_demo.py --no-tamper       # default: apply planned actions as-is
 
-Each run writes one folder under run/output/ with report.json, report.txt, and ledger.json (all rows inside ledger).
+Each run writes one folder under run/output/ with report.json, report.txt, report.html, and ledger.json (all rows inside ledger).
 
 See run/README.md for full instructions.
 """
@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import html
 import json
 import sys
 import time
@@ -848,6 +849,250 @@ def apply_actions_for_record(
             time.sleep(pause_s)
 
 
+@dataclass
+class _AttackBucket:
+    rows: int = 0
+    actions: int = 0
+    tampered: int = 0
+    applied: int = 0
+    blocked: int = 0
+
+
+def _report_pct(count: int, total: int) -> str:
+    if total <= 0:
+        return "0.0"
+    return f"{100.0 * count / total:.1f}"
+
+
+def _row_action_counts(record: RowPipelineRecord) -> tuple[int, int, int, int]:
+    """Return (actions, tampered, applied, blocked) for one ledger row."""
+    planned = record.planned_actions
+    n = len(planned)
+    overrides = {int(k): v for k, v in (record.action_overrides or {}).items()}
+    tampered = len(overrides)
+    items = chain_items_from_record(record)
+    applied = blocked = 0
+
+    if not record.apply_results:
+        return n, tampered, n, 0
+
+    for act in planned:
+        idx = int(act.index)
+        item = next((x for x in items if x.get("index") == idx), None)
+        is_tampered = idx in overrides
+        if is_tampered:
+            if item and (
+                item.get("action_modified_before_apply")
+                or str(item.get("failure_reason") or "") == "action_plan_mismatch"
+                or str(item.get("result") or "") != "success"
+            ):
+                blocked += 1
+            elif item and str(item.get("result") or "") == "success":
+                planned_label = str(act.action or "").strip().lower()
+                applied_label = str(item.get("action") or "").strip().lower()
+                override_label = str(overrides[idx]).strip().lower()
+                if applied_label == override_label and override_label != planned_label:
+                    applied += 1
+                else:
+                    blocked += 1
+            else:
+                blocked += 1
+        elif item and str(item.get("result") or "") == "success":
+            applied += 1
+        elif item and str(item.get("result") or "") != "success":
+            blocked += 1
+        else:
+            applied += 1
+
+    return n, tampered, applied, blocked
+
+
+def _attack_buckets(ledger: list[RowPipelineRecord]) -> dict[str, _AttackBucket]:
+    by_attack: dict[str, _AttackBucket] = {}
+    for record in ledger:
+        atk = str(record.attack_type or "UNKNOWN").upper()
+        bucket = by_attack.setdefault(atk, _AttackBucket())
+        n, tampered, applied, blocked = _row_action_counts(record)
+        bucket.rows += 1
+        bucket.actions += n
+        bucket.tampered += tampered
+        bucket.applied += applied
+        bucket.blocked += blocked
+    return dict(sorted(by_attack.items()))
+
+
+def render_attack_wise_report_html(
+    *,
+    run_id: str,
+    input_file: str,
+    apply_mode: str,
+    tamper: bool,
+    generated_at: str,
+    summary: BatchRunSummary,
+    ledger: list[RowPipelineRecord],
+) -> str:
+    esc = html.escape
+    by_attack = _attack_buckets(ledger)
+    total_rows = summary.total_rows or 1
+    total_actions = summary.total_actions or 1
+    tampered_total = sum(b.tampered for b in by_attack.values())
+    applied_total = sum(b.applied for b in by_attack.values())
+    blocked_total = sum(b.blocked for b in by_attack.values())
+
+    attack_rows_html: list[str] = []
+    for atk, bucket in by_attack.items():
+        attack_rows_html.append(
+            f"""<tr>
+  <td>{esc(atk)}</td>
+  <td class="num">{bucket.rows}</td>
+  <td class="num">{_report_pct(bucket.rows, total_rows)}</td>
+  <td class="num">{bucket.actions}</td>
+  <td class="num">{_report_pct(bucket.actions, total_actions)}</td>
+  <td class="num">{bucket.tampered}</td>
+  <td class="num">{_report_pct(bucket.tampered, bucket.actions)}</td>
+  <td class="num">{bucket.applied}</td>
+  <td class="num">{_report_pct(bucket.applied, bucket.actions)}</td>
+  <td class="num">{bucket.blocked}</td>
+  <td class="num">{_report_pct(bucket.blocked, bucket.actions)}</td>
+</tr>"""
+        )
+
+    tamper_note = (
+        "Tamper enabled — 1–2 whitelisted substitutes per row (≠ anchored plan)."
+        if tamper
+        else "Tamper disabled — actions applied as planned."
+    )
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PRAGMA batch report — {esc(run_id)}</title>
+  <style>
+    :root {{
+      --bg: #f8f9fb;
+      --card: #fff;
+      --text: #1a1a2e;
+      --muted: #5c6370;
+      --border: #dfe3ea;
+      --accent: #0d6e4f;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 2rem 1.5rem;
+      line-height: 1.5;
+    }}
+    .wrap {{ max-width: 1100px; margin: 0 auto; }}
+    h1 {{ font-size: 1.5rem; margin: 0 0 0.25rem; color: var(--accent); }}
+    .sub {{ color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }}
+    .card {{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }}
+    h2 {{ font-size: 1.1rem; margin: 0 0 1rem; }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }}
+    th, td {{
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+    }}
+    th {{ background: #eef2f7; font-weight: 600; }}
+    td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+    tr.total {{ font-weight: 600; background: #f0f7f4; }}
+    .meta {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem 1rem; font-size: 0.875rem; }}
+    .meta dt {{ color: var(--muted); margin: 0; }}
+    .meta dd {{ margin: 0 0 0.5rem; }}
+    footer {{ font-size: 0.8rem; color: var(--muted); margin-top: 2rem; }}
+    .note {{ font-size: 0.85rem; color: var(--muted); margin-top: 0.75rem; }}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>PRAGMA batch evaluation — research report</h1>
+    <p class="sub">Table 2 — results by attack type (count and %)</p>
+
+    <div class="card">
+      <h2>Run metadata</h2>
+      <dl class="meta">
+        <div><dt>Run ID</dt><dd>{esc(run_id)}</dd></div>
+        <div><dt>Input file</dt><dd>{esc(input_file)}</dd></div>
+        <div><dt>Apply mode</dt><dd>{esc(apply_mode or "—")}</dd></div>
+        <div><dt>Tamper</dt><dd>{"on" if tamper else "off"}</dd></div>
+        <div><dt>Generated</dt><dd>{esc(generated_at)}</dd></div>
+      </dl>
+      <p class="note">{esc(tamper_note)} Per-row detail is in <code>ledger.json</code>.</p>
+    </div>
+
+    <div class="card">
+      <h2>Table 2 — By attack type</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Attack type</th>
+            <th>Rows</th><th>% rows</th>
+            <th>Actions</th><th>% actions</th>
+            <th>Tampered</th><th>% tampered*</th>
+            <th>Applied</th><th>% applied*</th>
+            <th>Blocked</th><th>% blocked*</th>
+          </tr>
+        </thead>
+        <tbody>
+          {"".join(attack_rows_html)}
+          <tr class="total">
+            <td>Total</td>
+            <td class="num">{summary.total_rows}</td><td class="num">100.0</td>
+            <td class="num">{summary.total_actions}</td><td class="num">100.0</td>
+            <td class="num">{tampered_total}</td><td class="num">{_report_pct(tampered_total, total_actions)}</td>
+            <td class="num">{applied_total}</td><td class="num">{_report_pct(applied_total, total_actions)}</td>
+            <td class="num">{blocked_total}</td><td class="num">{_report_pct(blocked_total, total_actions)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="note">* Tampered / applied / blocked % = within that attack type's actions. Row/action % = share of the whole run.</p>
+    </div>
+
+    <footer>Generated by backend/run/file_batch_demo.py — ChainAgentVFL / PRAGMA</footer>
+  </div>
+</body>
+</html>
+"""
+
+
+def write_attack_wise_report_html(
+    run_dir: Path,
+    ledger: list[RowPipelineRecord],
+    meta: dict[str, Any],
+    summary: BatchRunSummary,
+    *,
+    input_path: Path,
+) -> Path:
+    generated_at = utc_now_iso()
+    html_text = render_attack_wise_report_html(
+        run_id=str(meta.get("run_id") or run_dir.name),
+        input_file=str(input_path),
+        apply_mode=str(meta.get("apply_mode") or ""),
+        tamper=bool(meta.get("tamper")),
+        generated_at=generated_at,
+        summary=summary,
+        ledger=ledger,
+    )
+    out = run_dir / "report.html"
+    out.write_text(html_text, encoding="utf-8")
+    return out
+
+
 def save_run_outputs(
     run_dir: Path,
     ledger: list[RowPipelineRecord],
@@ -904,6 +1149,11 @@ def save_run_outputs(
     print(f"  report.json  — summary totals")
     print(f"  report.txt   — summary (human-readable)")
     print(f"  ledger.json  — full batch detail ({len(ledger)} row(s))")
+    try:
+        write_attack_wise_report_html(run_dir, ledger, meta, summary, input_path=input_path)
+        print(f"  report.html     — attack-wise research report (Table 2)")
+    except Exception as exc:
+        print(f"  (report.html skipped: {exc})")
 
 
 def run_file_batch_demo(args: argparse.Namespace) -> int:
