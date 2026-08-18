@@ -64,9 +64,7 @@ frontend/tsconfig.tsbuildinfo
 
 # --- IDE & editors ---
 .idea/
-.cursor/*
-!.cursor/rules/
-!.cursor/rules/**
+.cursor/
 *.swp
 *.swo
 *~
