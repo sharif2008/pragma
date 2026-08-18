@@ -16,6 +16,16 @@ class KnowledgeFileOut(ORMModel):
     chunk_count: int
     embedding_model: str
     created_at: datetime
+    original_name: str | None = Field(default=None, description="User-facing uploaded filename.")
+    managed_file_public_id: str | None = Field(default=None, description="Managed file UUID.")
+
+
+class KnowledgeFileListResponse(BaseModel):
+    items: list[KnowledgeFileOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class KBUploadResponse(ORMModel):
@@ -39,7 +49,10 @@ class KBQueryHit(BaseModel):
     text: str
     source: str | None = None
     kb_public_id: str | None = None
-    rerank_score: float | None = Field(default=None, description="Fusion rerank score before MMR (when using multi-query).")
+    rerank_score: float | None = Field(
+        default=None,
+        description="Cross-encoder relevance (blended with RRF/max fusion) used to select chunks; higher is better.",
+    )
     mmr_margin: float | None = Field(default=None, description="MMR objective at selection time.")
 
 
@@ -64,13 +77,13 @@ class RAGLLMResponse(BaseModel):
 
 class KBMultiQueryRequest(BaseModel):
     queries: list[str] = Field(..., min_length=1)
-    final_k: int = Field(default=8, ge=1, le=30, description="Documents returned after fusion + MMR.")
+    final_k: int = Field(default=8, ge=1, le=30, description="Documents returned after CrossEncoder + optional MMR.")
     per_query_k: int = Field(default=12, ge=4, le=50, description="FAISS depth per query per KB index.")
     mmr_lambda: float = Field(default=0.55, ge=0.0, le=1.0, description="MMR tradeoff: relevance vs diversity.")
     kb_public_ids: list[str] | None = None
     use_mmr: bool = Field(
         default=True,
-        description="If false, return top documents by fusion rerank score only (RRF + max-score), skip MMR diversification.",
+        description="If false, return top documents by CrossEncoder/fusion score only (skip MMR diversification).",
     )
 
     @field_validator("queries")
@@ -88,19 +101,19 @@ class KBMultiQueryResponse(BaseModel):
 
 
 class KBFuseHitsMMRRequest(BaseModel):
-    """Hit lists from separate POST /kb/query calls (one list per query); server dedupes, fusion-reranks, MMR."""
+    """Hit lists from separate POST /kb/query calls; server dedupes, CrossEncoder-reranks, optional MMR."""
 
     queries: list[str] = Field(..., min_length=1)
     per_query_hits: list[list[KBQueryHit]] = Field(
         ...,
         description="Same length as queries; each inner list is /kb/query hits in rank order for that query.",
     )
-    final_k: int = Field(default=8, ge=1, le=30, description="Documents returned after fusion + MMR.")
+    final_k: int = Field(default=8, ge=1, le=30, description="Documents returned after CrossEncoder + optional MMR.")
     mmr_lambda: float = Field(default=0.55, ge=0.0, le=1.0, description="MMR tradeoff: relevance vs diversity.")
     kb_public_ids: list[str] | None = None
     use_mmr: bool = Field(
         default=True,
-        description="If false, fusion rerank only (no MMR diversification).",
+        description="If false, CrossEncoder/fusion ranking only (no MMR diversification).",
     )
 
     @field_validator("queries")

@@ -75,11 +75,17 @@ export type ModelVersionOut = {
   version_number: number;
   training_job_id: number | null;
   algorithm: string;
+  /** Friendly name editable in Setting → Training. */
+  display_name?: string | null;
   artifact_path: string;
   metrics_json: Record<string, unknown> | null;
   feature_columns_json: unknown[] | null;
   label_classes_json: unknown[] | null;
   created_at: IsoDateString;
+};
+
+export type ModelVersionUpdate = {
+  display_name?: string | null;
 };
 
 export type TrainingStartResponse = {
@@ -148,6 +154,17 @@ export type KnowledgeFileOut = {
   chunk_count: number;
   embedding_model: string;
   created_at: IsoDateString;
+  /** User-facing uploaded filename when available. */
+  original_name?: string | null;
+  managed_file_public_id?: string | null;
+};
+
+export type KnowledgeFileListResponse = {
+  items: KnowledgeFileOut[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 };
 
 export type KBUploadResponse = {
@@ -191,6 +208,10 @@ export type AgenticDecideRequest = {
 
 export type AgenticPromptPreviewOut = {
   prompt: string;
+  rag_context?: string | null;
+  results_row_index?: number | null;
+  predicted_label?: string | null;
+  confidence?: number | null;
 };
 
 export type AgenticJobCreateRequest = {
@@ -238,7 +259,37 @@ export type AgenticReportOut = {
   /** Optional on-chain trust anchor metadata (local Hardhat). */
   trust_anchor?: Record<string, unknown> | null;
   /** Apply/execution status summary when present. */
-  execution_report?: Record<string, unknown> | null;
+  execution_report?: ExecutionReportSummaryOut | null;
+};
+
+export type ExecutionReportSummaryOut = {
+  id: number;
+  status: ExecutionReportStatus;
+  applied_at?: IsoDateString | null;
+  integrity_overall: TrustAnchorOverallIntegrity;
+  error_reason?: string | null;
+  attack_type?: string | null;
+  chain_actions_total?: number;
+  chain_actions_whitelisted?: number;
+  chain_actions_applied?: number;
+};
+
+export type ChainActionItemOut = {
+  index?: number;
+  attack_type?: string;
+  action: string;
+  network_tier?: string;
+  whitelisted?: boolean;
+  whitelist_error?: string;
+  apply_tx_hash?: string;
+  result?: string;
+  failure_reason?: string;
+  apply_error?: string;
+};
+
+export type ActionsChainJsonOut = {
+  attack_type?: string | null;
+  items?: ChainActionItemOut[];
 };
 
 export type TrustAnchorListItemOut = {
@@ -292,6 +343,10 @@ export type ExecutionReportListItemOut = {
   applied_at?: IsoDateString | null;
   integrity_overall: TrustAnchorOverallIntegrity;
   error_reason?: string | null;
+  attack_type?: string | null;
+  chain_actions_total?: number;
+  chain_actions_whitelisted?: number;
+  chain_actions_applied?: number;
   created_at: IsoDateString;
 };
 
@@ -310,6 +365,8 @@ export type ExecutionReportDetailOut = {
   actions_core_json?: Record<string, unknown> | null;
   actions_edge_json?: Record<string, unknown> | null;
   actions_ran_json?: Record<string, unknown> | null;
+  attack_type?: string | null;
+  actions_chain_json?: ActionsChainJsonOut | null;
   error_reason?: string | null;
   error_detail?: string | null;
   created_at: IsoDateString;

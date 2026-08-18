@@ -1,4 +1,3 @@
-import type { IconifyName } from 'src/components/iconify';
 import type { PredictionJobListItem } from 'src/services/predictions.service';
 import type {
   JobStatus,
@@ -15,7 +14,7 @@ import type {
   KBRAGLatestPredictionResponse,
 } from 'src/api/types';
 
-import { useId, useRef, useMemo, Fragment, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback, type ReactNode } from 'react';
 
 import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
@@ -30,6 +29,7 @@ import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Tooltip from '@mui/material/Tooltip';
 import Divider from '@mui/material/Divider';
+import { alpha } from '@mui/material/styles';
 import Checkbox from '@mui/material/Checkbox';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
@@ -43,10 +43,10 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
 import DialogTitle from '@mui/material/DialogTitle';
-import { alpha, useTheme } from '@mui/material/styles';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
+import TablePagination from '@mui/material/TablePagination';
 import CircularProgress from '@mui/material/CircularProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import AccordionSummary from '@mui/material/AccordionSummary';
@@ -65,11 +65,11 @@ import {
   listModels,
   agentDecide,
   kbListFiles,
+  isPipelineKbArtifactName,
   deleteModel,
   listDatasets,
   kbFuseHitsMmr,
   deleteDataset,
-  getApiBaseUrl,
   startTraining,
   uploadDataset,
   getTrainingJob,
@@ -88,6 +88,7 @@ import {
   listPredictionInputs,
   listAllPredictionJobs,
   uploadPredictionInput,
+  updateModelDisplayName,
   kbLlmShapRetrievalQuery,
   agentDecidePromptPreview,
   kbRagTemplatesPredictionJob,
@@ -98,6 +99,9 @@ import { Iconify } from 'src/components/iconify';
 import { TimeSortHeadCell } from 'src/components/table-sort/time-sort-head-cell';
 import { ModelVersionDetailDialog } from 'src/components/run-monitoring/detail-dialogs';
 
+import { SettingAgenticPanel } from 'src/sections/ml/view/setting-agentic-panel';
+import { SettingScoreRagPanel } from 'src/sections/ml/view/setting-score-rag-panel';
+import { SettingActiveActionsPanel } from 'src/sections/ml/view/setting-active-actions-panel';
 import {
   readAgenticPrep,
   writeAgenticPrep,
@@ -115,9 +119,8 @@ function formatError(e: unknown): string {
 }
 
 export function MlWorkbenchView() {
-  /** 0 = Summary · 1 = Data & training (datasets, training, KB) · 2 = Predictions, RAG prep, agent */
-  const [group, setGroup] = useState(0);
-  const [innerTab, setInnerTab] = useState(0);
+  /** 0 Overview · 1 Datasets · 2 Training · 3 Knowledge · 4 Predictions · 5 Agentic planner · 6 Agentic execution */
+  const [tab, setTab] = useState(0);
   const [banner, setBanner] = useState<{ severity: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [ping, setPing] = useState<string | null>(null);
 
@@ -138,18 +141,22 @@ export function MlWorkbenchView() {
 
   return (
     <DashboardContent maxWidth="xl">
-      <Stack spacing={2} sx={{ mb: 3 }}>
-        <Typography variant="h4">ML &amp; RAG workbench</Typography>
-        <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
-          <Typography variant="body2" color="text.secondary">
-            API base: <strong>{getApiBaseUrl()}</strong>
-          </Typography>
-          <Button size="small" variant="outlined" onClick={refreshHealth}>
-            Ping /health
+      <Stack spacing={1.5} sx={{ mb: 2.5 }}>
+        <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
+          <Typography variant="h4">Setting</Typography>
+          {ping && <Chip size="small" color="success" label={ping} />}
+          <Button size="small" variant="text" onClick={refreshHealth}>
+            Ping
           </Button>
-          {ping && <Chip size="small" color="success" label={`health: ${ping}`} />}
         </Stack>
-        {banner && <Alert severity={banner.severity}>{banner.text}</Alert>}
+        <Typography variant="body2" color="text.secondary">
+          Configure data, models, scoring, action plans, and active apply / blockchain validation.
+        </Typography>
+        {banner && (
+          <Alert severity={banner.severity} onClose={() => setBanner(null)}>
+            {banner.text}
+          </Alert>
+        )}
       </Stack>
 
       <Card
@@ -159,84 +166,41 @@ export function MlWorkbenchView() {
           borderColor: 'divider',
           borderRadius: 2,
           overflow: 'hidden',
-          boxShadow: (t) => `0 0 0 1px ${alpha(t.palette.divider, 0.6)}, ${t.shadows[2]}`,
         }}
       >
         <Tabs
-          value={group}
+          value={tab}
           onChange={(_, v) => {
-            setGroup(v);
-            setInnerTab(0);
+            setBanner(null);
+            setTab(v);
           }}
-          variant="fullWidth"
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           sx={{
-            px: { xs: 0.5, sm: 1 },
-            pt: 1,
-            bgcolor: (t) => alpha(t.palette.primary.main, 0.06),
+            px: 1,
             borderBottom: 1,
             borderColor: 'divider',
-            minHeight: 52,
-            '& .MuiTab-root': { minHeight: 48, fontWeight: 700, textTransform: 'none', fontSize: '0.9rem' },
+            minHeight: 48,
+            '& .MuiTab-root': { minHeight: 48, textTransform: 'none', fontWeight: 600 },
           }}
         >
-          <Tab label="Summary" />
-          <Tab label="Data & training" />
-          <Tab label="Predict, RAG & agent" />
+          <Tab label="Overview" />
+          <Tab label="Datasets" />
+          <Tab label="Training" />
+          <Tab label="Knowledge" />
+          <Tab label="Predictions" />
+          <Tab label="Agentic planner" />
+          <Tab label="Agentic execution" />
         </Tabs>
-        {group === 1 && (
-          <Tabs
-            key="ml-inner-data-training"
-            value={innerTab}
-            onChange={(_, v) => setInnerTab(v)}
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
-            sx={{
-              px: { xs: 0.5, sm: 1 },
-              pt: 0.5,
-              bgcolor: (t) => alpha(t.palette.grey[500], 0.06),
-              borderBottom: 1,
-              borderColor: 'divider',
-              minHeight: 48,
-              '& .MuiTab-root': { minHeight: 44, fontWeight: 600, textTransform: 'none', fontSize: '0.8125rem' },
-            }}
-          >
-            <Tab label="Datasets" />
-            <Tab label="Training & models" />
-            <Tab label="Knowledge base" />
-          </Tabs>
-        )}
-        {group === 2 && (
-          <Tabs
-            key="ml-inner-predict-rag-agent"
-            value={innerTab}
-            onChange={(_, v) => setInnerTab(v)}
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
-            sx={{
-              px: { xs: 0.5, sm: 1 },
-              pt: 0.5,
-              bgcolor: (t) => alpha(t.palette.grey[500], 0.06),
-              borderBottom: 1,
-              borderColor: 'divider',
-              minHeight: 48,
-              '& .MuiTab-root': { minHeight: 44, fontWeight: 600, textTransform: 'none', fontSize: '0.8125rem' },
-            }}
-          >
-            <Tab label="Predictions" />
-            <Tab label="RAG & LLM prep" />
-            <Tab label="Agentic actions" />
-          </Tabs>
-        )}
         <CardContent>
-          {group === 0 && <PipelineSummaryPanel />}
-          {group === 1 && innerTab === 0 && <DatasetsPanel onNotify={setBanner} />}
-          {group === 1 && innerTab === 1 && <TrainingPanel onNotify={setBanner} />}
-          {group === 1 && innerTab === 2 && <KbPanel onNotify={setBanner} />}
-          {group === 2 && innerTab === 0 && <PredictionsPanel onNotify={setBanner} />}
-          {group === 2 && innerTab === 1 && <RagLlmPrepPanel onNotify={setBanner} />}
-          {group === 2 && innerTab === 2 && <AgenticActionsPanel onNotify={setBanner} />}
+          {tab === 0 && <SettingOverviewPanel onGo={setTab} />}
+          {tab === 1 && <DatasetsPanel onNotify={setBanner} />}
+          {tab === 2 && <TrainingPanel onNotify={setBanner} />}
+          {tab === 3 && <KbPanel onNotify={setBanner} />}
+          {tab === 4 && <SettingScoreRagPanel onNotify={setBanner} />}
+          {tab === 5 && <SettingAgenticPanel onNotify={setBanner} />}
+          {tab === 6 && <SettingActiveActionsPanel onNotify={setBanner} />}
         </CardContent>
       </Card>
     </DashboardContent>
@@ -245,875 +209,69 @@ export function MlWorkbenchView() {
 
 type PanelProps = { onNotify: (b: { severity: 'success' | 'error' | 'info'; text: string } | null) => void };
 
-const PIPELINE_STEPS: {
-  label: string;
-  summary: string;
-  bullets: string[];
-  apis: string;
-}[] = [
-  {
-    label: 'Datasets',
-    summary: 'Versioned training CSVs (public_id + preview).',
-    bullets: [
-      'Upload CSV → public_id + version for traceability; optional replace public_id for a new version in the same chain.',
-      'Preview endpoint: column names and sample rows before training.',
-    ],
-    apis: 'POST /datasets/upload · GET /datasets · GET /datasets/{public_id}/preview',
-  },
-  {
-    label: 'Training & models',
-    summary: 'VFL-only jobs → async metrics and model_version_public_id.',
-    bullets: [
-      'Algorithm is vfl (not RF/XGBoost): dataset public_id + target column.',
-      'Three-party vertical split (embed → fuse → classify); workbench uses storage/agentic_features.json for column ownership; API can omit vfl_agent_definitions_path for heuristics.',
-      'Rebuild clones dataset + hyperparameters into a new job.',
-    ],
-    apis:
-      'POST /training/start · GET /training · DELETE /training/{id} · POST /training/rebuild · GET /models · DELETE /models/{id}',
-  },
-  {
-    label: 'Predictions',
-    summary: 'Batch score with a registered model → output CSV.',
-    bullets: [
-      'Upload prediction CSV, then model_version_public_id + input public_id to start the job.',
-      'Outputs: predicted_label, max_class_probability, optional flags; poll until completed.',
-    ],
-    apis: 'POST /predictions/upload-input · POST /predictions/start · GET /predictions/{public_id}',
-  },
-  {
-    label: 'Knowledge base (LLM RAG stack)',
-    summary: 'Chunk → embed → FAISS; multi-query + rerank + MMR → LLM.',
-    bullets: [
-      'Semantic split → chunks → embeddings → per-doc FAISS.',
-      'Retrieval: fused multi-query, RRF + max-score rerank, MMR for diverse passages.',
-      '/kb/rag-llm with citations; precomputed_citations after /kb/query + /kb/fuse-hits-mmr (or legacy /kb/query-multi). Feed docs + prediction context into Agentic.',
-    ],
-    apis:
-      'GET /kb/rag-templates/latest-prediction · POST /kb/llm-shap-retrieval-query · POST /kb/query + /kb/fuse-hits-mmr · POST /kb/rag-llm · POST /kb/upload · GET /kb/files',
-  },
-  {
-    label: 'Agentic actions',
-    summary: 'Policy LLM: predictions + KB → summary + recommended_action.',
-    bullets: [
-      'Inputs: prediction job stats + optional kb_citations (same RAG stack).',
-      'Outputs: agentic_reports with recommended_action (e.g. block_ip, alert_admin, monitor).',
-      'Execution mapping: RAN / Edge / CORE roles; optional hash attestation for verification.',
-    ],
-    apis:
-      'POST /agent/decide (optional anchor_trust_chain) · POST /agent/decide/prompt-preview · GET /agent/reports · DELETE /agent/reports/{public_id}',
-  },
-  {
-    label: 'Trust layer (blockchain)',
-    summary: 'Anchor for report integrity (roadmap in demo API).',
-    bullets: [
-      'Attest hash(summary ∥ recommended_action ∥ prediction_job_public_id ∥ timestamp); store tx id with report_path.',
-      'Verifiers re-hash and compare to on-chain (or enterprise log) commitment.',
-    ],
-    apis: '(roadmap) chain notary / Web3 adapter — not in this demo API yet.',
-  },
-];
-
-/** Stages 1–3: ingest data and produce predictions (Data & training + Predictions tabs). */
-const PIPELINE_STEPS_DATA = PIPELINE_STEPS.slice(0, 3);
-/** Stages 4–6: KB retrieval, policy LLM, trust (Knowledge base + RAG prep + Agentic). */
-const PIPELINE_STEPS_LLM_RAG = PIPELINE_STEPS.slice(3);
-
-const PIPELINE_STAGE_CARDS: {
-  id: string;
+const SETTING_SECTIONS: {
+  tab: number;
   title: string;
-  sub: string;
-  icon: IconifyName;
-  tabHint: string;
+  blurb: string;
+  /** MUI palette key used for soft card tint */
+  tint: 'info' | 'success' | 'warning' | 'secondary' | 'primary' | 'error';
 }[] = [
-  {
-    id: 'datasets',
-    title: 'Datasets',
-    sub: 'Versioned CSV',
-    icon: 'solar:check-circle-bold',
-    tabHint: 'Datasets',
-  },
-  {
-    id: 'training',
-    title: 'Training',
-    sub: 'Models & VFL',
-    icon: 'eva:trending-up-fill',
-    tabHint: 'Training & models',
-  },
-  {
-    id: 'predict',
-    title: 'Predictions',
-    sub: 'Batch scores',
-    icon: 'solar:eye-bold',
-    tabHint: 'Predictions',
-  },
-  {
-    id: 'kb',
-    title: 'Knowledge',
-    sub: 'RAG · MMR · LLM',
-    icon: 'eva:search-fill',
-    tabHint: 'Knowledge base',
-  },
-  {
-    id: 'agent',
-    title: 'Agentic',
-    sub: 'Policy LLM',
-    icon: 'solar:chat-round-dots-bold',
-    tabHint: 'Agentic actions',
-  },
-  {
-    id: 'chain',
-    title: 'Trust',
-    sub: 'Blockchain',
-    icon: 'solar:shield-keyhole-bold-duotone',
-    tabHint: 'Roadmap / attestation',
-  },
+  { tab: 1, title: 'Datasets', blurb: 'Upload and preview training CSVs.', tint: 'info' },
+  { tab: 2, title: 'Training', blurb: 'Train VFL models and set display names.', tint: 'success' },
+  { tab: 3, title: 'Knowledge', blurb: 'Upload and manage knowledge documents.', tint: 'warning' },
+  { tab: 4, title: 'Predictions', blurb: 'Upload a CSV, score rows, and see contribution summaries.', tint: 'secondary' },
+  { tab: 5, title: 'Agentic planner', blurb: 'Pick rows, save action plans, open Details per row.', tint: 'primary' },
+  { tab: 6, title: 'Agentic execution', blurb: 'Validate blockchain, apply plans, inspect results.', tint: 'error' },
 ];
 
-function PipelineInteractiveFlow() {
-  const theme = useTheme();
-  const [active, setActive] = useState<number | null>(null);
-
+function SettingOverviewPanel({ onGo }: { onGo: (tab: number) => void }) {
   return (
-    <Box>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 800, letterSpacing: -0.3 }}>
-          Flow at a glance
-        </Typography>
-        <Chip size="small" variant="outlined" color="primary" label="Tap a stage · jump hint below" sx={{ fontWeight: 600 }} />
-      </Stack>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, maxWidth: 720, lineHeight: 1.65 }}>
-        Follow the stages left to right: data and models first, then scoring, retrieval, and the agentic policy. The trust step
-        anchors attestation.
+    <Stack spacing={2.5}>
+      <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.7, maxWidth: 720 }}>
+        Flow: datasets → training → predictions → agentic planner → agentic execution (blockchain validate / apply). Knowledge
+        docs feed RAG when enabled on decide.
       </Typography>
-      <Stack
-        direction="row"
-        spacing={0}
-        alignItems="stretch"
-        sx={{
-          overflowX: 'auto',
-          pb: 1,
-          pt: 0.5,
-          mx: -0.5,
-          px: 0.5,
-          scrollbarWidth: 'thin',
-        }}
-      >
-        {PIPELINE_STAGE_CARDS.map((n, i) => {
-          const isChain = n.id === 'chain';
-          const isActive = active === i;
-          const accent = isChain ? theme.palette.success.main : theme.palette.primary.main;
-          return (
-            <Fragment key={n.id}>
-              <Card
-                elevation={0}
-                onClick={() => setActive((v) => (v === i ? null : i))}
-                sx={{
-                  position: 'relative',
-                  minWidth: 132,
-                  flex: '0 0 auto',
-                  cursor: 'pointer',
-                  borderRadius: 2,
-                  border: '2px solid',
-                  borderColor: isActive ? accent : 'divider',
-                  bgcolor: (t) => alpha(accent, isActive ? 0.12 : 0.03),
-                  boxShadow: isActive ? `0 8px 24px ${alpha(accent, 0.2)}` : 'none',
-                  transition: theme.transitions.create(['border-color', 'box-shadow', 'background-color', 'transform'], {
-                    duration: theme.transitions.duration.short,
-                  }),
-                  '&:hover': {
-                    borderColor: isActive ? accent : alpha(accent, 0.35),
-                    bgcolor: (t) => alpha(accent, isActive ? 0.14 : 0.06),
-                    transform: 'translateY(-3px)',
-                    boxShadow: isActive ? `0 12px 28px ${alpha(accent, 0.22)}` : theme.shadows[3],
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 8,
-                    right: 8,
-                    width: 22,
-                    height: 22,
-                    borderRadius: '50%',
-                    typography: 'caption',
-                    fontWeight: 800,
-                    fontSize: 11,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: isActive ? accent : alpha(theme.palette.grey[500], 0.12),
-                    color: isActive ? (isChain ? theme.palette.success.contrastText : theme.palette.primary.contrastText) : 'text.secondary',
-                  }}
-                >
-                  {i + 1}
-                </Box>
-                <CardContent sx={{ py: 2, px: 1.75, '&:last-child': { pb: 2 } }}>
-                  <Iconify
-                    width={32}
-                    icon={n.icon}
-                    sx={{ color: accent, mb: 1.25, opacity: isActive ? 1 : 0.88 }}
-                  />
-                  <Typography variant="subtitle2" sx={{ lineHeight: 1.3, fontWeight: 800, fontSize: 14 }}>
-                    {n.title}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.35, lineHeight: 1.4 }}>
-                    {n.sub}
-                  </Typography>
-                  <Chip
-                    size="small"
-                    label={n.tabHint}
-                    sx={{
-                      mt: 1.25,
-                      height: 22,
-                      fontWeight: 600,
-                      fontSize: 10,
-                      bgcolor: (t) => alpha(accent, 0.12),
-                      color: accent,
-                      border: '1px solid',
-                      borderColor: (t) => alpha(accent, 0.25),
-                    }}
-                  />
-                </CardContent>
-              </Card>
-              {i < PIPELINE_STAGE_CARDS.length - 1 && (
-                <Box
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    px: { xs: 0.25, sm: 0.75 },
-                    flexShrink: 0,
-                    alignSelf: 'center',
-                  }}
-                >
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: 32,
-                      height: 32,
-                      borderRadius: '50%',
-                      background: (t) =>
-                        `linear-gradient(135deg, ${alpha(t.palette.primary.main, 0.12)} 0%, ${alpha(t.palette.primary.main, 0.04)} 100%)`,
-                      border: 1,
-                      borderColor: 'divider',
-                      color: 'primary.main',
-                    }}
-                  >
-                    <Iconify icon="eva:arrow-ios-forward-fill" width={18} />
-                  </Box>
-                </Box>
-              )}
-            </Fragment>
-          );
-        })}
-      </Stack>
-      <Collapse in={active !== null} unmountOnExit>
-        {active !== null && (
-          <Box
-            sx={{
-              mt: 2.5,
-              py: 1.75,
-              px: 2.25,
-              borderRadius: 2,
-              border: 1,
-              borderColor: 'primary.main',
-              borderLeftWidth: 4,
-              borderLeftColor: 'primary.main',
-              bgcolor: (t) => alpha(t.palette.primary.main, 0.06),
-              boxShadow: (t) => `inset 0 1px 0 ${alpha(t.palette.common.white, 0.06)}`,
-            }}
-          >
-            <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>
-              <Typography component="span" variant="subtitle2" color="text.primary" sx={{ fontWeight: 800 }}>
-                {PIPELINE_STAGE_CARDS[active].title}
-              </Typography>
-              {' — open '}
-              <Typography component="span" variant="subtitle2" color="primary.main" sx={{ fontWeight: 700 }}>
-                {PIPELINE_STAGE_CARDS[active].tabHint}
-              </Typography>
-              {
-                ' via the tabs: Summary, Data & training (datasets, training, knowledge), or Predict, RAG & agent (predictions, RAG prep, agentic). Order is left → right.'
-              }
-            </Typography>
-          </Box>
-        )}
-      </Collapse>
-    </Box>
-  );
-}
-
-function PipelineDecisionTreeDiagram({ embedded = false }: { embedded?: boolean }) {
-  const theme = useTheme();
-  const uid = useId().replace(/:/g, '');
-  const arrowId = `dt-arr-${uid}`;
-  const arrowTrustId = `dt-arr-tr-${uid}`;
-  const shadowId = `dt-sh-${uid}`;
-  const gradStrongId = `dt-gs-${uid}`;
-  const gradSoftId = `dt-gf-${uid}`;
-
-  const ff = String(theme.typography.fontFamily ?? 'system-ui, sans-serif').replace(/"/g, '');
-
-  const primary = theme.palette.primary.main;
-  const primaryDark = theme.palette.primary.dark;
-  const contrast = theme.palette.primary.contrastText;
-  const stroke = theme.palette.divider;
-  const accent = theme.palette.text.secondary;
-  const trust = theme.palette.success.main;
-  const laneBg = alpha(primary, 0.06);
-  const laneBorder = alpha(primary, 0.14);
-  const softNode = alpha(primary, 0.35);
-
-  const svgText = (props: { x: number; y: number; anchor?: 'middle' | 'start'; size: number; weight?: number; fill: string; children: string }) => (
-    <text
-      x={props.x}
-      y={props.y}
-      textAnchor={props.anchor ?? 'middle'}
-      fill={props.fill}
-      style={{ fontSize: props.size, fontWeight: props.weight ?? 500, fontFamily: ff }}
-    >
-      {props.children}
-    </text>
-  );
-
-  return (
-    <Box
-      sx={{
-        p: embedded ? 0 : 2,
-        pt: embedded ? 0 : 2,
-        borderRadius: embedded ? 0 : 2,
-        border: embedded ? 0 : 1,
-        borderColor: 'divider',
-        bgcolor: embedded ? 'transparent' : 'background.neutral',
-      }}
-    >
-      {!embedded && (
-        <>
-          <Typography variant="subtitle2" sx={{ mb: 0.5, fontWeight: 700 }}>
-            Agent decision tree
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-            Predictions + RAG → policy LLM → optional attestation → RAN / Edge / CORE.
-          </Typography>
-        </>
-      )}
       <Box
         sx={{
-          width: 1,
-          overflowX: 'auto',
-          borderRadius: 2,
-          bgcolor: (t) => alpha(t.palette.grey[500], 0.06),
-          border: 1,
-          borderColor: 'divider',
-          boxShadow: (t) => `inset 0 1px 0 ${alpha(t.palette.common.white, 0.05)}`,
+          display: 'grid',
+          gap: 1.5,
+          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
         }}
       >
-        <svg
-          width="100%"
-          height={380}
-          viewBox="0 0 720 380"
-          role="img"
-          aria-label="Decision tree: predictions and RAG into agentic LLM, blockchain attestation, and RAN Edge CORE actions"
-          style={{ display: 'block', minWidth: 600 }}
-        >
-          <defs>
-            <linearGradient id={gradStrongId} x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor={primary} stopOpacity={1} />
-              <stop offset="100%" stopColor={primaryDark} stopOpacity={1} />
-            </linearGradient>
-            <linearGradient id={gradSoftId} x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor={softNode} stopOpacity={0.9} />
-              <stop offset="100%" stopColor={softNode} stopOpacity={0.5} />
-            </linearGradient>
-            <filter id={shadowId} x="-8%" y="-8%" width="116%" height="116%">
-              <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#000" floodOpacity="0.12" />
-            </filter>
-            <marker
-              id={arrowId}
-              markerWidth="8"
-              markerHeight="8"
-              refX="7"
-              refY="4"
-              orient="auto"
-              markerUnits="strokeWidth"
-            >
-              <path d="M0,0 L8,4 L0,8 Z" fill={accent} />
-            </marker>
-            <marker
-              id={arrowTrustId}
-              markerWidth="8"
-              markerHeight="8"
-              refX="7"
-              refY="4"
-              orient="auto"
-              markerUnits="strokeWidth"
-            >
-              <path d="M0,0 L8,4 L0,8 Z" fill={trust} />
-            </marker>
-          </defs>
-
-          <rect x="0" y="0" width="720" height="380" rx="12" fill={theme.palette.background.paper} opacity={0.45} />
-
-          {svgText({ x: 132, y: 26, size: 11, weight: 800, fill: accent, children: 'Prediction context' })}
-          {svgText({ x: 488, y: 26, size: 11, weight: 800, fill: accent, children: 'Knowledge base → RAG pipeline' })}
-
-          <rect x="16" y="36" width="232" height="148" rx="14" fill={laneBg} stroke={laneBorder} strokeWidth="1.5" />
-          <rect x="264" y="36" width="440" height="148" rx="14" fill={laneBg} stroke={laneBorder} strokeWidth="1.5" />
-
-          <rect
-            x="36"
-            y="56"
-            width="192"
-            height="108"
-            rx="12"
-            fill={`url(#${gradStrongId})`}
-            filter={`url(#${shadowId})`}
-          />
-          {svgText({ x: 132, y: 92, size: 14, weight: 800, fill: contrast, children: 'Predictions job' })}
-          {svgText({ x: 132, y: 112, size: 10, weight: 500, fill: contrast, children: 'labels · probabilities · flags' })}
-          {svgText({ x: 132, y: 132, size: 9, weight: 500, fill: contrast, children: 'stats for agentic prompt', anchor: 'middle' })}
-
-          {[
-            { y: 52, h: 26, n: '1', t1: 'Chunk + embed', t2: 'FAISS index' },
-            { y: 84, h: 26, n: '2', t1: 'Multi-query fusion', t2: 'RRF · rerank' },
-            { y: 116, h: 26, n: '3', t1: 'MMR selection', t2: 'diverse passages' },
-            { y: 148, h: 28, n: '4', t1: 'LLM RAG answer', t2: 'citations · grounded' },
-          ].map((row, i) => (
-            <g key={i}>
-              <circle cx="292" cy={row.y + row.h / 2} r="11" fill={primary} opacity={0.92} />
-              <text
-                x="292"
-                y={row.y + row.h / 2 + 4}
-                textAnchor="middle"
-                fill={contrast}
-                style={{ fontSize: 10, fontWeight: 800, fontFamily: ff }}
-              >
-                {row.n}
-              </text>
-              <rect
-                x="312"
-                y={row.y}
-                width="376"
-                height={row.h}
-                rx="8"
-                fill={i < 3 ? `url(#${gradSoftId})` : `url(#${gradStrongId})`}
-                stroke={stroke}
-                strokeWidth="1"
-                opacity={i < 3 ? 1 : 1}
-                filter={i === 3 ? `url(#${shadowId})` : undefined}
-              />
-              {svgText({
-                x: 500,
-                y: row.y + 12,
-                size: 10,
-                weight: 700,
-                fill: i < 3 ? accent : contrast,
-                children: row.t1,
-              })}
-              {svgText({
-                x: 500,
-                y: row.y + 23,
-                size: 8,
-                weight: 500,
-                fill: i < 3 ? accent : contrast,
-                children: row.t2,
-              })}
-            </g>
-          ))}
-
-          <rect
-            x="200"
-            y="206"
-            width="320"
-            height="56"
-            rx="14"
-            fill={`url(#${gradStrongId})`}
-            filter={`url(#${shadowId})`}
-          />
-          {svgText({ x: 360, y: 232, size: 15, weight: 800, fill: contrast, children: 'Agentic LLM — policy' })}
-          {svgText({
-            x: 360,
-            y: 252,
-            size: 9,
-            weight: 500,
-            fill: contrast,
-            children: 'merge scores + RAG → summary · recommended_action',
-          })}
-
-          <path
-            d="M 132 164 C 132 182, 220 198, 280 206"
-            fill="none"
-            stroke={stroke}
-            strokeWidth="2.5"
-            markerEnd={`url(#${arrowId})`}
-          />
-          <path
-            d="M 500 176 C 500 188, 430 198 360 206"
-            fill="none"
-            stroke={stroke}
-            strokeWidth="2.5"
-            markerEnd={`url(#${arrowId})`}
-          />
-          {svgText({ x: 360, y: 198, size: 9, weight: 700, fill: accent, children: 'fuse inputs' })}
-
-          <rect
-            x="258"
-            y="278"
-            width="204"
-            height="40"
-            rx="12"
-            fill={alpha(trust, 0.12)}
-            stroke={trust}
-            strokeWidth="2"
-            strokeDasharray="6 4"
-          />
-          {svgText({ x: 360, y: 298, size: 12, weight: 800, fill: trust, children: 'Trust · attestation' })}
-          {svgText({ x: 360, y: 312, size: 8, weight: 600, fill: trust, children: 'hash report · verify on-chain' })}
-          <line
-            x1="360"
-            y1="262"
-            x2="360"
-            y2="278"
-            stroke={trust}
-            strokeWidth="2.5"
-            strokeDasharray="6 4"
-            markerEnd={`url(#${arrowTrustId})`}
-          />
-
-          {svgText({ x: 360, y: 338, size: 11, weight: 800, fill: accent, children: 'Map recommended_action → SOC playbooks' })}
-
-          {[
-            { x: 72, w: 112, label: 'RAN' },
-            { x: 304, w: 112, label: 'Edge' },
-            { x: 536, w: 112, label: 'CORE' },
-          ].map((b) => (
-            <g key={b.label}>
-              <rect
-                x={b.x}
-                y="348"
-                width={b.w}
-                height="28"
-                rx="8"
-                fill={alpha(primary, 0.2)}
-                stroke={alpha(primary, 0.45)}
-                strokeWidth="1.5"
-              />
-              {svgText({
-                x: b.x + b.w / 2,
-                y: 366,
-                size: 12,
-                weight: 800,
-                fill: primaryDark,
-                children: b.label,
-              })}
-            </g>
-          ))}
-
-          <line
-            x1="360"
-            y1="318"
-            x2="128"
-            y2="348"
-            stroke={stroke}
-            strokeWidth="1.5"
-            strokeDasharray="4 3"
-            markerEnd={`url(#${arrowId})`}
-          />
-          <line
-            x1="360"
-            y1="318"
-            x2="360"
-            y2="348"
-            stroke={stroke}
-            strokeWidth="1.5"
-            strokeDasharray="4 3"
-            markerEnd={`url(#${arrowId})`}
-          />
-          <line
-            x1="360"
-            y1="318"
-            x2="592"
-            y2="348"
-            stroke={stroke}
-            strokeWidth="1.5"
-            strokeDasharray="4 3"
-            markerEnd={`url(#${arrowId})`}
-          />
-        </svg>
-      </Box>
-      <Stack direction="row" flexWrap="wrap" sx={{ mt: 2, gap: 1.5 }}>
-        <Chip
-          size="small"
-          variant="outlined"
-          label="Solid arrows — data & decisions"
-          sx={{ fontWeight: 600, borderColor: 'divider' }}
-        />
-        <Chip
-          size="small"
-          variant="outlined"
-          color="success"
-          label="Dashed green — trust path"
-          sx={{ fontWeight: 600 }}
-        />
-      </Stack>
-      <Typography variant="body2" color="text.secondary" sx={{ display: 'block', mt: 1.75, lineHeight: 1.65, maxWidth: 720 }}>
-        Retrieval runs as a <strong>numbered stack</strong> (chunk → retrieve → MMR → LLM). The <strong>agentic</strong> step
-        consumes both prediction stats and grounded answers, then you may <strong>attest</strong> and fan out to{' '}
-        <strong>RAN / Edge / CORE</strong> automations.
-      </Typography>
-    </Box>
-  );
-}
-
-function renderPipelineStepAccordions(steps: typeof PIPELINE_STEPS) {
-  return steps.map((s) => (
-    <Accordion
-      key={s.label}
-      defaultExpanded={false}
-      disableGutters
-      sx={{
-        border: 1,
-        borderColor: 'divider',
-        borderRadius: 1.5,
-        overflow: 'hidden',
-        boxShadow: 'none',
-        '&:before': { display: 'none' },
-      }}
-    >
-      <AccordionSummary
-        expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" width={18} />}
-        sx={{ px: 2, py: 1.25, minHeight: 48, '&.Mui-expanded': { minHeight: 48 } }}
-      >
-        <Stack spacing={0.25} sx={{ pr: 1, textAlign: 'left' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            {s.label}
-          </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ lineHeight: 1.4, display: { xs: 'none', sm: 'block' } }}
-          >
-            {s.summary}
-          </Typography>
-        </Stack>
-      </AccordionSummary>
-      <AccordionDetails sx={{ pt: 0, px: 2, pb: 2 }}>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: { xs: 'block', sm: 'none' }, mb: 1.5, lineHeight: 1.5 }}
-        >
-          {s.summary}
-        </Typography>
-        <Box
-          component="ul"
-          sx={{ m: 0, pl: 2.25, typography: 'body2', color: 'text.secondary', '& li': { mb: 0.5 } }}
-        >
-          {s.bullets.map((b, i) => (
-            <li key={`${s.label}-${i}`}>{b}</li>
-          ))}
-        </Box>
-        <Typography
-          variant="caption"
-          color="text.disabled"
-          sx={{
-            display: 'block',
-            mt: 1.5,
-            fontFamily: 'monospace',
-            fontSize: 11,
-            wordBreak: 'break-all',
-            lineHeight: 1.5,
-          }}
-        >
-          {s.apis}
-        </Typography>
-      </AccordionDetails>
-    </Accordion>
-  ));
-}
-
-function PipelineSummaryPanel() {
-  const theme = useTheme();
-  return (
-    <Stack spacing={3} sx={{ maxWidth: 1 }}>
-      <Paper
-        elevation={0}
-        sx={{
-          position: 'relative',
-          overflow: 'hidden',
-          p: { xs: 2.5, sm: 3.5 },
-          borderRadius: 2,
-          border: 1,
-          borderColor: 'divider',
-          boxShadow: (t) => `0 12px 40px ${alpha(t.palette.primary.main, 0.08)}`,
-          background: (t) =>
-            `linear-gradient(135deg, ${alpha(t.palette.primary.main, 0.11)} 0%, ${alpha(t.palette.background.paper, 1)} 42%, ${alpha(t.palette.success.main, 0.06)} 100%)`,
-        }}
-      >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: -48,
-            right: -32,
-            width: 200,
-            height: 200,
-            borderRadius: '50%',
-            bgcolor: (t) => alpha(t.palette.primary.main, 0.08),
-            pointerEvents: 'none',
-          }}
-        />
-        <Box sx={{ position: 'relative' }}>
-          <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1} sx={{ mb: 1.5 }}>
-            <Chip size="small" color="primary" label="End-to-end" sx={{ fontWeight: 700 }} />
-            <Chip size="small" variant="outlined" label="VFL" sx={{ fontWeight: 600 }} />
-            <Chip size="small" variant="outlined" label="RAG + MMR" sx={{ fontWeight: 600 }} />
-            <Chip size="small" variant="outlined" label="Agentic policy" sx={{ fontWeight: 600 }} />
-          </Stack>
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: 800,
-              letterSpacing: -0.5,
-              mb: 1.25,
-              background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.success.main})`,
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              color: 'primary.main',
-            }}
-          >
-            Pipeline overview
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 2, maxWidth: 800, lineHeight: 1.7, fontSize: 16 }}>
-            Datasets → VFL training → predictions → knowledge (RAG) → agentic policy → trust. Use the{' '}
-            <strong>Data &amp; training</strong> tab for ingest and models, and <strong>Predict, RAG &amp; agent</strong> for
-            batch scoring, RAG/LLM prep, and agentic runs.
-          </Typography>
-          <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2.5 }}>
-            <Chip size="small" variant="outlined" color="info" label="Tabs: Data & training · Datasets / Training / KB" />
-            <Chip
-              size="small"
-              variant="outlined"
-              color="success"
-              label="Tabs: Predict & agent · Predictions / RAG & LLM prep / Agentic"
-            />
-          </Stack>
-        </Box>
-      </Paper>
-
-      <Box>
-        <Typography
-          variant="overline"
-          sx={{ fontWeight: 800, letterSpacing: 0.9, color: 'text.secondary', mb: 0.5, display: 'block' }}
-        >
-          Stage reference
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, maxWidth: 900 }}>
-          <strong>Left column:</strong> data through batch predictions. <strong>Right column:</strong> retrieval, grounded LLM,
-          and agentic policy — open accordions for API hints and step details.
-        </Typography>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="stretch">
+        {SETTING_SECTIONS.map((s) => (
           <Paper
+            key={s.tab}
             variant="outlined"
             sx={{
-              flex: 1,
               p: 2,
               borderRadius: 2,
-              borderTop: 3,
-              borderTopColor: 'info.main',
-              bgcolor: (t) => alpha(t.palette.info.main, 0.04),
+              height: 1,
+              cursor: 'pointer',
+              borderColor: (t) => alpha(t.palette[s.tint].main, 0.28),
+              bgcolor: (t) => alpha(t.palette[s.tint].main, 0.1),
+              transition: (t) => t.transitions.create(['border-color', 'background-color', 'box-shadow']),
+              '&:hover': {
+                borderColor: `${s.tint}.main`,
+                bgcolor: (t) => alpha(t.palette[s.tint].main, 0.16),
+                boxShadow: 1,
+              },
             }}
+            onClick={() => onGo(s.tab)}
           >
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.25 }}>
-              Data → prediction
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-              Datasets, VFL training, scoring jobs
-            </Typography>
-            <Stack spacing={0.75}>{renderPipelineStepAccordions(PIPELINE_STEPS_DATA)}</Stack>
+            <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={1}>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, color: `${s.tint}.dark` }}>
+                  {s.title}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  {s.blurb}
+                </Typography>
+              </Box>
+              <Iconify icon="eva:arrow-ios-forward-fill" width={18} sx={{ color: `${s.tint}.main`, mt: 0.5, opacity: 0.7 }} />
+            </Stack>
           </Paper>
-          <Paper
-            variant="outlined"
-            sx={{
-              flex: 1,
-              p: 2,
-              borderRadius: 2,
-              borderTop: 3,
-              borderTopColor: 'success.main',
-              bgcolor: (t) => alpha(t.palette.success.main, 0.05),
-            }}
-          >
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 0.25 }}>
-              LLM, RAG &amp; agent
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-              KB stack, policy model, optional trust anchor
-            </Typography>
-            <Stack spacing={0.75}>{renderPipelineStepAccordions(PIPELINE_STEPS_LLM_RAG)}</Stack>
-          </Paper>
-        </Stack>
+        ))}
       </Box>
-
-      <Paper
-        elevation={0}
-        sx={{
-          p: { xs: 2, sm: 2.5 },
-          borderRadius: 2,
-          border: 1,
-          borderColor: 'divider',
-        }}
-      >
-        <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 2 }}>
-          Interactive flow
-        </Typography>
-        <PipelineInteractiveFlow />
-      </Paper>
-
-      <Paper
-        elevation={0}
-        sx={{
-          p: { xs: 2, sm: 3 },
-          borderRadius: 2,
-          border: 1,
-          borderColor: (t) => alpha(t.palette.primary.main, 0.22),
-          borderLeftWidth: 5,
-          borderLeftColor: 'primary.main',
-          bgcolor: (t) => alpha(t.palette.primary.main, 0.03),
-          boxShadow: (t) => `0 8px 32px ${alpha(t.palette.common.black, 0.06)}`,
-        }}
-      >
-        <Stack direction="row" alignItems="flex-start" spacing={2} sx={{ mb: 2.5 }}>
-          <Box
-            sx={{
-              width: 48,
-              height: 48,
-              borderRadius: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              background: (t) =>
-                `linear-gradient(145deg, ${alpha(t.palette.primary.main, 0.2)} 0%, ${alpha(t.palette.primary.dark, 0.12)} 100%)`,
-              color: 'primary.main',
-              boxShadow: (t) => `0 4px 14px ${alpha(t.palette.primary.main, 0.25)}`,
-            }}
-          >
-            <Iconify icon="solar:chat-round-dots-bold" width={28} />
-          </Box>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.25, letterSpacing: -0.2 }}>
-              Agent decision tree
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75, lineHeight: 1.65, maxWidth: 680 }}>
-              Two inputs converge on the policy model: <strong>batch prediction signals</strong> and a <strong>four-step RAG
-              stack</strong>. After the decision, you can anchor trust, then route <code>recommended_action</code> to network
-              roles.
-            </Typography>
-          </Box>
-        </Stack>
-        <PipelineDecisionTreeDiagram embedded />
-      </Paper>
     </Stack>
   );
 }
@@ -1398,6 +556,9 @@ function TrainingPanel({ onNotify }: PanelProps) {
   const [modelDetail, setModelDetail] = useState<ModelVersionOut | null>(null);
   const [jobsTimeOrder, setJobsTimeOrder] = useState<TimeSortOrder>('desc');
   const [modelsTimeOrder, setModelsTimeOrder] = useState<TimeSortOrder>('desc');
+  const [renameModel, setRenameModel] = useState<ModelVersionOut | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renaming, setRenaming] = useState(false);
 
   const datasetsForSelect = useMemo(
     () => sortByTime(datasets, (d) => d.created_at, 'desc'),
@@ -1475,7 +636,7 @@ function TrainingPanel({ onNotify }: PanelProps) {
           sx={{ minWidth: 280, flex: 1 }}
           helperText={
             datasets.length === 0
-              ? 'Upload a CSV under Data & training → Datasets first.'
+              ? 'Upload a CSV under Datasets first.'
               : 'Choose by file name and version'
           }
         >
@@ -1651,11 +812,11 @@ function TrainingPanel({ onNotify }: PanelProps) {
       >
         <TableHead>
           <TableRow>
+            <TableCell>Name</TableCell>
             <TableCell>public_id</TableCell>
             <TableCell>algorithm</TableCell>
             <TableCell>version</TableCell>
             <TimeSortHeadCell label="Registered" order={modelsTimeOrder} onOrderChange={setModelsTimeOrder} />
-            <TableCell>metrics</TableCell>
             <TableCell align="right">View</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>
@@ -1672,13 +833,15 @@ function TrainingPanel({ onNotify }: PanelProps) {
           )}
           {modelsSorted.map((m) => (
             <TableRow key={m.public_id}>
-              <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{m.public_id}</TableCell>
+              <TableCell sx={{ maxWidth: 200 }}>
+                <Typography variant="body2" noWrap title={m.display_name || undefined} sx={{ fontWeight: 600 }}>
+                  {m.display_name?.trim() || '—'}
+                </Typography>
+              </TableCell>
+              <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{m.public_id.slice(0, 8)}…</TableCell>
               <TableCell>{m.algorithm}</TableCell>
               <TableCell>{m.version_number}</TableCell>
               <TableCell sx={{ whiteSpace: 'nowrap', typography: 'caption' }}>{fDateTime(m.created_at)}</TableCell>
-              <TableCell sx={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {m.metrics_json ? JSON.stringify(m.metrics_json) : '—'}
-              </TableCell>
               <TableCell align="right">
                 <Tooltip title="View model details">
                   <IconButton
@@ -1693,36 +856,97 @@ function TrainingPanel({ onNotify }: PanelProps) {
                 </Tooltip>
               </TableCell>
               <TableCell align="right">
-                <Button
-                  size="small"
-                  color="error"
-                  variant="outlined"
-                  onClick={async () => {
-                    if (
-                      !window.confirm(
-                        `Delete model ${m.public_id.slice(0, 8)}… (v${m.version_number})? This removes the registry row and the .joblib file. Prediction jobs that used this model must be gone first.`
-                      )
-                    ) {
-                      return;
-                    }
-                    onNotify(null);
-                    try {
-                      await deleteModel(m.public_id);
-                      onNotify({ severity: 'success', text: 'Model deleted' });
-                      await refreshModels();
-                      await loadJobs();
-                    } catch (e) {
-                      onNotify({ severity: 'error', text: formatError(e) });
-                    }
-                  }}
-                >
-                  Delete
-                </Button>
+                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      setRenameModel(m);
+                      setRenameValue(m.display_name || '');
+                    }}
+                  >
+                    Rename
+                  </Button>
+                  <Button
+                    size="small"
+                    color="error"
+                    variant="outlined"
+                    onClick={async () => {
+                      if (
+                        !window.confirm(
+                          `Delete model ${m.public_id.slice(0, 8)}… (v${m.version_number})? This removes the registry row and the .joblib file. Prediction jobs that used this model must be gone first.`
+                        )
+                      ) {
+                        return;
+                      }
+                      onNotify(null);
+                      try {
+                        await deleteModel(m.public_id);
+                        onNotify({ severity: 'success', text: 'Model deleted' });
+                        await refreshModels();
+                        await loadJobs();
+                      } catch (e) {
+                        onNotify({ severity: 'error', text: formatError(e) });
+                      }
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </Stack>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      <Dialog
+        open={!!renameModel}
+        onClose={() => {
+          if (!renaming) setRenameModel(null);
+        }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Rename model</DialogTitle>
+        <DialogContent>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+            {renameModel?.public_id}
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Display name"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            helperText="Shown in Setting lists. Leave blank to clear."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={renaming} onClick={() => setRenameModel(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={renaming || !renameModel}
+            onClick={async () => {
+              if (!renameModel) return;
+              setRenaming(true);
+              try {
+                const name = renameValue.trim() || null;
+                await updateModelDisplayName(renameModel.public_id, name);
+                onNotify({ severity: 'success', text: name ? `Named “${name}”` : 'Name cleared' });
+                setRenameModel(null);
+                await refreshModels();
+              } catch (e) {
+                onNotify({ severity: 'error', text: formatError(e) });
+              } finally {
+                setRenaming(false);
+              }
+            }}
+          >
+            {renaming ? 'Saving…' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <ModelVersionDetailDialog
         open={Boolean(modelDetail)}
@@ -1733,6 +957,8 @@ function TrainingPanel({ onNotify }: PanelProps) {
   );
 }
 
+// Legacy panel — superseded by Setting tabs; kept for reference.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function PredictionsPanel({ onNotify }: PanelProps) {
   const [models, setModels] = useState<ModelVersionOut[]>([]);
   const [inputs, setInputs] = useState<ManagedFileOut[]>([]);
@@ -1971,7 +1197,7 @@ function PredictionsPanel({ onNotify }: PanelProps) {
           sx={{ maxWidth: 560 }}
           helperText={
             models.length === 0
-              ? 'Train a model under Data & training → Training & models first.'
+              ? 'Train a model under Training first.'
               : 'Dropdown lists registered models. Pick which weights to use for scoring.'
           }
         >
@@ -2492,26 +1718,108 @@ function PredictionsPanel({ onNotify }: PanelProps) {
 }
 
 function KbPanel({ onNotify }: PanelProps) {
-  const [rows, setRows] = useState<Awaited<ReturnType<typeof kbListFiles>>>([]);
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof kbListFiles>>['items']>([]);
+  const [kbTotal, setKbTotal] = useState(0);
+  const [kbPage, setKbPage] = useState(0);
+  const [kbRowsPerPage, setKbRowsPerPage] = useState(10);
   const [kbUploading, setKbUploading] = useState(false);
+  const [kbDeleting, setKbDeleting] = useState(false);
+  const [kbLoading, setKbLoading] = useState(false);
   const [kbTimeOrder, setKbTimeOrder] = useState<TimeSortOrder>('desc');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
-  const kbRowsSorted = useMemo(
-    () => sortByTime(rows, (r) => r.created_at, kbTimeOrder),
-    [rows, kbTimeOrder]
-  );
+  const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.public_id));
+  const someSelected = selectedIds.size > 0;
 
   const load = useCallback(async () => {
+    setKbLoading(true);
     try {
-      setRows(await kbListFiles());
+      const res = await kbListFiles({
+        page: kbPage + 1,
+        pageSize: kbRowsPerPage,
+        order: kbTimeOrder,
+      });
+      const items = res.items.filter((r) => !isPipelineKbArtifactName(r.original_name));
+      setRows(items);
+      setKbTotal(res.total);
+      setSelectedIds((prev) => {
+        const next = new Set<string>();
+        for (const id of prev) {
+          if (items.some((r) => r.public_id === id)) next.add(id);
+        }
+        return next;
+      });
     } catch (e) {
       onNotify({ severity: 'error', text: formatError(e) });
+    } finally {
+      setKbLoading(false);
     }
-  }, [onNotify]);
+  }, [onNotify, kbPage, kbRowsPerPage, kbTimeOrder]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelectedIds(new Set());
+      return;
+    }
+    setSelectedIds(new Set(rows.map((r) => r.public_id)));
+  };
+
+  const deleteSelected = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    const labels = ids.map((id) => {
+      const row = rows.find((r) => r.public_id === id);
+      return row?.original_name?.trim() || id.slice(0, 8);
+    });
+    if (
+      !window.confirm(
+        ids.length === 1
+          ? `Delete knowledge file “${labels[0]}”? This removes the document and its vector index.`
+          : `Delete ${ids.length} knowledge files?\n\n${labels.slice(0, 8).join('\n')}${labels.length > 8 ? '\n…' : ''}`
+      )
+    ) {
+      return;
+    }
+    onNotify(null);
+    setKbDeleting(true);
+    let ok = 0;
+    const errors: string[] = [];
+    try {
+      for (const id of ids) {
+        try {
+          await kbDelete(id);
+          ok += 1;
+        } catch (e) {
+          errors.push(`${id.slice(0, 8)}…: ${formatError(e)}`);
+        }
+      }
+      await load();
+      setSelectedIds(new Set());
+      if (errors.length === 0) {
+        onNotify({ severity: 'success', text: `Deleted ${ok} knowledge file(s).` });
+      } else {
+        onNotify({
+          severity: 'error',
+          text: `Deleted ${ok}; ${errors.length} failed. ${errors[0]}`,
+        });
+      }
+    } finally {
+      setKbDeleting(false);
+    }
+  };
 
   const onUpload: React.ChangeEventHandler<HTMLInputElement> = async (ev) => {
     const file = ev.target.files?.[0];
@@ -2521,8 +1829,13 @@ function KbPanel({ onNotify }: PanelProps) {
     setKbUploading(true);
     try {
       const r = await kbUpload(file);
-      onNotify({ severity: 'success', text: `Indexed ${r.chunk_count} chunks → ${r.kb_public_id}` });
+      onNotify({
+        severity: 'success',
+        text: `Indexed “${file.name}” · ${r.chunk_count} chunks`,
+      });
+      setKbPage(0);
       await load();
+      setKbPage(0);
     } catch (e) {
       onNotify({ severity: 'error', text: formatError(e) });
     } finally {
@@ -2533,57 +1846,155 @@ function KbPanel({ onNotify }: PanelProps) {
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-        <Button variant="contained" component="label" disabled={kbUploading}>
+        <Button variant="contained" component="label" disabled={kbUploading || kbDeleting || kbLoading}>
           {kbUploading ? 'Uploading…' : 'Upload KB document'}
-          <input type="file" hidden onChange={onUpload} disabled={kbUploading} />
+          <input type="file" hidden onChange={onUpload} disabled={kbUploading || kbDeleting || kbLoading} />
         </Button>
-        <Button onClick={load} disabled={kbUploading}>
+        <Button onClick={() => void load()} disabled={kbUploading || kbDeleting || kbLoading}>
           Refresh KB list
         </Button>
-        {kbUploading && <CircularProgress size={22} aria-label="Uploading document" />}
+        <Button
+          color="error"
+          variant="outlined"
+          disabled={!someSelected || kbUploading || kbDeleting || kbLoading}
+          onClick={() => void deleteSelected()}
+        >
+          {kbDeleting ? 'Deleting…' : `Delete selected${someSelected ? ` (${selectedIds.size})` : ''}`}
+        </Button>
+        {(kbUploading || kbDeleting || kbLoading) && (
+          <CircularProgress size={22} aria-label={kbUploading ? 'Uploading document' : kbDeleting ? 'Deleting documents' : 'Loading documents'} />
+        )}
       </Stack>
+      <TableContainer component={Paper} variant="outlined">
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>public_id</TableCell>
-            <TableCell>chunks</TableCell>
-            <TableCell>embedding</TableCell>
-            <TimeSortHeadCell label="Indexed" order={kbTimeOrder} onOrderChange={setKbTimeOrder} />
-            <TableCell align="right">actions</TableCell>
+            <TableCell padding="checkbox">
+              <Checkbox
+                size="small"
+                checked={allSelected}
+                indeterminate={someSelected && !allSelected}
+                disabled={rows.length === 0 || kbDeleting || kbLoading}
+                onChange={toggleAll}
+                inputProps={{ 'aria-label': 'Select all knowledge files on this page' }}
+              />
+            </TableCell>
+            <TableCell>File name</TableCell>
+            <TableCell>Chunks</TableCell>
+            <TableCell>Embedding</TableCell>
+            <TimeSortHeadCell
+              label="Indexed"
+              order={kbTimeOrder}
+              onOrderChange={(next) => {
+                setKbTimeOrder(next);
+                setKbPage(0);
+              }}
+            />
+            <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {kbRowsSorted.map((r) => (
-            <TableRow key={r.public_id}>
-              <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{r.public_id}</TableCell>
-              <TableCell>{r.chunk_count}</TableCell>
-              <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.embedding_model}</TableCell>
-              <TableCell sx={{ whiteSpace: 'nowrap', typography: 'caption' }}>{fDateTime(r.created_at)}</TableCell>
-              <TableCell align="right">
-                <Button
-                  size="small"
-                  color="error"
-                  onClick={async () => {
-                    if (!window.confirm(`Delete KB ${r.public_id}?`)) return;
-                    try {
-                      await kbDelete(r.public_id);
-                      await load();
-                    } catch (e) {
-                      onNotify({ severity: 'error', text: formatError(e) });
-                    }
-                  }}
-                >
-                  Delete
-                </Button>
+          {!kbLoading && rows.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={6}>
+                <Typography variant="body2" color="text.secondary">
+                  No knowledge documents yet. Upload a PDF, TXT, MD, or JSON guide to index it for RAG.
+                </Typography>
               </TableCell>
             </TableRow>
-          ))}
+          )}
+          {kbLoading && (
+            <TableRow>
+              <TableCell colSpan={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Loading knowledge documents…
+                </Typography>
+              </TableCell>
+            </TableRow>
+          )}
+          {!kbLoading &&
+            rows.map((r) => {
+            const displayName = r.original_name?.trim() || 'Untitled document';
+            return (
+              <TableRow key={r.public_id} hover selected={selectedIds.has(r.public_id)}>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    size="small"
+                    checked={selectedIds.has(r.public_id)}
+                    disabled={kbDeleting}
+                    onChange={() => toggleOne(r.public_id)}
+                    inputProps={{ 'aria-label': `Select ${displayName}` }}
+                  />
+                </TableCell>
+                <TableCell sx={{ maxWidth: 360 }}>
+                  <Typography variant="body2" noWrap title={displayName} sx={{ fontWeight: 600 }}>
+                    {displayName}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    noWrap
+                    display="block"
+                    title={r.public_id}
+                    sx={{ fontFamily: 'monospace' }}
+                  >
+                    {r.public_id.slice(0, 8)}…
+                  </Typography>
+                </TableCell>
+                <TableCell>{r.chunk_count}</TableCell>
+                <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }} title={r.embedding_model}>
+                  {r.embedding_model}
+                </TableCell>
+                <TableCell sx={{ whiteSpace: 'nowrap', typography: 'caption' }}>{fDateTime(r.created_at)}</TableCell>
+                <TableCell align="right">
+                  <Button
+                    size="small"
+                    color="error"
+                    disabled={kbDeleting}
+                    onClick={async () => {
+                      if (
+                        !window.confirm(
+                          `Delete knowledge file “${displayName}”? This removes the document and its vector index.`
+                        )
+                      ) {
+                        return;
+                      }
+                      try {
+                        await kbDelete(r.public_id);
+                        onNotify({ severity: 'success', text: `Deleted “${displayName}”.` });
+                        await load();
+                      } catch (e) {
+                        onNotify({ severity: 'error', text: formatError(e) });
+                      }
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
+      <TablePagination
+        component="div"
+        count={kbTotal}
+        page={kbPage}
+        onPageChange={(_, p) => setKbPage(p)}
+        rowsPerPage={kbRowsPerPage}
+        onRowsPerPageChange={(e) => {
+          setKbRowsPerPage(parseInt(e.target.value, 10));
+          setKbPage(0);
+        }}
+        rowsPerPageOptions={[5, 10, 25, 50]}
+        sx={{ minHeight: 44, '& .MuiTablePagination-toolbar': { minHeight: 44, pl: 1 } }}
+      />
+      </TableContainer>
 
       <Alert severity="info" variant="outlined">
-        RAG templates, multi-query retrieval, and KB LLM synthesis live under <strong>Predict, RAG &amp; agent → RAG &amp; LLM
-        prep</strong>. Upload and curate documents here on <strong>Knowledge base</strong>.
+        Only uploaded guides (PDF, TXT, MD, JSON) appear here. Pipeline run files such as{' '}
+        <code>traffic_run_*.json</code> are not knowledge and are excluded automatically. RAG prep and multi-query retrieval
+        live under <strong>RAG prep</strong>.
       </Alert>
     </Stack>
   );
@@ -2872,6 +2283,8 @@ function RagPrepSection({
   );
 }
 
+// Legacy panel — superseded by Setting tabs; kept for reference.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function RagLlmPrepPanel({ onNotify }: PanelProps) {
   const [jobRows, setJobRows] = useState<PredictionJobListItem[]>([]);
   const [listLoading, setListLoading] = useState(false);
@@ -3104,22 +2517,21 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
             sx={{ border: 1, borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper', '&:before': { display: 'none' } }}
           >
             <AccordionSummary expandIcon={<Iconify width={20} icon="eva:arrow-ios-downward-fill" />}>
-              <Typography variant="subtitle2">5G / 6G mobile network context (RAN · Edge · Core)</Typography>
+              <Typography variant="subtitle2">Enterprise network domains (Access · Perimeter · Endpoint)</Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Stack spacing={1.5}>
                 <Typography variant="body2" color="text.secondary">
-                  Use this mental model when reading SHAP parties and RAG hits: <strong>RAN</strong> covers radio access
-                  (gNB, NR air interface, O-RAN near-RT / non-RT RIC), <strong>Edge</strong> is MEC and UPF user-plane
-                  offload close to subscribers, and <strong>Core</strong> is the 5GC control / user-plane anchor (AMF, SMF,
-                  UPF, slicing, NEF/NRF). <strong>6G</strong> extends this with IMT-2030 themes (AI-native RAN, ISAC, NTN)—treat
-                  KB matches as forward-looking research where applicable.
+                  Use this mental model when reading SHAP parties and RAG hits: <strong>Access / ISP</strong> is
+                  subscriber/ISP-edge volume and rate telemetry; <strong>Perimeter / IDS</strong> is north-south
+                  inspection (ports, WAF, scans); <strong>Endpoint / EDR</strong> is host-proximate bidirectional and
+                  reverse-path forensics.
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   After you load a <strong>completed prediction job</strong>, the API adds a template pack{' '}
-                  <strong>5G / 6G mobile network (RAN · Edge · Core)</strong> with retrieval strings and an LLM synthesis
-                  prompt aligned to that batch. Row-level SHAP templates append the same framing so vectors stay relevant to
-                  mobile operator SOC work.
+                  <strong>Enterprise network (Access · Perimeter · Endpoint)</strong> with retrieval strings and an LLM
+                  synthesis prompt aligned to that batch. Row-level SHAP templates use the same domain framing for SOC
+                  triage.
                 </Typography>
               </Stack>
             </AccordionDetails>
@@ -3428,7 +2840,7 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
                   {Math.min(30, Math.max(1, finalDocCount))} · per_query_k={Math.min(50, Math.max(4, perQueryK))} ·{' '}
                   {retrievalPipeline === 'fusion_mmr'
                     ? `MMR on (λ=${MMR_PRESETS[mmrPreset]})`
-                    : 'MMR off (fusion rerank only)'}
+                    : 'MMR off (CrossEncoder / fusion only)'}
                 </Typography>
                 <Box component="ol" sx={{ m: 0, pl: 2.5, typography: 'body2', color: 'text.secondary' }}>
                   {resolvedRetrievalQueries.length === 0 ? (
@@ -3495,8 +2907,8 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
                   sx={{ minWidth: 220 }}
                   helperText="Rerank fusion; enable MMR for diverse top chunks."
                 >
-                  <MenuItem value="fusion_mmr">Fusion rerank + MMR</MenuItem>
-                  <MenuItem value="fusion_only">Fusion rerank only (no MMR)</MenuItem>
+                  <MenuItem value="fusion_mmr">CrossEncoder + MMR</MenuItem>
+                  <MenuItem value="fusion_only">CrossEncoder only (no MMR)</MenuItem>
                 </TextField>
                 <TextField
                   select
@@ -3686,13 +3098,13 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
           </Typography>
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
             Template pack: <strong>{selectedTemplate.label}</strong> — {selectedTemplate.description}. KB synthesis LLM runs under{' '}
-            <strong>Predict, RAG &amp; agent → Agentic actions</strong> after you save prep.
+            <strong>Agentic</strong> after you save prep.
           </Typography>
 
           <Box sx={{ width: 1 }}>
             <Typography variant="subtitle2" gutterBottom>
               Top {topHitsForLlm.length} document(s) (cap {finalDocCount}) —{' '}
-              {retrievalPipeline === 'fusion_mmr' ? 'rerank + MMR' : 'rerank only'}
+              {retrievalPipeline === 'fusion_mmr' ? 'CrossEncoder + MMR' : 'CrossEncoder only'}
             </Typography>
             {multiMetaLine && (
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
@@ -3791,6 +3203,8 @@ function resolveAgenticDecideContext(
   return { jid, ri, predictionStatus };
 }
 
+// Legacy panel — superseded by Setting tabs; kept for reference.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function AgenticActionsPanel({ onNotify }: PanelProps) {
   const [prep, setPrep] = useState(() => readAgenticPrep());
   const [selectedAgenticJobPublicId, setSelectedAgenticJobPublicId] = useState(
@@ -4200,7 +3614,7 @@ function AgenticActionsPanel({ onNotify }: PanelProps) {
           <Stack spacing={2}>
             {!prep && (
               <Alert severity="warning" variant="outlined">
-                No prep in this browser session. Save from <strong>RAG &amp; LLM prep</strong>, then <strong>Reload prep</strong>.
+                No prep in this browser session. Save from <strong>RAG prep</strong>, then <strong>Reload prep</strong>.
               </Alert>
             )}
             {prep && !hasCitations && (

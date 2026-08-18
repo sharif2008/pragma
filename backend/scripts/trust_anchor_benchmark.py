@@ -487,7 +487,7 @@ def _build_single_template_rag_query(
         f"predicted_label={predicted_label}, confidence={confidence:.2f}. "
         f"{label_phi}: {bits}. "
         "Include containment, monitoring, validation, and escalation decision points. "
-        "5G/6G operator context: triangulate RAN, edge MEC, and 5GC core using these indicators."
+        "Enterprise network context: triangulate Access / ISP, Perimeter / IDS, and Endpoint / EDR using these indicators."
     )
 
 
@@ -1171,7 +1171,7 @@ Use --no-deploy-contract to reuse TRUST_CHAIN_CONTRACT_ADDRESS from the environm
         _print_step("parse + commitment (sha256)", commitment_ms, f"sha256={_short_hex(commitment_sha256, 16)}")
 
         t_chain0 = time.perf_counter()
-        tx_hash, contract_addr2, agent_key_sha, report_key_sha = trust_chain_service.anchor_report_commitment_on_chain(
+        tx_hash, contract_addr2, agent_key_sha, report_key_sha, _anchor_ms = trust_chain_service.anchor_report_commitment_on_chain(
             settings=settings,
             agentic_job_public_id="csv_benchmark",
             agentic_report_public_id=f"csv_row_{i}",
@@ -1183,7 +1183,7 @@ Use --no-deploy-contract to reuse TRUST_CHAIN_CONTRACT_ADDRESS from the environm
 
         # 5) Validate: read from chain + recompute from canonical payload
         t_val0 = time.perf_counter()
-        rpc_ok, on_chain_hex, err = trust_chain_service.read_commitment_from_chain(
+        rpc_ok, on_chain_hex, err, _verify_ms = trust_chain_service.read_commitment_from_chain(
             settings,
             contract_address=contract_addr2,
             agent_key_sha256_hex=agent_key_sha,

@@ -104,6 +104,16 @@ export async function applyAgenticReport(publicId: string): Promise<ExecutionRep
   return requestJson<ExecutionReportDetailOut>(paths.agent.applyReport(publicId), { method: 'POST' });
 }
 
+export async function applyAgenticReportAction(
+  publicId: string,
+  actionIndex: number
+): Promise<ExecutionReportDetailOut> {
+  return requestJson<ExecutionReportDetailOut>(paths.agent.applyReportAction(publicId), {
+    method: 'POST',
+    body: JSON.stringify({ action_index: actionIndex }),
+  });
+}
+
 export async function listExecutionReports(limit = 100, offset = 0): Promise<ExecutionReportListItemOut[]> {
   const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   return requestJson<ExecutionReportListItemOut[]>(`${paths.agent.executionReports}?${q}`);

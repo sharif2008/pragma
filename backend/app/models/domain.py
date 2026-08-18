@@ -120,6 +120,7 @@ class ModelVersion(Base):
         ForeignKey("training_jobs.id", ondelete="SET NULL"), nullable=True
     )
     algorithm: Mapped[str] = mapped_column(String(64), nullable=False)
+    display_name: Mapped[str | None] = mapped_column(String(256), nullable=True)
     artifact_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     metrics_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     feature_columns_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
@@ -292,6 +293,8 @@ class AgenticReportExecutionReport(Base):
     actions_core_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     actions_edge_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     actions_ran_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    attack_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    actions_chain_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     error_reason: Mapped[str | None] = mapped_column(String(128), nullable=True)
     error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)

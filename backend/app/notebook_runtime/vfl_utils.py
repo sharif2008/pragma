@@ -10,8 +10,146 @@ This module contains:
 """
 
 import json
+import random
 import re
+from functools import lru_cache
 from pathlib import Path
+from typing import Any
+
+
+def _attack_options_path() -> Path:
+    try:
+        from app.notebook_runtime.storage_paths import ATTACK_OPTIONS_JSON
+
+        return ATTACK_OPTIONS_JSON
+    except ImportError:
+        backend_root = Path(__file__).resolve().parent.parent.parent
+        return backend_root / "storage" / "attack_options.json"
+
+
+@lru_cache(maxsize=1)
+def load_attack_option_keys() -> frozenset[str]:
+    """Attack type keys from attack_options.json (must match Hardhat whitelist seed)."""
+    path = _attack_options_path()
+    if not path.is_file():
+        return frozenset({"BENIGN", "DDOS", "DOS", "SSHPATATOR", "FTPPATATOR", "PORTSCAN", "WEBATTACK", "BOT", "OTHERS"})
+    data = json.loads(path.read_text(encoding="utf-8"))
+    attacks = data.get("attacks")
+    if isinstance(attacks, dict):
+        return frozenset(str(k).upper() for k in attacks.keys())
+    return frozenset({"OTHERS"})
+
+
+@lru_cache(maxsize=1)
+def load_attack_actions_by_type() -> dict[str, tuple[str, ...]]:
+    """Whitelisted action labels per attack type (attack_options.json / on-chain seed)."""
+    path = _attack_options_path()
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    attacks = data.get("attacks")
+    if not isinstance(attacks, dict):
+        return {}
+    out: dict[str, tuple[str, ...]] = {}
+    for key, values in attacks.items():
+        if isinstance(values, list):
+            out[str(key).upper()] = tuple(str(v) for v in values if str(v).strip())
+    return out
+
+
+def not_allowed_actions_for_type(attack_type: str | None) -> tuple[str, ...]:
+    """Actions used by other classes but not on this class's whitelist."""
+    # REVIEW: Off-whitelist pool for --tamper threat A (illegal for this class).
+    by_type = load_attack_actions_by_type()
+    key = str(attack_type or "").upper()
+    allowed = {a.strip().lower() for a in by_type.get(key, ()) if str(a).strip()}
+    out: list[str] = []
+    seen: set[str] = set()
+    for other_key, actions in by_type.items():
+        if other_key == key:
+            continue
+        for candidate in actions:
+            label = str(candidate).strip()
+            cnorm = label.lower()
+            if not cnorm or cnorm in allowed or cnorm in seen:
+                continue
+            seen.add(cnorm)
+            out.append(label)
+    return tuple(out)
+
+
+def pick_disallowed_action(
+    attack_type: str | None,
+    *,
+    exclude: frozenset[str] | None = None,
+    rng: Any = None,
+) -> str | None:
+    """Random action that is not whitelisted for attack_type."""
+    # REVIEW: --tamper threat A: labels that exist for other classes, illegal for this class.
+    blocked = {x.strip().lower() for x in (exclude or frozenset()) if str(x).strip()}
+    pool = [a for a in not_allowed_actions_for_type(attack_type) if a.strip().lower() not in blocked]
+    if not pool:
+        return None
+    picker = rng if rng is not None else random
+    return picker.choice(pool)
+
+
+def pick_allowed_alternate_action(
+    planned_action: str,
+    attack_type: str | None,
+    *,
+    exclude: frozenset[str] | None = None,
+    rng: Any = None,
+) -> str | None:
+    """Whitelisted action for attack_type that differs from planned (case-insensitive)."""
+    planned_norm = str(planned_action or "").strip().lower()
+    if not planned_norm:
+        return None
+    blocked = {planned_norm}
+    if exclude:
+        blocked |= {x.strip().lower() for x in exclude if str(x).strip()}
+
+    by_type = load_attack_actions_by_type()
+    key = str(attack_type or "").upper()
+    class_pool = [c for c in by_type.get(key, ()) if str(c).strip().lower() not in blocked]
+    # REVIEW: With an RNG (batch --tamper), stay on this class whitelist so plan-drift
+    # is refused at Gate 2, not accidentally drawn from another class (Gate 1).
+    if rng is not None:
+        if not class_pool:
+            return None
+        return rng.choice(class_pool)
+
+    search_types = [key, "OTHERS"]
+    seen_types: set[str] = set()
+    for atk in search_types:
+        if not atk or atk in seen_types:
+            continue
+        seen_types.add(atk)
+        for candidate in by_type.get(atk, ()):
+            cnorm = candidate.strip().lower()
+            if cnorm and cnorm not in blocked:
+                return candidate
+    for candidates in by_type.values():
+        for candidate in candidates:
+            cnorm = candidate.strip().lower()
+            if cnorm and cnorm not in blocked:
+                return candidate
+    return None
+
+
+def canonical_attack_type(label_str: object, *, attack_keys: frozenset[str] | None = None) -> str:
+    """
+    Normalize a model/dataset label to a single attack_options.json key.
+    Unknown sub-types (e.g. INFILTRATION, Heartbleed) map to OTHERS.
+    """
+    s = str(label_str or "").strip()
+    if not s:
+        return "UNKNOWN"
+    simplified = simplify_label(s)
+    keys = attack_keys if attack_keys is not None else load_attack_option_keys()
+    if simplified.upper() in keys:
+        return simplified.upper()
+    return "OTHERS"
 
 
 # ============================================================================
