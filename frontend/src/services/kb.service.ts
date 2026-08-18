@@ -5,6 +5,7 @@ import type {
   KBQueryResponse,
   KBUploadResponse,
   KnowledgeFileOut,
+  KnowledgeFileListResponse,
   KBMultiQueryRequest,
   KBMultiQueryResponse,
   KBFuseHitsMMRRequest,
@@ -20,8 +21,27 @@ export async function kbUpload(file: File): Promise<KBUploadResponse> {
   return postMultipart<KBUploadResponse>(paths.kb.upload, file);
 }
 
-export async function kbListFiles(): Promise<KnowledgeFileOut[]> {
-  return requestJson<KnowledgeFileOut[]>(paths.kb.files);
+export function isPipelineKbArtifactName(name?: string | null): boolean {
+  const n = (name || '').trim().toLowerCase();
+  if (!n) return false;
+  return (
+    n.startsWith('traffic_run_') ||
+    n.startsWith('customer_message_') ||
+    n.includes('_traffic_run_') ||
+    n.includes('_customer_message_')
+  );
+}
+
+export async function kbListFiles(opts?: {
+  page?: number;
+  pageSize?: number;
+  order?: 'asc' | 'desc';
+}): Promise<KnowledgeFileListResponse> {
+  const q = new URLSearchParams();
+  q.set('page', String(Math.max(1, opts?.page ?? 1)));
+  q.set('page_size', String(Math.max(1, opts?.pageSize ?? 10)));
+  q.set('order', opts?.order === 'asc' ? 'asc' : 'desc');
+  return requestJson<KnowledgeFileListResponse>(`${paths.kb.files}?${q.toString()}`);
 }
 
 export const kbList = kbListFiles;

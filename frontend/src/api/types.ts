@@ -159,6 +159,14 @@ export type KnowledgeFileOut = {
   managed_file_public_id?: string | null;
 };
 
+export type KnowledgeFileListResponse = {
+  items: KnowledgeFileOut[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+};
+
 export type KBUploadResponse = {
   kb_public_id: string;
   managed_file_public_id: string;

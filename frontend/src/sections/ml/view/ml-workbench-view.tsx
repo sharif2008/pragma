@@ -46,6 +46,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
+import TablePagination from '@mui/material/TablePagination';
 import CircularProgress from '@mui/material/CircularProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import AccordionSummary from '@mui/material/AccordionSummary';
@@ -64,6 +65,7 @@ import {
   listModels,
   agentDecide,
   kbListFiles,
+  isPipelineKbArtifactName,
   deleteModel,
   listDatasets,
   kbFuseHitsMmr,
@@ -1716,35 +1718,43 @@ function PredictionsPanel({ onNotify }: PanelProps) {
 }
 
 function KbPanel({ onNotify }: PanelProps) {
-  const [rows, setRows] = useState<Awaited<ReturnType<typeof kbListFiles>>>([]);
+  const [rows, setRows] = useState<Awaited<ReturnType<typeof kbListFiles>>['items']>([]);
+  const [kbTotal, setKbTotal] = useState(0);
+  const [kbPage, setKbPage] = useState(0);
+  const [kbRowsPerPage, setKbRowsPerPage] = useState(10);
   const [kbUploading, setKbUploading] = useState(false);
   const [kbDeleting, setKbDeleting] = useState(false);
+  const [kbLoading, setKbLoading] = useState(false);
   const [kbTimeOrder, setKbTimeOrder] = useState<TimeSortOrder>('desc');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
-  const kbRowsSorted = useMemo(
-    () => sortByTime(rows, (r) => r.created_at, kbTimeOrder),
-    [rows, kbTimeOrder]
-  );
-
-  const allSelected = kbRowsSorted.length > 0 && kbRowsSorted.every((r) => selectedIds.has(r.public_id));
+  const allSelected = rows.length > 0 && rows.every((r) => selectedIds.has(r.public_id));
   const someSelected = selectedIds.size > 0;
 
   const load = useCallback(async () => {
+    setKbLoading(true);
     try {
-      const list = await kbListFiles();
-      setRows(list);
+      const res = await kbListFiles({
+        page: kbPage + 1,
+        pageSize: kbRowsPerPage,
+        order: kbTimeOrder,
+      });
+      const items = res.items.filter((r) => !isPipelineKbArtifactName(r.original_name));
+      setRows(items);
+      setKbTotal(res.total);
       setSelectedIds((prev) => {
         const next = new Set<string>();
         for (const id of prev) {
-          if (list.some((r) => r.public_id === id)) next.add(id);
+          if (items.some((r) => r.public_id === id)) next.add(id);
         }
         return next;
       });
     } catch (e) {
       onNotify({ severity: 'error', text: formatError(e) });
+    } finally {
+      setKbLoading(false);
     }
-  }, [onNotify]);
+  }, [onNotify, kbPage, kbRowsPerPage, kbTimeOrder]);
 
   useEffect(() => {
     load();
@@ -1764,7 +1774,7 @@ function KbPanel({ onNotify }: PanelProps) {
       setSelectedIds(new Set());
       return;
     }
-    setSelectedIds(new Set(kbRowsSorted.map((r) => r.public_id)));
+    setSelectedIds(new Set(rows.map((r) => r.public_id)));
   };
 
   const deleteSelected = async () => {
@@ -1823,7 +1833,9 @@ function KbPanel({ onNotify }: PanelProps) {
         severity: 'success',
         text: `Indexed “${file.name}” · ${r.chunk_count} chunks`,
       });
+      setKbPage(0);
       await load();
+      setKbPage(0);
     } catch (e) {
       onNotify({ severity: 'error', text: formatError(e) });
     } finally {
@@ -1834,25 +1846,26 @@ function KbPanel({ onNotify }: PanelProps) {
   return (
     <Stack spacing={2}>
       <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-        <Button variant="contained" component="label" disabled={kbUploading || kbDeleting}>
+        <Button variant="contained" component="label" disabled={kbUploading || kbDeleting || kbLoading}>
           {kbUploading ? 'Uploading…' : 'Upload KB document'}
-          <input type="file" hidden onChange={onUpload} disabled={kbUploading || kbDeleting} />
+          <input type="file" hidden onChange={onUpload} disabled={kbUploading || kbDeleting || kbLoading} />
         </Button>
-        <Button onClick={load} disabled={kbUploading || kbDeleting}>
+        <Button onClick={() => void load()} disabled={kbUploading || kbDeleting || kbLoading}>
           Refresh KB list
         </Button>
         <Button
           color="error"
           variant="outlined"
-          disabled={!someSelected || kbUploading || kbDeleting}
+          disabled={!someSelected || kbUploading || kbDeleting || kbLoading}
           onClick={() => void deleteSelected()}
         >
           {kbDeleting ? 'Deleting…' : `Delete selected${someSelected ? ` (${selectedIds.size})` : ''}`}
         </Button>
-        {(kbUploading || kbDeleting) && (
-          <CircularProgress size={22} aria-label={kbUploading ? 'Uploading document' : 'Deleting documents'} />
+        {(kbUploading || kbDeleting || kbLoading) && (
+          <CircularProgress size={22} aria-label={kbUploading ? 'Uploading document' : kbDeleting ? 'Deleting documents' : 'Loading documents'} />
         )}
       </Stack>
+      <TableContainer component={Paper} variant="outlined">
       <Table size="small">
         <TableHead>
           <TableRow>
@@ -1861,29 +1874,46 @@ function KbPanel({ onNotify }: PanelProps) {
                 size="small"
                 checked={allSelected}
                 indeterminate={someSelected && !allSelected}
-                disabled={kbRowsSorted.length === 0 || kbDeleting}
+                disabled={rows.length === 0 || kbDeleting || kbLoading}
                 onChange={toggleAll}
-                inputProps={{ 'aria-label': 'Select all knowledge files' }}
+                inputProps={{ 'aria-label': 'Select all knowledge files on this page' }}
               />
             </TableCell>
             <TableCell>File name</TableCell>
             <TableCell>Chunks</TableCell>
             <TableCell>Embedding</TableCell>
-            <TimeSortHeadCell label="Indexed" order={kbTimeOrder} onOrderChange={setKbTimeOrder} />
+            <TimeSortHeadCell
+              label="Indexed"
+              order={kbTimeOrder}
+              onOrderChange={(next) => {
+                setKbTimeOrder(next);
+                setKbPage(0);
+              }}
+            />
             <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {kbRowsSorted.length === 0 && (
+          {!kbLoading && rows.length === 0 && (
             <TableRow>
               <TableCell colSpan={6}>
                 <Typography variant="body2" color="text.secondary">
-                  No knowledge documents yet. Upload a file to index it for RAG.
+                  No knowledge documents yet. Upload a PDF, TXT, MD, or JSON guide to index it for RAG.
                 </Typography>
               </TableCell>
             </TableRow>
           )}
-          {kbRowsSorted.map((r) => {
+          {kbLoading && (
+            <TableRow>
+              <TableCell colSpan={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Loading knowledge documents…
+                </Typography>
+              </TableCell>
+            </TableRow>
+          )}
+          {!kbLoading &&
+            rows.map((r) => {
             const displayName = r.original_name?.trim() || 'Untitled document';
             return (
               <TableRow key={r.public_id} hover selected={selectedIds.has(r.public_id)}>
@@ -1946,10 +1976,25 @@ function KbPanel({ onNotify }: PanelProps) {
           })}
         </TableBody>
       </Table>
+      <TablePagination
+        component="div"
+        count={kbTotal}
+        page={kbPage}
+        onPageChange={(_, p) => setKbPage(p)}
+        rowsPerPage={kbRowsPerPage}
+        onRowsPerPageChange={(e) => {
+          setKbRowsPerPage(parseInt(e.target.value, 10));
+          setKbPage(0);
+        }}
+        rowsPerPageOptions={[5, 10, 25, 50]}
+        sx={{ minHeight: 44, '& .MuiTablePagination-toolbar': { minHeight: 44, pl: 1 } }}
+      />
+      </TableContainer>
 
       <Alert severity="info" variant="outlined">
-        RAG templates, multi-query retrieval, and KB LLM synthesis live under <strong>RAG prep</strong>. Upload and curate
-        documents here on <strong>Knowledge</strong>. Select one or more rows to remove old indexed files.
+        Only uploaded guides (PDF, TXT, MD, JSON) appear here. Pipeline run files such as{' '}
+        <code>traffic_run_*.json</code> are not knowledge and are excluded automatically. RAG prep and multi-query retrieval
+        live under <strong>RAG prep</strong>.
       </Alert>
     </Stack>
   );
