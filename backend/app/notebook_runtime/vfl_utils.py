@@ -10,9 +10,11 @@ This module contains:
 """
 
 import json
+import random
 import re
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 
 def _attack_options_path() -> Path:
@@ -55,13 +57,51 @@ def load_attack_actions_by_type() -> dict[str, tuple[str, ...]]:
     return out
 
 
+def not_allowed_actions_for_type(attack_type: str | None) -> tuple[str, ...]:
+    """Actions used by other classes but not on this class's whitelist."""
+    # REVIEW: Off-whitelist pool for --tamper threat A (illegal for this class).
+    by_type = load_attack_actions_by_type()
+    key = str(attack_type or "").upper()
+    allowed = {a.strip().lower() for a in by_type.get(key, ()) if str(a).strip()}
+    out: list[str] = []
+    seen: set[str] = set()
+    for other_key, actions in by_type.items():
+        if other_key == key:
+            continue
+        for candidate in actions:
+            label = str(candidate).strip()
+            cnorm = label.lower()
+            if not cnorm or cnorm in allowed or cnorm in seen:
+                continue
+            seen.add(cnorm)
+            out.append(label)
+    return tuple(out)
+
+
+def pick_disallowed_action(
+    attack_type: str | None,
+    *,
+    exclude: frozenset[str] | None = None,
+    rng: Any = None,
+) -> str | None:
+    """Random action that is not whitelisted for attack_type."""
+    # REVIEW: --tamper threat A: labels that exist for other classes, illegal for this class.
+    blocked = {x.strip().lower() for x in (exclude or frozenset()) if str(x).strip()}
+    pool = [a for a in not_allowed_actions_for_type(attack_type) if a.strip().lower() not in blocked]
+    if not pool:
+        return None
+    picker = rng if rng is not None else random
+    return picker.choice(pool)
+
+
 def pick_allowed_alternate_action(
     planned_action: str,
     attack_type: str | None,
     *,
     exclude: frozenset[str] | None = None,
+    rng: Any = None,
 ) -> str | None:
-    """First whitelisted action for attack_type that differs from planned (case-insensitive)."""
+    """Whitelisted action for attack_type that differs from planned (case-insensitive)."""
     planned_norm = str(planned_action or "").strip().lower()
     if not planned_norm:
         return None
@@ -70,7 +110,16 @@ def pick_allowed_alternate_action(
         blocked |= {x.strip().lower() for x in exclude if str(x).strip()}
 
     by_type = load_attack_actions_by_type()
-    search_types = [str(attack_type or "").upper(), "OTHERS"]
+    key = str(attack_type or "").upper()
+    class_pool = [c for c in by_type.get(key, ()) if str(c).strip().lower() not in blocked]
+    # REVIEW: With an RNG (batch --tamper), stay on this class whitelist so plan-drift
+    # is refused at Gate 2, not accidentally drawn from another class (Gate 1).
+    if rng is not None:
+        if not class_pool:
+            return None
+        return rng.choice(class_pool)
+
+    search_types = [key, "OTHERS"]
     seen_types: set[str] = set()
     for atk in search_types:
         if not atk or atk in seen_types:

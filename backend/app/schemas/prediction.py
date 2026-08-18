@@ -238,6 +238,11 @@ class TrustAnchorVerifyOut(BaseModel):
         description="valid: chain+payload both OK when both checkable; invalid: any failed check; "
         "unknown: could not reach chain or read file; anchor_failed: no successful anchor tx."
     )
+    # REVIEW: Chain verify latency for Trust Anchor UI / batch latency.json (getCommitment only).
+    verify_ms: float | None = Field(
+        default=None,
+        description="Wall-clock ms for getCommitment RPC (chain verify).",
+    )
 
 
 class ApplyAgenticActionRequest(BaseModel):
@@ -308,3 +313,5 @@ class ExecutionReportDetailOut(BaseModel):
     error_reason: str | None = None
     error_detail: str | None = None
     created_at: datetime
+    # REVIEW: Copied from getCommitment RPC; also stored on actions_chain_json.verify_ms.
+    verify_ms: float | None = None

@@ -177,7 +177,7 @@ def persist_agentic_report_from_decision(
                 rag_context_used=row.rag_context_used,
                 structured_plan=structured_plan,
             )
-            tx_hash, contract_addr, agent_key_sha, report_key_sha = (
+            tx_hash, contract_addr, agent_key_sha, report_key_sha, anchor_ms = (
                 trust_chain_service.anchor_report_commitment_on_chain(
                     settings=settings,
                     agentic_job_public_id=agentic_job_public_id,
@@ -185,6 +185,9 @@ def persist_agentic_report_from_decision(
                     commitment_sha256_hex=commitment,
                 )
             )
+            # REVIEW: Persist anchor RPC ms on the report file so GET / latency reports can copy it.
+            payload["chain_timing"] = {"anchor_ms": anchor_ms}
+            report_abs.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
             anchor = AgenticReportTrustAnchor(
                 agentic_report_id=row.id,
                 chain_id=settings.trust_chain_chain_id,
@@ -294,6 +297,20 @@ def agentic_report_out(db: Session, row: AgenticReport) -> AgenticReportOut:
             "anchored_at": anchor.anchored_at.isoformat() if anchor.anchored_at else None,
             "error": anchor.error,
         }
+        try:
+            from app.core.config import get_settings
+
+            settings = get_settings()
+            if row.report_path:
+                path = settings.storage_root / row.report_path
+                if path.is_file():
+                    data = json.loads(path.read_text(encoding="utf-8"))
+                    timing = data.get("chain_timing") if isinstance(data, dict) else None
+                    # REVIEW: Expose stored anchor_ms on GET report for attack_monitor latency.json.
+                    if isinstance(timing, dict) and timing.get("anchor_ms") is not None:
+                        anchor_out["anchor_ms"] = timing.get("anchor_ms")
+        except Exception:
+            pass
     exec_out = None
     if exec_row:
         chain_summary = _chain_action_summary(exec_row.actions_chain_json)
@@ -439,13 +456,14 @@ def verify_trust_anchor_row(db: Session, settings: Settings, anchor_id: int) -> 
     chain_valid: bool | None = None
     chain_detail: str | None = None
     on_chain_hex: str | None = None
+    verify_ms: float | None = None
 
     payload_valid: bool | None = None
     payload_detail: str | None = None
     recomputed: str | None = None
 
     if not anchor_failed and anchor.contract_address.strip():
-        rpc_ok, oc_hex, err = trust_chain_service.read_commitment_from_chain(
+        rpc_ok, oc_hex, err, verify_ms = trust_chain_service.read_commitment_from_chain(
             settings,
             contract_address=anchor.contract_address,
             agent_key_sha256_hex=anchor.agent_key_sha256,
@@ -548,6 +566,7 @@ def verify_trust_anchor_row(db: Session, settings: Settings, anchor_id: int) -> 
         payload_integrity_valid=payload_valid,
         payload_integrity_detail=payload_detail,
         overall_integrity=overall_lit,
+        verify_ms=verify_ms,
     )
 
 
@@ -660,13 +679,11 @@ def _build_chain_action_items(
             "network_tier": str(action_item.get("network_tier") or ""),
             "result": "skipped",
         }
+        # REVIEW: Gate order is whitelist then plan-binding so off-list tampers
+        # count as action_not_whitelisted, not action_plan_mismatch.
         if planned_action and str(planned_action) != action:
             item["planned_action"] = str(planned_action)
             item["action_modified_before_apply"] = True
-            item["result"] = "failed"
-            item["failure_reason"] = "action_plan_mismatch"
-            items.append(item)
-            continue
         if not attack_type:
             item["failure_reason"] = "missing_attack_type"
             items.append(item)
@@ -686,6 +703,12 @@ def _build_chain_action_items(
             item["failure_reason"] = (
                 "action_not_whitelisted" if allowed is False else "whitelist_unavailable"
             )
+            items.append(item)
+            continue
+
+        if planned_action and str(planned_action) != action:
+            item["result"] = "failed"
+            item["failure_reason"] = "action_plan_mismatch"
             items.append(item)
             continue
 
@@ -712,6 +735,16 @@ def _build_chain_action_items(
                 item["apply_error"] = apply_err
         items.append(item)
     return {"attack_type": attack_type, "items": items}
+
+
+def _attach_verify_ms(chain_action_json: Any, verify: Any) -> None:
+    """Copy getCommitment RPC ms onto the chain JSON returned to apply clients."""
+    # REVIEW: Latency report reads verify_ms from apply JSON / actions_chain_json.
+    if not isinstance(chain_action_json, dict) or verify is None:
+        return
+    ms = getattr(verify, "verify_ms", None)
+    if ms is not None:
+        chain_action_json["verify_ms"] = ms
 
 
 def _chain_items_all_success(chain_action_json: Any) -> bool:
@@ -910,6 +943,7 @@ def apply_agentic_report_action(
     )
     if isinstance(chain_action_json.get("items"), list) and chain_action_json["items"]:
         chain_action_json["items"][0]["index"] = action_index
+    _attach_verify_ms(chain_action_json, verify)
 
     per_items = _per_action_items_from_exec_json(existing.actions_core_json if existing else None)
 
@@ -953,6 +987,7 @@ def apply_agentic_report_action(
             error_reason=out.error_reason,
             error_detail=out.error_detail,
             created_at=out.created_at,
+            verify_ms=getattr(verify, "verify_ms", None) if verify else None,
         )
 
     action_item = flat[action_index]
@@ -1017,6 +1052,7 @@ def apply_agentic_report_action(
         error_reason=out.error_reason,
         error_detail=out.error_detail,
         created_at=out.created_at,
+        verify_ms=getattr(verify, "verify_ms", None) if verify else None,
     )
 
 
@@ -1131,6 +1167,7 @@ def apply_agentic_report(
         agentic_report_public_id=report.public_id,
         integrity_valid=apply_ok,
     )
+    _attach_verify_ms(chain_action_json, verify)
 
     chain_ok = verify.chain_integrity_valid if verify else None
     payload_ok = verify.payload_integrity_valid if verify else None
@@ -1174,6 +1211,7 @@ def apply_agentic_report(
             error_reason=out.error_reason,
             error_detail=out.error_detail,
             created_at=out.created_at,
+            verify_ms=getattr(verify, "verify_ms", None) if verify else None,
         )
 
     from datetime import datetime, timezone
@@ -1223,6 +1261,7 @@ def apply_agentic_report(
         error_reason=out.error_reason,
         error_detail=out.error_detail,
         created_at=out.created_at,
+        verify_ms=getattr(verify, "verify_ms", None) if verify else None,
     )
 
 

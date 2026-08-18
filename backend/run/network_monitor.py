@@ -6,9 +6,9 @@ and optionally apply detection actions on-chain.
 Requires the API server to be running and at least one trained model in the database.
 
 Usage (from backend/):
-  python run/monitor_flow_demo.py
-  python run/monitor_flow_demo.py --mode simple --apply
-  python run/file_batch_demo.py
+  python run/network_monitor.py
+  python run/network_monitor.py --mode simple --apply
+  python run/attack_monitor.py
 
 See run/README.md for full instructions.
 """
@@ -22,6 +22,8 @@ import uuid
 from typing import Any
 
 import httpx
+
+# REVIEW: This script is run/network_monitor.py (renamed from network_monitorpy).
 
 # Full VFL feature row (includes trailing ground-truth label for traffic/header modes).
 SAMPLE_ROW_WITH_LABEL = (
