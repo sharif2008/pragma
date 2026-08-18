@@ -10,7 +10,7 @@ from typing import Any
 
 import numpy as np
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import Settings
@@ -42,6 +42,20 @@ def is_pipeline_run_artifact_name(name: str | None) -> bool:
     """True for auto-generated run files that must not live in the knowledge base."""
     n = Path(name or "").name.lower()
     return n.startswith(_PIPELINE_ARTIFACT_PREFIXES) or any(m in n for m in _PIPELINE_ARTIFACT_MARKERS)
+
+
+def _artifact_managed_file_predicate():
+    """SQLAlchemy filter: managed file names/paths that are pipeline run artifacts."""
+    parts = []
+    for prefix in _PIPELINE_ARTIFACT_PREFIXES:
+        pat = prefix.lower()
+        parts.append(func.lower(ManagedFile.original_name).like(f"{pat}%"))
+        parts.append(func.lower(ManagedFile.storage_path).like(f"%{pat}%"))
+    for marker in _PIPELINE_ARTIFACT_MARKERS:
+        pat = marker.lower()
+        parts.append(func.lower(ManagedFile.original_name).like(f"%{pat}%"))
+        parts.append(func.lower(ManagedFile.storage_path).like(f"%{pat}%"))
+    return or_(*parts)
 
 
 async def ingest_kb_document(
@@ -77,33 +91,92 @@ async def ingest_kb_document(
     return kb
 
 
-def list_kb_files(db: Session) -> list[dict[str, Any]]:
+def _kb_row_to_dict(kb: KnowledgeBaseFile) -> dict[str, Any]:
+    mf = kb.managed_file
+    return {
+        "id": kb.id,
+        "public_id": kb.public_id,
+        "managed_file_id": kb.managed_file_id,
+        "vector_index_dir": kb.vector_index_dir,
+        "chunk_count": kb.chunk_count,
+        "embedding_model": kb.embedding_model,
+        "created_at": kb.created_at,
+        "original_name": mf.original_name if mf else None,
+        "managed_file_public_id": mf.public_id if mf else None,
+    }
+
+
+def list_kb_files(db: Session, settings: Settings) -> list[dict[str, Any]]:
+    """Return all uploaded knowledge documents (excludes pipeline run artifacts)."""
+    page = list_kb_files_page(
+        db,
+        settings,
+        page=1,
+        page_size=10_000,
+        order="desc",
+        auto_purge_artifacts=False,
+    )
+    return list(page["items"])
+
+
+def list_kb_files_page(
+    db: Session,
+    settings: Settings,
+    *,
+    page: int = 1,
+    page_size: int = 10,
+    order: str = "desc",
+    auto_purge_artifacts: bool = True,
+) -> dict[str, Any]:
+    """Paginated knowledge list — only user-uploaded documents, never traffic-run JSON."""
+    page = max(1, int(page))
+    page_size = min(max(1, int(page_size)), 100)
+    order_norm = "asc" if str(order or "").strip().lower() == "asc" else "desc"
+
+    artifact_pred = _artifact_managed_file_predicate()
+    if auto_purge_artifacts:
+        has_artifacts = db.scalar(
+            select(func.count(KnowledgeBaseFile.id))
+            .join(ManagedFile, KnowledgeBaseFile.managed_file_id == ManagedFile.id)
+            .where(artifact_pred)
+        )
+        if has_artifacts:
+            purge_pipeline_run_kb_artifacts(db, settings)
+
+    total = (
+        db.scalar(
+            select(func.count(KnowledgeBaseFile.id))
+            .join(ManagedFile, KnowledgeBaseFile.managed_file_id == ManagedFile.id)
+            .where(~artifact_pred)
+        )
+        or 0
+    )
+    order_clause = (
+        KnowledgeBaseFile.created_at.asc()
+        if order_norm == "asc"
+        else KnowledgeBaseFile.created_at.desc()
+    )
     rows = list(
         db.scalars(
             select(KnowledgeBaseFile)
+            .join(ManagedFile, KnowledgeBaseFile.managed_file_id == ManagedFile.id)
             .options(joinedload(KnowledgeBaseFile.managed_file))
-            .order_by(KnowledgeBaseFile.created_at.desc())
-        ).unique().all()
-    )
-    out: list[dict[str, Any]] = []
-    for kb in rows:
-        if _kb_is_pipeline_artifact(kb):
-            continue
-        mf = kb.managed_file
-        out.append(
-            {
-                "id": kb.id,
-                "public_id": kb.public_id,
-                "managed_file_id": kb.managed_file_id,
-                "vector_index_dir": kb.vector_index_dir,
-                "chunk_count": kb.chunk_count,
-                "embedding_model": kb.embedding_model,
-                "created_at": kb.created_at,
-                "original_name": mf.original_name if mf else None,
-                "managed_file_public_id": mf.public_id if mf else None,
-            }
+            .where(~artifact_pred)
+            .order_by(order_clause)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
         )
-    return out
+        .unique()
+        .all()
+    )
+    total_pages = max(1, (total + page_size - 1) // page_size) if total else 0
+    return {
+        "items": [_kb_row_to_dict(kb) for kb in rows],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": total_pages,
+    }
 
 
 def get_kb(db: Session, public_id: str) -> KnowledgeBaseFile:

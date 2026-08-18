@@ -18,6 +18,7 @@ from app.schemas.kb import (
     KBQueryResponse,
     KBUploadResponse,
     KBRAGLatestPredictionResponse,
+    KnowledgeFileListResponse,
     KnowledgeFileOut,
     RAGLLMRequest,
     RAGLLMResponse,
@@ -43,9 +44,28 @@ async def kb_upload(
     )
 
 
-@router.get("/files", response_model=list[KnowledgeFileOut])
-def kb_list(db: Annotated[Session, Depends(get_db)]) -> list[KnowledgeFileOut]:
-    return [KnowledgeFileOut.model_validate(row) for row in kb_service.list_kb_files(db)]
+@router.get("/files", response_model=KnowledgeFileListResponse)
+def kb_list(
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    page: int = Query(default=1, ge=1, description="Page number (1-based)."),
+    page_size: int = Query(default=10, ge=1, le=100, description="Rows per page."),
+    order: str = Query(default="desc", description="Sort by indexed time: asc or desc."),
+) -> KnowledgeFileListResponse:
+    data = kb_service.list_kb_files_page(
+        db,
+        settings,
+        page=page,
+        page_size=page_size,
+        order=order,
+    )
+    return KnowledgeFileListResponse(
+        items=[KnowledgeFileOut.model_validate(row) for row in data["items"]],
+        total=data["total"],
+        page=data["page"],
+        page_size=data["page_size"],
+        total_pages=data["total_pages"],
+    )
 
 
 @router.delete("/{public_id}", status_code=204)

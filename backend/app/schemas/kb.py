@@ -20,6 +20,14 @@ class KnowledgeFileOut(ORMModel):
     managed_file_public_id: str | None = Field(default=None, description="Managed file UUID.")
 
 
+class KnowledgeFileListResponse(BaseModel):
+    items: list[KnowledgeFileOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 class KBUploadResponse(ORMModel):
     kb_public_id: str
     managed_file_public_id: str
