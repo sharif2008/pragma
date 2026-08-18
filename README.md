@@ -16,8 +16,8 @@ This codebase (**ChainAgentVFL**) implements the same conceptual stack—**block
 
 To address accountability, PRAGMA includes a **blockchain trust layer** implemented as **hash-only anchoring**: after an agentic report is produced and persisted, the backend computes a deterministic SHA-256 commitment over a canonical JSON payload and anchors only the resulting `bytes32` digest on an Ethereum smart contract. Before applying any report-derived actions, the backend verifies the on-chain commitment against the database record and the saved report artifact; execution is blocked if integrity verification fails.
 
-<video src="assets/Pragma%20demo.webm" width="100%" controls playsinline>
-  <a href="assets/Pragma%20demo.webm">Watch the PRAGMA demo (Detect → Reason → Commit → Apply)</a>
+<video src="assets/pragma-demo.webm" width="100%" controls playsinline>
+  <a href="assets/pragma-demo.webm">Watch the PRAGMA demo (Detect → Reason → Commit → Apply)</a>
 </video>
 
 ## Overview
