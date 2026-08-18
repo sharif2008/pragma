@@ -17,16 +17,6 @@ import { getRun, listRuns, getRunEvents, listRunEvents } from './runs.service';
 import { agentDecide, getAgentReport, listAgentReports } from './agent.service';
 import { listDatasets, deleteDataset, uploadDataset, getDatasetPreview } from './datasets.service';
 import {
-  listModels,
-  deleteModel,
-  getTraining,
-  startTraining,
-  getTrainingJob,
-  rebuildTraining,
-  listTrainingJobs,
-  deleteTrainingJob,
-} from './training.service';
-import {
   kbList,
   kbQuery,
   kbDelete,
@@ -37,6 +27,17 @@ import {
   kbLlmShapRetrievalQuery,
   kbRagTemplatesLatestPrediction,
 } from './kb.service';
+import {
+  listModels,
+  deleteModel,
+  getTraining,
+  startTraining,
+  getTrainingJob,
+  rebuildTraining,
+  listTrainingJobs,
+  deleteTrainingJob,
+  updateModelDisplayName,
+} from './training.service';
 import {
   getPrediction,
   startPrediction,
@@ -68,6 +69,7 @@ export const api = {
   deleteTrainingJob,
   listModels,
   deleteModel,
+  updateModelDisplayName,
   uploadPredictionInput,
   listPredictionInputs,
   uploadPredictionCsv,

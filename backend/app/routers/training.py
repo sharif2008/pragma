@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.models.domain import JobStatus
 from app.schemas.training import (
     ModelVersionOut,
+    ModelVersionUpdate,
     TrainingJobOut,
     TrainingRebuildRequest,
     TrainingStartRequest,
@@ -96,6 +97,16 @@ models_router = APIRouter(prefix="/models", tags=["models"])
 @models_router.get("", response_model=list[ModelVersionOut])
 def list_models(db: Annotated[Session, Depends(get_db)]) -> list[ModelVersionOut]:
     return training_service.list_models(db)
+
+
+@models_router.patch("/{public_id}", response_model=ModelVersionOut)
+def update_model(
+    public_id: str,
+    body: ModelVersionUpdate,
+    db: Annotated[Session, Depends(get_db)],
+) -> ModelVersionOut:
+    """Set or clear the friendly display name for a registered model."""
+    return training_service.update_model_display_name(db, public_id, body.display_name)
 
 
 @models_router.delete("/{public_id}", status_code=204)

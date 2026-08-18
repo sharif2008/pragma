@@ -33,6 +33,63 @@ def _preview(text: str | None, n: int = 220) -> str | None:
     return s[:n]
 
 
+def _recommended_action_from_final(final_actions: Any) -> str | None:
+    if isinstance(final_actions, list) and final_actions:
+        first = final_actions[0]
+        if isinstance(first, dict):
+            rec = first.get("recommended_action")
+            if rec and str(rec).strip():
+                return str(rec).strip()
+    if isinstance(final_actions, dict):
+        rec = final_actions.get("recommended_action")
+        if rec and str(rec).strip():
+            return str(rec).strip()
+    return None
+
+
+def format_run_message_preview(
+    *,
+    predictions_json: dict[str, Any] | None,
+    final_actions: Any = None,
+    fallback: str | None = None,
+) -> str | None:
+    """Build a human-readable monitor message from prediction + agentic results."""
+    preds = predictions_json if isinstance(predictions_json, dict) else {}
+    label = preds.get("predicted_label")
+    parts: list[str] = []
+    if label and str(label).strip():
+        parts.append(str(label).strip())
+    if label:
+        conf = preds.get("max_class_probability")
+        if conf is None:
+            conf = preds.get("confidence")
+        if conf is not None:
+            try:
+                parts.append(f"{float(conf):.0%}")
+            except (TypeError, ValueError):
+                pass
+        if preds.get("flagged_attack_or_anomaly") is True:
+            parts.append("flagged")
+    rec = _recommended_action_from_final(final_actions)
+    if rec:
+        parts.append(f"-> {rec}")
+    if parts:
+        return _preview(" · ".join(parts), 220)
+    return _preview(fallback, 220) if fallback else None
+
+
+def display_message_preview(row: AgentRun) -> str | None:
+    """Message shown in monitor list — prefer prediction summary over ingest placeholder."""
+    derived = format_run_message_preview(
+        predictions_json=row.predictions_json if isinstance(row.predictions_json, dict) else None,
+        final_actions=row.final_actions,
+        fallback=row.message_preview,
+    )
+    if derived:
+        return derived
+    return row.message_preview
+
+
 def get_run_by_id(db: Session, run_id: str) -> AgentRun | None:
     return db.scalar(select(AgentRun).where(AgentRun.run_id == run_id))
 
@@ -128,6 +185,7 @@ def update_run(
     predicted_shape_constraints: dict[str, Any] | None = None,
     rag_json: dict[str, Any] | None = None,
     final_actions: list[dict[str, Any]] | dict[str, Any] | None = None,
+    message_preview: str | None = None,
     error_summary: str | None = None,
     duration_ms: int | None = None,
     completed_at: datetime | None = None,
@@ -148,6 +206,8 @@ def update_run(
         row.rag_json = rag_json
     if final_actions is not None:
         row.final_actions = final_actions
+    if message_preview is not None:
+        row.message_preview = _preview(message_preview, 220)
     if error_summary is not None:
         row.error_summary = error_summary
     if duration_ms is not None:

@@ -101,3 +101,9 @@ backend/storage/training_datasets/**
 
 # Backend file logs
 backend/logs/
+
+# Batch demo run artifacts (ledger/report JSON per run)
+backend/run/output/
+
+# HuggingFace cache / local screenshots (not repo docs)
+backend/storage/hf_home/

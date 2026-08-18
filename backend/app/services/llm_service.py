@@ -12,6 +12,7 @@ from app.services.agentic_llm_prompt import (
     build_agentic_decide_user_prompt,
     summarize_plan_for_db,
 )
+from app.services.network_domains import rewrite_plan_network_tiers
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ def _mock_decision_orchestration(
         "primary_actions": [
             {
                 "action": "monitor",
-                "network_tier": "Core",
+                "network_tier": "Endpoint / EDR",
                 "party_evidence_type": "mock",
                 "reasoning": "OpenAI API key not set; deterministic stub.",
             }
@@ -59,6 +60,7 @@ def _mock_decision_orchestration(
         "execution_priority": "Standard",
         "knowledge_sources_used": ["mock"],
     }
+    plan = rewrite_plan_network_tiers(plan)
     raw = json.dumps(plan, indent=2, ensure_ascii=False)
     summary, rec = summarize_plan_for_db(plan, raw)
     return {
@@ -66,6 +68,7 @@ def _mock_decision_orchestration(
         "recommended_action": rec,
         "raw_llm_response": raw,
         "rag_context_used": (rag_context[:12000] if use_rag and rag_context else None),
+        "structured_plan": plan,
     }
 
 
@@ -134,13 +137,17 @@ async def agent_decide(
             "primary_actions": [],
             "supporting_actions": [],
         }
-    summary, rec = summarize_plan_for_db(parsed, content)
+    parsed = rewrite_plan_network_tiers(parsed)
+    # Prefer rewritten JSON in stored raw so UI Details does not show legacy tier keys.
+    content_out = json.dumps(parsed, indent=2, ensure_ascii=False)
+    summary, rec = summarize_plan_for_db(parsed, content_out)
     rag_used = rag_context[:12000] if use_rag and rag_context else None
     return {
         "summary": summary,
         "recommended_action": rec,
-        "raw_llm_response": content[:65000] if len(content) > 65000 else content,
+        "raw_llm_response": content_out[:65000] if len(content_out) > 65000 else content_out,
         "rag_context_used": rag_used,
+        "structured_plan": parsed,
     }
 
 

@@ -4,6 +4,8 @@ import type {
   ModelVersionOut,
   AgenticReportOut,
   PredictionJobOut,
+  ExecutionReportDetailOut,
+  ExecutionReportSummaryOut,
 } from 'src/api/types';
 
 import { varAlpha } from 'minimal-shared/utils';
@@ -30,9 +32,13 @@ import CircularProgress from '@mui/material/CircularProgress';
 
 import { sortByTime, type TimeSortOrder } from 'src/utils/table-time-sort';
 
-import { api, ApiError } from 'src/services';
+import { api, ApiError, getExecutionReport } from 'src/services';
 
 import { TimeSortHeadCell } from 'src/components/table-sort/time-sort-head-cell';
+import {
+  ExecutionChainSummary,
+  ExecutionChainResultsList,
+} from 'src/components/agentic/execution-chain-results';
 
 // ----------------------------------------------------------------------
 
@@ -393,6 +399,7 @@ function pickPredictionResultsRow(
 export function useAgentReportDetailLoad(publicId: string | null | undefined) {
   const [report, setReport] = useState<AgenticReportOut | null>(null);
   const [predJob, setPredJob] = useState<PredictionJobOut | null>(null);
+  const [execDetail, setExecDetail] = useState<ExecutionReportDetailOut | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -401,6 +408,7 @@ export function useAgentReportDetailLoad(publicId: string | null | undefined) {
     if (!id) {
       setReport(null);
       setPredJob(null);
+      setExecDetail(null);
       setError('');
       setLoading(false);
       return;
@@ -409,9 +417,18 @@ export function useAgentReportDetailLoad(publicId: string | null | undefined) {
     setError('');
     setReport(null);
     setPredJob(null);
+    setExecDetail(null);
     try {
       const r = await api.getAgentReport(id);
       setReport(r);
+      const ex = r.execution_report;
+      if (ex && typeof ex === 'object' && typeof ex.id === 'number') {
+        try {
+          setExecDetail(await getExecutionReport(ex.id));
+        } catch {
+          setExecDetail(null);
+        }
+      }
       const pid = r.prediction_job_public_id?.trim();
       if (pid) {
         try {
@@ -432,7 +449,7 @@ export function useAgentReportDetailLoad(publicId: string | null | undefined) {
     void load();
   }, [load]);
 
-  return { report, predJob, loading, error, reload: load };
+  return { report, predJob, execDetail, loading, error, reload: load };
 }
 
 export type AgentReportDetailContentProps = {
@@ -440,6 +457,7 @@ export type AgentReportDetailContentProps = {
   error: string;
   report: AgenticReportOut | null;
   predJob: PredictionJobOut | null;
+  execDetail?: ExecutionReportDetailOut | null;
   publicId: string | null;
 };
 
@@ -449,6 +467,7 @@ export function AgentReportDetailContent({
   error,
   report,
   predJob,
+  execDetail = null,
   publicId,
 }: AgentReportDetailContentProps) {
   const [tab, setTab] = useState<
@@ -489,6 +508,10 @@ export function AgentReportDetailContent({
       : null;
 
   const resultsRow = pickPredictionResultsRow(predJob, report.results_row_index);
+  const execSummary: ExecutionReportSummaryOut | null =
+    report.execution_report && typeof report.execution_report === 'object'
+      ? (report.execution_report as ExecutionReportSummaryOut)
+      : null;
 
   return (
     <>
@@ -528,6 +551,17 @@ export function AgentReportDetailContent({
                   </Typography>
                 </Box>
                 <DetailRow label="Recommended action" value={report.recommended_action} mono />
+                {execSummary ? (
+                  <>
+                    <DetailRow label="Execution status" value={execSummary.status ?? '—'} />
+                    <DetailRow label="Attack type" value={execSummary.attack_type ?? '—'} />
+                    <DetailRow
+                      label="Chain actions"
+                      value={`${execSummary.chain_actions_applied ?? 0}/${execSummary.chain_actions_total ?? 0} applied on-chain · ${execSummary.chain_actions_whitelisted ?? 0} whitelisted`}
+                    />
+                    {execDetail ? <ExecutionChainSummary exec={execDetail} /> : null}
+                  </>
+                ) : null}
                 <DetailRow label="Report file" value={report.report_path} mono />
                 {trustChainBlock && (
                   <Box>
@@ -706,9 +740,25 @@ export function AgentReportDetailContent({
             {tab === 'actions' && (
               <Stack spacing={1.25}>
                 <Typography variant="body2" color="text.secondary">
-                  Primary / supporting actions from the structured orchestration output (subset), then full plan if
-                  needed.
+                  Primary / supporting actions from the structured orchestration output, plus on-chain apply
+                  results when an execution report exists.
                 </Typography>
+                {execDetail ? (
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.75 }}>
+                      On-chain apply results
+                    </Typography>
+                    <ExecutionChainResultsList exec={execDetail} execApplied={execDetail.status === 'applied'} />
+                  </Box>
+                ) : execSummary ? (
+                  <Alert severity="info">
+                    Execution summary: {execSummary.status}
+                    {execSummary.attack_type ? ` · attack ${execSummary.attack_type}` : ''}
+                    {typeof execSummary.chain_actions_total === 'number'
+                      ? ` · ${execSummary.chain_actions_applied ?? 0}/${execSummary.chain_actions_total} applied`
+                      : ''}
+                  </Alert>
+                ) : null}
                 {!structuredPlan && (
                   <Alert severity="info">
                     No <code>structured_plan</code> on this report — check the LLM tab for a raw JSON body, or run a
@@ -756,7 +806,7 @@ export function AgentReportDetailContent({
 
 export function AgentReportDetailDialog({ open, publicId, onClose }: AgentReportDetailDialogProps) {
   const effectiveId = open ? publicId : null;
-  const { report, predJob, loading, error, reload } = useAgentReportDetailLoad(effectiveId);
+  const { report, predJob, execDetail, loading, error, reload } = useAgentReportDetailLoad(effectiveId);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth scroll="paper">
@@ -777,6 +827,7 @@ export function AgentReportDetailDialog({ open, publicId, onClose }: AgentReport
             error={error}
             report={report}
             predJob={predJob}
+            execDetail={execDetail}
             publicId={effectiveId}
           />
         </Box>

@@ -82,39 +82,38 @@ def build_rag_templates_from_summary(summary: dict[str, Any]) -> list[dict[str, 
             ),
         },
         {
-            "id": "mobile_5g_6g_ran_edge_core",
-            "label": "5G / 6G mobile network (RAN · Edge · Core)",
+            "id": "enterprise_access_perimeter_endpoint",
+            "label": "Enterprise network (Access · Perimeter · Endpoint)",
             "description": (
-                "Telecom-oriented retrieval for 5G NR / 5G-Advanced and 6G research themes: radio access, MEC edge, "
-                "and packet core—aligned with batch scoring context."
+                "PRAGMA-style domain retrieval: Access / ISP volume-rate signals, Perimeter / IDS inspection, "
+                "and Endpoint / EDR host-proximate forensics—aligned with batch scoring context."
             ),
             "retrieval_queries": [
                 (
-                    f"5G NR and O-RAN security: gNB DU/CU, near-RT RIC, A1/A2/E2 interfaces; anomaly or attack indicators "
-                    f"when batch scoring shows {ctx}"
+                    f"Access / ISP edge security: rate limiting, scrubbing, ACL, and flood controls when batch scoring shows {ctx}"
                 ),
                 (
-                    "Multi-access edge computing MEC and 5G UPF user plane: threat detection, lateral movement, and lawful "
-                    "intercept considerations at the edge for mobile backhaul and N6 routing"
+                    "Perimeter / IDS security operations: WAF, port hardening, scan tarpitting, DNS/HTTP exposure review "
+                    "for north-south traffic anomalies"
                 ),
                 (
-                    "5G Core 5GC architecture: AMF, SMF, UPF, NSSF, network slicing and exposure (NEF/NRF); security "
-                    "operations when classifier outputs suggest core- or slice-level risk"
+                    "Endpoint / EDR response: account lockout, MFA enforcement, service isolation, and host-proximate "
+                    "forensics when classifier outputs suggest endpoint-impacting abuse"
                 ),
                 (
-                    f"6G vision and IMT-2030: integrated sensing and communication, AI-native RAN, sub-networks, NTN; "
-                    f"policy and research guidance relevant to SOC review when labels include {label_hint}"
+                    f"Cross-domain incident response for Access / ISP vs Perimeter / IDS vs Endpoint / EDR when "
+                    f"multi-party (VFL-style) feature splits disagree; labels include {label_hint}"
                 ),
                 (
-                    "RAN–Edge–Core coordination: cross-domain incident response when radio metrics, edge telemetry, and "
-                    "core signaling disagreements appear in multi-party (VFL-style) feature splits"
+                    "Network-flow feature interpretation for SOC: packet counts, PIAT, TCP flags, unique ports, "
+                    "and bidirectional vs src2dst evidence in enterprise intrusion detection"
                 ),
             ],
             "llm_prompt": (
                 f"Batch job {job_id}: {ctx} "
-                "You are briefing SOC analysts in a 5G/6G mobile operator context. Using only retrieved passages, "
-                "map findings to RAN vs Edge (MEC) vs Core responsibilities, cite slice or plane where relevant, "
-                "and list concrete verification steps (e.g. SIEM fields, RIC counters, core NF logs)."
+                "You are briefing SOC analysts in an enterprise network context (not 5G telecom). Using only retrieved passages, "
+                "map findings to Access / ISP vs Perimeter / IDS vs Endpoint / EDR responsibilities, "
+                "and list concrete verification steps (SIEM fields, IDS alerts, EDR host logs)."
             ),
         },
     ]

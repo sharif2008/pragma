@@ -24,8 +24,8 @@ class TrainingStartRequest(BaseModel):
     vfl_agent_definitions_path: str | None = Field(
         default=None,
         description=(
-            "Optional path to agentic_features.json (e.g. storage/agentic_features.json — RAN/Edge/Core "
-            "logged_features) for vertical column split. If omitted, IDS-style heuristics assign columns to 3 parties."
+            "Optional path to agentic_features.json (e.g. storage/agentic_features.json — Access/ISP, Perimeter/IDS, "
+            "Endpoint/EDR logged_features via RAN/Edge/Core keys) for vertical column split. If omitted, IDS-style heuristics assign columns to 3 parties."
         ),
     )
 
@@ -56,11 +56,22 @@ class ModelVersionOut(ORMModel):
     version_number: int
     training_job_id: int | None
     algorithm: str
+    display_name: str | None = None
     artifact_path: str
     metrics_json: dict | None
     feature_columns_json: list | None
     label_classes_json: list | None
     created_at: datetime
+
+
+class ModelVersionUpdate(BaseModel):
+    """Rename a registered model (display label only)."""
+
+    display_name: str | None = Field(
+        default=None,
+        max_length=256,
+        description="Friendly name shown in Setting UI; null or blank clears the name.",
+    )
 
 
 class TrainingStartResponse(BaseModel):

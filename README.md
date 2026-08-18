@@ -16,6 +16,12 @@ This codebase (**ChainAgentVFL**) implements the same conceptual stack—**block
 
 To address accountability, PRAGMA includes a **blockchain trust layer** implemented as **hash-only anchoring**: after an agentic report is produced and persisted, the backend computes a deterministic SHA-256 commitment over a canonical JSON payload and anchors only the resulting `bytes32` digest on an Ethereum smart contract. Before applying any report-derived actions, the backend verifies the on-chain commitment against the database record and the saved report artifact; execution is blocked if integrity verification fails.
 
+### Demo
+
+[![Watch the PRAGMA demo — Detect → Reason → Commit → Apply](https://img.youtube.com/vi/YgUtq4202oU/hqdefault.jpg)](https://youtu.be/YgUtq4202oU)
+
+**Watch on YouTube:** [https://youtu.be/YgUtq4202oU](https://youtu.be/YgUtq4202oU)
+
 ## Overview
 
 PRAGMA is organized into three components that together support an operator-facing workflow from detection to decision to integrity-verified execution:
@@ -42,25 +48,16 @@ This is **hash-only anchoring** (no sensitive data on-chain): the chain provides
 ## System diagram
 
 ```mermaid
-flowchart TD
-  OperatorUI[Frontend_Operator_UI] -->|HTTP_API| Backend[FastAPI_Backend]
+flowchart LR
+  UI[Operator UI] --> API[Backend API]
 
-  Backend -->|train_predict| VFL[VFL_Pipeline]
-  Backend -->|retrieve_context| RAG[FAISS_SentenceTransformers_RAG]
-  Backend -->|agent_decide| LLM[LLM_or_Mock_Agent]
+  API --> Detect[VFL detect + SHAP]
+  Detect --> Plan[RAG + LLM plan]
+  Plan --> Trust[Hash-only blockchain anchor]
+  Trust --> Apply[Verify then apply]
 
-  Backend -->|persist| DB[(MySQL_DB)]
-  Backend -->|write_report_artifact| Storage[(storage_reports_json)]
-
-  Backend -->|compute_SHA256_commitment| Commit[Canonical_JSON_SHA256]
-  Commit -->|anchor_bytes32| Chain[Hardhat_Local_Ethereum]
-  Chain -->|AgenticTrustRegistry_anchor_getCommitment| Contract[Solidity_Registry]
-
-  Backend -->|verify_integrity| Contract
-  Backend -->|verify_integrity| Storage
-  Backend -->|apply_if_valid| Exec[Action_Execution_Stub]
-
-  Backend -->|status_results| OperatorUI
+  API --- DB[(MySQL)]
+  API --- Files[(Reports + KB)]
 ```
 
 ## Technologies used
@@ -82,9 +79,13 @@ flowchart TD
   - React + Vite
   - Material UI-based admin template
 
+## Operator UI (Setting)
+
+![Setting page — Overview tab with workflow shortcuts](assets/agentic_setting.png)
+
 ## Dataset and notebooks
 
-- **Dataset (CSV)**: `sample.csv` (and any CSVs you upload/use through the backend workflows).
+- **Dataset (CSV)**: `backend/run/data/sample.csv` (and any CSVs you upload through the backend workflows).
 - **Jupyter**: notebooks are under `backend/notebooks/` (install separately: `pip install notebook ipykernel`).
 
 ## License

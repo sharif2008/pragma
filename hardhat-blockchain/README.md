@@ -48,6 +48,19 @@ Equivalent: `npx hardhat run scripts/deploy.js --network localhost`
 
 Copy the printed **AgenticTrustRegistry** contract address for the next step.
 
+On deploy, the registry is automatically seeded with **per-attack action whitelists** from `contracts/attack_options.json` (e.g. `DDOS` → `limit rate`, `enable scrubbing`, …). To re-seed an existing deployment:
+
+```bash
+TRUST_REGISTRY_ADDRESS=0xYourDeployedAddress npm run seed:whitelist
+```
+
+PowerShell:
+
+```powershell
+$env:TRUST_REGISTRY_ADDRESS = "0xYourDeployedAddress"
+npm run seed:whitelist
+```
+
 ### Anchor a trust commitment (demo)
 
 The anchor script expects:
@@ -82,7 +95,8 @@ Equivalent: `npx hardhat run scripts/interact.js --network localhost` (with the 
 | ----------------- | -------------------------------- |
 | `npm run compile` | Compile Solidity                 |
 | `npm run node`    | Start local chain on `:8545`     |
-| `npm run deploy:local` | Deploy `AgenticTrustRegistry` |
+| `npm run deploy:local` | Deploy `AgenticTrustRegistry` and seed action whitelist |
+| `npm run seed:whitelist` | Re-seed whitelist on an existing registry (`TRUST_REGISTRY_ADDRESS`) |
 | `npm run anchor:local` | Call `anchor` / `getCommitment` |
 
 ### MetaMask (optional)

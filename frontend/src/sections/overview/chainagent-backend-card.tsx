@@ -59,8 +59,8 @@ export function ChainagentBackendCard() {
             <Button size="small" variant="outlined" onClick={ping}>
               Ping again
             </Button>
-            <Button size="small" variant="contained" onClick={() => navigate('/ml')}>
-              Open workbench
+            <Button size="small" variant="contained" onClick={() => navigate('/setting')}>
+              Open setting
             </Button>
           </Stack>
         </Stack>
