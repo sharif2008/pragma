@@ -6,18 +6,20 @@ record each row's action set, then apply detection actions (bulk by default).
 Apply uses the backend API, which:
   1. Verifies trust-anchor / on-chain commitment for the report
   2. Checks each action against the smart-contract whitelist (attack_type + action label)
-  3. Calls applyAction on-chain only when whitelisted and integrity is valid
-  4. Persists results in agentic execution reports (actions_chain_json)
+  3. Checks the unit against the committed plan (plan-binding)
+  4. Calls applyAction on-chain only when both gates pass
+  5. Persists results in agentic execution reports (actions_chain_json)
 
 Usage (from backend/, API + trained model + Hardhat chain recommended):
-  python run/file_batch_demo.py
-  python run/file_batch_demo.py --input-file ../data/sample_1000.csv --max-rows 10
-  python run/file_batch_demo.py --no-apply
-  python run/file_batch_demo.py --apply-mode per-action
-  python run/file_batch_demo.py --tamper          # substitute whitelisted actions ≠ plan
-  python run/file_batch_demo.py --no-tamper       # default: apply planned actions as-is
+  python run/attack_monitor.py
+  python run/attack_monitor.py --input-file run/data/sample_1000.csv --max-rows 10
+  python run/attack_monitor.py --no-apply
+  python run/attack_monitor.py --apply-mode per-action
+  python run/attack_monitor.py --tamper          # mix off-whitelist + plan-drift rewrites
+  python run/attack_monitor.py --no-tamper       # default: apply planned actions as-is
 
-Each run writes one folder under run/output/ with report.json, report.txt, report.html, and ledger.json (all rows inside ledger).
+Each run writes one folder under run/output/ with report.json, report.txt, report.html,
+and ledger.json (enforcement + chain store/verify latency in the reports).
 
 See run/README.md for full instructions.
 """
@@ -28,6 +30,7 @@ import argparse
 import csv
 import html
 import json
+import random
 import sys
 import time
 import uuid
@@ -38,6 +41,7 @@ from typing import Any
 
 import httpx
 
+# REVIEW: This script is run/attack_monitor.py; data and output stay under run/.
 RUN_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = RUN_DIR.parent
 
@@ -46,6 +50,7 @@ try:
         canonical_attack_type,
         load_attack_option_keys,
         pick_allowed_alternate_action,
+        pick_disallowed_action,
     )
 except ImportError:
     sys.path.insert(0, str(BACKEND_DIR))
@@ -53,6 +58,7 @@ except ImportError:
         canonical_attack_type,
         load_attack_option_keys,
         pick_allowed_alternate_action,
+        pick_disallowed_action,
     )
 
 TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "partial", "needs_input"})
@@ -88,16 +94,22 @@ class RowPipelineRecord:
     report_public_id: str | None = None
     planned_actions: list[PlannedAction] = field(default_factory=list)
     action_overrides: dict[int, str] = field(default_factory=dict)
+    # REVIEW: Per-index off_whitelist | plan_drift plus chain store/verify ms for reports.
+    tamper_kinds: dict[int, str] = field(default_factory=dict)
     pipeline_error: str | None = None
     apply_results: list[dict[str, Any]] = field(default_factory=list)
     execution_report_id: int | None = None
     execution_status: str | None = None
+    anchor_ms: float | None = None
+    verify_ms: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         out = asdict(self)
         out["planned_actions"] = [a.to_dict() if isinstance(a, PlannedAction) else a for a in self.planned_actions]
         if self.action_overrides:
             out["action_overrides"] = {str(k): v for k, v in self.action_overrides.items()}
+        if self.tamper_kinds:
+            out["tamper_kinds"] = {str(k): v for k, v in self.tamper_kinds.items()}
         return out
 
 
@@ -253,6 +265,8 @@ def list_reports_for_job(client: httpx.Client, agentic_job_public_id: str) -> li
 
 def _actions_payload_from_run_or_response(payload: dict[str, Any]) -> dict[str, Any] | None:
     """Normalize actions/final_actions from simulate or GET /runs responses."""
+    # REVIEW: Keep return inside the list branch so a missing `actions` key
+    # falls through to `final_actions` instead of UnboundLocalError (`first`).
     for key in ("actions", "final_actions"):
         raw = payload.get(key)
         if isinstance(raw, dict):
@@ -362,23 +376,41 @@ def auto_tamper_overrides(
     attack_type: str | None,
     *,
     file_row: int = 0,
-) -> dict[int, str]:
-    """Substitute 1–2 whitelisted actions per row (not the full plan)."""
+    tamper_seed: int = 42,
+) -> tuple[dict[int, str], dict[int, str]]:
+    """Rewrite 1–2 planned units: mix off-whitelist vs whitelist-legal plan drift."""
+    # REVIEW: Dual-gate tamper — threat A fails Gate 1, threat B fails Gate 2.
     if not planned:
-        return {}
-    # Alternate 1 vs 2 tampered actions by row (row 0 → 1, row 1 → 2, row 2 → 1, …).
+        return {}, {}
+    rng = random.Random((int(tamper_seed) << 16) ^ int(file_row))
     tamper_count = min(len(planned), 2, 1 + (file_row % 2))
     used: set[str] = set()
     overrides: dict[int, str] = {}
+    kinds: dict[int, str] = {}
     for act in planned[:tamper_count]:
-        alt = pick_allowed_alternate_action(act.action, attack_type, exclude=frozenset(used))
+        kind = "off_whitelist" if rng.random() < 0.5 else "plan_drift"
+        if kind == "off_whitelist":
+            alt = pick_disallowed_action(attack_type, exclude=frozenset(used), rng=rng)
+            if not alt:
+                alt = pick_allowed_alternate_action(
+                    act.action, attack_type, exclude=frozenset(used), rng=rng
+                )
+                kind = "plan_drift" if alt else kind
+        else:
+            alt = pick_allowed_alternate_action(
+                act.action, attack_type, exclude=frozenset(used), rng=rng
+            )
+            if not alt:
+                alt = pick_disallowed_action(attack_type, exclude=frozenset(used), rng=rng)
+                kind = "off_whitelist" if alt else kind
         if not alt:
             continue
         if alt.strip().lower() == act.action.strip().lower():
             continue
         overrides[act.index] = alt
+        kinds[act.index] = kind
         used.add(alt)
-    return overrides
+    return overrides, kinds
 
 
 def chain_item_was_tampered(item: dict[str, Any]) -> bool:
@@ -437,6 +469,22 @@ def chain_items_from_exec(exec_report: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(items, list):
         return []
     return [x for x in items if isinstance(x, dict)]
+
+
+def _verify_ms_from_exec(exec_report: dict[str, Any]) -> float | None:
+    chain = exec_report.get("actions_chain_json")
+    if isinstance(chain, dict) and chain.get("verify_ms") is not None:
+        try:
+            return float(chain["verify_ms"])
+        except (TypeError, ValueError):
+            return None
+    raw = exec_report.get("verify_ms")
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
 
 
 def summarize_chain_item(item: dict[str, Any]) -> dict[str, Any]:
@@ -506,6 +554,7 @@ def accumulate_tamper_metrics(
     summary: BatchRunSummary,
 ) -> None:
     """Count tamper from client overrides + chain results (plan mismatch must not apply)."""
+    # REVIEW: After gate reorder, a failed override has result=failed and Gate 1/2 reason.
     overrides = record.action_overrides or {}
     if not overrides:
         for item in chain_items:
@@ -526,28 +575,26 @@ def accumulate_tamper_metrics(
             continue
 
         result = str(item.get("result") or "")
-        reason = str(item.get("failure_reason") or "")
         applied = str(item.get("action") or "").strip().lower()
         planned_norm = str(planned or "").strip().lower()
         override_norm = str(override or "").strip().lower()
 
-        if item.get("action_modified_before_apply") or reason == "action_plan_mismatch":
+        if result != "success":
             summary.tamper_rejected_on_chain += 1
             continue
 
-        if result == "success" and applied == override_norm and override_norm != planned_norm:
+        if applied == override_norm and override_norm != planned_norm:
             summary.tamper_accepted_on_chain += 1
             continue
 
-        if result == "success" and applied == planned_norm and override_norm != planned_norm:
-            # Override sent but anchored plan was applied — treat as blocked in the report.
+        if applied == planned_norm and override_norm != planned_norm:
+            # Override sent but anchored plan was applied — treat as blocked.
             summary.tamper_rejected_on_chain += 1
             summary.integrity_failures += 1
             summary.actions_applied = max(0, summary.actions_applied - 1)
             continue
 
-        if result != "success":
-            summary.tamper_rejected_on_chain += 1
+        summary.tamper_rejected_on_chain += 1
 
 
 def compute_batch_summary(
@@ -601,6 +648,7 @@ def format_report_text(
     input_path: Path,
     summary: BatchRunSummary,
     apply_enabled: bool,
+    ledger: list[RowPipelineRecord] | None = None,
 ) -> str:
     lines = [
         "Run report",
@@ -626,7 +674,76 @@ def format_report_text(
     lines.append(f"Pipeline row failures:   {summary.pipeline_failures}")
     if summary.labels_mapped_to_others:
         lines.append(f"Mapped to OTHERS:        {summary.labels_mapped_to_others}  (raw label not in attack_options.json)")
+    if ledger:
+        lines.extend(["", "By attack class (proposed / changed / WL reject / plan reject / applied / block% of changed)"])
+        class_rows = attack_class_report_rows(ledger)
+        for row in class_rows:
+            lines.append(
+                f"  {row['attack']:<12} n={row['n']:<4} prop={row['proposed']:<4} "
+                f"chg={row['changed']:<4} wl={row['wl_reject']:<4} plan={row['plan_reject']:<4} "
+                f"ok={row['applied']:<4} block%={row['block_pct_changed']:.1f}"
+            )
+        total = _class_totals_row(class_rows)
+        lines.append(
+            f"  {'TOTAL':<12} n={total['n']:<4} prop={total['proposed']:<4} "
+            f"chg={total['changed']:<4} wl={total['wl_reject']:<4} plan={total['plan_reject']:<4} "
+            f"ok={total['applied']:<4} block%={total['block_pct_changed']:.1f}"
+        )
+        lines.append(
+            "  Caption: not-allowed rewrites blocked at whitelist; whitelist-legal drift blocked at plan list."
+        )
+        latency = build_latency_report(ledger, run_id=run_id)
+        store = latency.get("anchor_store") or {}
+        verify = latency.get("chain_verify") or {}
+        lines.extend(
+            [
+                "",
+                "Chain latency (anchor store + getCommitment verify; not LLM/RAG)",
+                f"  Anchor store:  n={store.get('count', 0)}  total_ms={store.get('total_ms', 0)}  mean_ms={store.get('mean_ms', 0)}",
+                f"  Chain verify:  n={verify.get('count', 0)}  total_ms={verify.get('total_ms', 0)}  mean_ms={verify.get('mean_ms', 0)}",
+                "  Per row: file_row, attack, anchor_ms, verify_ms",
+            ]
+        )
+        for row in latency.get("rows") or []:
+            lines.append(
+                f"    {row.get('file_row')}  {row.get('attack_type') or '—'}  "
+                f"{row.get('anchor_ms')}  {row.get('verify_ms')}"
+            )
     return "\n".join(lines) + "\n"
+
+
+def build_latency_report(ledger: list[RowPipelineRecord], *, run_id: str) -> dict[str, Any]:
+    """Per-row and run-level chain store/verify timings (ms), embedded in report.json."""
+    # REVIEW: Chain RPC only; folded into report.json/txt/html — no latency.txt.
+    rows: list[dict[str, Any]] = []
+    anchors: list[float] = []
+    verifies: list[float] = []
+    for rec in ledger:
+        row = {
+            "file_row": rec.file_row,
+            "attack_type": rec.attack_type,
+            "anchor_ms": rec.anchor_ms,
+            "verify_ms": rec.verify_ms,
+        }
+        rows.append(row)
+        if rec.anchor_ms is not None:
+            anchors.append(float(rec.anchor_ms))
+        if rec.verify_ms is not None:
+            verifies.append(float(rec.verify_ms))
+
+    def _stats(vals: list[float]) -> dict[str, float | int]:
+        if not vals:
+            return {"count": 0, "total_ms": 0.0, "mean_ms": 0.0}
+        total = sum(vals)
+        return {"count": len(vals), "total_ms": round(total, 3), "mean_ms": round(total / len(vals), 3)}
+
+    return {
+        "run_id": run_id,
+        "generated_at": utc_now_iso(),
+        "anchor_store": _stats(anchors),
+        "chain_verify": _stats(verifies),
+        "rows": rows,
+    }
 
 
 def print_batch_report(
@@ -636,6 +753,7 @@ def print_batch_report(
     input_path: Path,
     summary: BatchRunSummary,
     apply_enabled: bool,
+    ledger: list[RowPipelineRecord] | None = None,
 ) -> None:
     print("\n========== Batch report ==========")
     print(f"Run folder:     {run_dir}")
@@ -660,6 +778,30 @@ def print_batch_report(
             print(f"Rows no apply:  {summary.rows_without_apply}")
     if summary.labels_mapped_to_others:
         print(f"Mapped OTHERS:  {summary.labels_mapped_to_others}  (raw label not in attack_options.json)")
+    if ledger:
+        print("By class:       attack  n  proposed  changed  WL  plan  applied  block%changed")
+        class_rows = attack_class_report_rows(ledger)
+        for row in class_rows:
+            print(
+                f"  {row['attack']:<12} {row['n']:<4} {row['proposed']:<4} {row['changed']:<4} "
+                f"{row['wl_reject']:<4} {row['plan_reject']:<4} {row['applied']:<4} {row['block_pct_changed']:.1f}"
+            )
+        total = _class_totals_row(class_rows)
+        print(
+            f"  {'TOTAL':<12} {total['n']:<4} {total['proposed']:<4} {total['changed']:<4} "
+            f"{total['wl_reject']:<4} {total['plan_reject']:<4} {total['applied']:<4} {total['block_pct_changed']:.1f}"
+        )
+        latency = build_latency_report(ledger, run_id=run_id)
+        store = latency.get("anchor_store") or {}
+        verify = latency.get("chain_verify") or {}
+        print(
+            f"Anchor store:   n={store.get('count', 0)}  total_ms={store.get('total_ms', 0)}  "
+            f"mean_ms={store.get('mean_ms', 0)}"
+        )
+        print(
+            f"Chain verify:   n={verify.get('count', 0)}  total_ms={verify.get('total_ms', 0)}  "
+            f"mean_ms={verify.get('mean_ms', 0)}"
+        )
     print("==================================")
 
 
@@ -747,6 +889,12 @@ def run_pipeline_for_file_row(
         if report_id:
             report = fetch_agent_report(client, report_id)
             record.planned_actions = planned_actions_from_report(report)
+            ta = report.get("trust_anchor") if isinstance(report, dict) else None
+            if isinstance(ta, dict) and ta.get("anchor_ms") is not None:
+                try:
+                    record.anchor_ms = float(ta["anchor_ms"])
+                except (TypeError, ValueError):
+                    record.anchor_ms = None
 
         print(
             f"  run_id={record.run_id} status={record.pipeline_status} "
@@ -770,6 +918,7 @@ def apply_actions_for_record(
     apply_mode: str,
     pause_s: float,
     tamper: bool,
+    tamper_seed: int = 42,
 ) -> None:
     if not record.report_public_id:
         print("  (skip apply: no agentic report for this row)")
@@ -778,25 +927,32 @@ def apply_actions_for_record(
         print("  (skip apply: no planned actions on report)")
         return
 
-    overrides = (
-        auto_tamper_overrides(record.planned_actions, record.attack_type, file_row=record.file_row)
+    overrides, kinds = (
+        auto_tamper_overrides(
+            record.planned_actions,
+            record.attack_type,
+            file_row=record.file_row,
+            tamper_seed=tamper_seed,
+        )
         if tamper
-        else {}
+        else ({}, {})
     )
     record.action_overrides = overrides
+    record.tamper_kinds = kinds
 
     print(f"\n--- Apply file_row={record.file_row} report={record.report_public_id[:8]}… ---")
     if tamper:
         if overrides:
             print(
-                f"  tamper on — substituting {len(overrides)} whitelisted action(s) "
-                f"different from plan (attack_type={record.attack_type or '—'}):"
+                f"  tamper on — substituting {len(overrides)} action(s) "
+                f"(off-whitelist and/or plan-drift; attack_type={record.attack_type or '—'}):"
             )
             for idx, label in sorted(overrides.items()):
                 orig = next((a.action for a in record.planned_actions if a.index == idx), "?")
-                print(f"    [{idx}] {orig!r} -> {label!r}")
+                kind = kinds.get(idx, "?")
+                print(f"    [{idx}] {orig!r} -> {label!r} ({kind})")
         else:
-            print("  tamper on — no alternate whitelisted action found for this plan")
+            print("  tamper on — no substitute action found for this plan")
 
     if apply_mode == "bulk":
         try:
@@ -807,6 +963,7 @@ def apply_actions_for_record(
             )
             record.execution_report_id = exec_report.get("id")
             record.execution_status = str(exec_report.get("status") or "")
+            record.verify_ms = _verify_ms_from_exec(exec_report)
             items = [summarize_chain_item(x) for x in chain_items_from_exec(exec_report)]
             record.apply_results.append({"mode": "bulk", "items": items, "exec": exec_report})
             print_apply_result(exec_report)
@@ -833,6 +990,8 @@ def apply_actions_for_record(
             )
             record.execution_report_id = exec_report.get("id")
             record.execution_status = str(exec_report.get("status") or "")
+            if record.verify_ms is None:
+                record.verify_ms = _verify_ms_from_exec(exec_report)
             items = chain_items_from_exec(exec_report)
             picked = next((x for x in items if x.get("index") == idx), items[-1] if items else {})
             summary = summarize_chain_item(picked) if picked else {}
@@ -852,10 +1011,15 @@ def apply_actions_for_record(
 @dataclass
 class _AttackBucket:
     rows: int = 0
-    actions: int = 0
-    tampered: int = 0
+    proposed: int = 0
+    changed: int = 0
+    wl_reject: int = 0
+    plan_reject: int = 0
     applied: int = 0
-    blocked: int = 0
+
+    @property
+    def blocked_changed(self) -> int:
+        return self.wl_reject + self.plan_reject
 
 
 def _report_pct(count: int, total: int) -> str:
@@ -864,47 +1028,42 @@ def _report_pct(count: int, total: int) -> str:
     return f"{100.0 * count / total:.1f}"
 
 
-def _row_action_counts(record: RowPipelineRecord) -> tuple[int, int, int, int]:
-    """Return (actions, tampered, applied, blocked) for one ledger row."""
+def _row_gate_counts(record: RowPipelineRecord) -> tuple[int, int, int, int, int]:
+    """Return (proposed, changed, wl_reject, plan_reject, applied) without double-counting."""
+    # REVIEW: Changed units count once as WL or plan reject; unmodified successes are Applied.
     planned = record.planned_actions
     n = len(planned)
     overrides = {int(k): v for k, v in (record.action_overrides or {}).items()}
-    tampered = len(overrides)
     items = chain_items_from_record(record)
-    applied = blocked = 0
+    changed = wl_reject = plan_reject = applied = 0
 
     if not record.apply_results:
-        return n, tampered, n, 0
+        return n, len(overrides), 0, 0, n
 
     for act in planned:
         idx = int(act.index)
         item = next((x for x in items if x.get("index") == idx), None)
-        is_tampered = idx in overrides
-        if is_tampered:
-            if item and (
-                item.get("action_modified_before_apply")
-                or str(item.get("failure_reason") or "") == "action_plan_mismatch"
-                or str(item.get("result") or "") != "success"
+        is_changed = idx in overrides
+        reason = str((item or {}).get("failure_reason") or "")
+        result = str((item or {}).get("result") or "")
+        if is_changed:
+            changed += 1
+            if reason in WHITELIST_FAILURE_REASONS or (item and item.get("whitelisted") is False):
+                wl_reject += 1
+            elif reason == "action_plan_mismatch" or (
+                item and item.get("action_modified_before_apply") and result != "success"
             ):
-                blocked += 1
-            elif item and str(item.get("result") or "") == "success":
-                planned_label = str(act.action or "").strip().lower()
-                applied_label = str(item.get("action") or "").strip().lower()
-                override_label = str(overrides[idx]).strip().lower()
-                if applied_label == override_label and override_label != planned_label:
-                    applied += 1
-                else:
-                    blocked += 1
-            else:
-                blocked += 1
-        elif item and str(item.get("result") or "") == "success":
+                plan_reject += 1
+            elif result != "success":
+                plan_reject += 1
+            elif result == "success":
+                applied += 1
+        elif item and result == "success":
             applied += 1
-        elif item and str(item.get("result") or "") != "success":
-            blocked += 1
-        else:
+        elif not item:
             applied += 1
 
-    return n, tampered, applied, blocked
+    return n, changed, wl_reject, plan_reject, applied
 
 
 def _attack_buckets(ledger: list[RowPipelineRecord]) -> dict[str, _AttackBucket]:
@@ -912,13 +1071,56 @@ def _attack_buckets(ledger: list[RowPipelineRecord]) -> dict[str, _AttackBucket]
     for record in ledger:
         atk = str(record.attack_type or "UNKNOWN").upper()
         bucket = by_attack.setdefault(atk, _AttackBucket())
-        n, tampered, applied, blocked = _row_action_counts(record)
+        proposed, changed, wl_reject, plan_reject, applied = _row_gate_counts(record)
         bucket.rows += 1
-        bucket.actions += n
-        bucket.tampered += tampered
+        bucket.proposed += proposed
+        bucket.changed += changed
+        bucket.wl_reject += wl_reject
+        bucket.plan_reject += plan_reject
         bucket.applied += applied
-        bucket.blocked += blocked
     return dict(sorted(by_attack.items()))
+
+
+def attack_class_report_rows(ledger: list[RowPipelineRecord]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for atk, bucket in _attack_buckets(ledger).items():
+        blocked = bucket.blocked_changed
+        rows.append(
+            {
+                "attack": atk,
+                "n": bucket.rows,
+                "proposed": bucket.proposed,
+                "changed": bucket.changed,
+                "wl_reject": bucket.wl_reject,
+                "plan_reject": bucket.plan_reject,
+                "applied": bucket.applied,
+                "block_pct_changed": float(_report_pct(blocked, bucket.changed)) if bucket.changed else 100.0,
+            }
+        )
+    return rows
+
+
+def _class_totals_row(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Sum per-class gate counts into one TOTAL row."""
+    n = proposed = changed = wl_reject = plan_reject = applied = 0
+    for row in rows:
+        n += int(row.get("n") or 0)
+        proposed += int(row.get("proposed") or 0)
+        changed += int(row.get("changed") or 0)
+        wl_reject += int(row.get("wl_reject") or 0)
+        plan_reject += int(row.get("plan_reject") or 0)
+        applied += int(row.get("applied") or 0)
+    blocked = wl_reject + plan_reject
+    return {
+        "attack": "TOTAL",
+        "n": n,
+        "proposed": proposed,
+        "changed": changed,
+        "wl_reject": wl_reject,
+        "plan_reject": plan_reject,
+        "applied": applied,
+        "block_pct_changed": float(_report_pct(blocked, changed)) if changed else 100.0,
+    }
 
 
 def render_attack_wise_report_html(
@@ -930,38 +1132,53 @@ def render_attack_wise_report_html(
     generated_at: str,
     summary: BatchRunSummary,
     ledger: list[RowPipelineRecord],
+    latency: dict[str, Any] | None = None,
 ) -> str:
     esc = html.escape
     by_attack = _attack_buckets(ledger)
-    total_rows = summary.total_rows or 1
-    total_actions = summary.total_actions or 1
-    tampered_total = sum(b.tampered for b in by_attack.values())
+    class_rows = attack_class_report_rows(ledger)
+    changed_total = sum(b.changed for b in by_attack.values())
+    wl_total = sum(b.wl_reject for b in by_attack.values())
+    plan_total = sum(b.plan_reject for b in by_attack.values())
     applied_total = sum(b.applied for b in by_attack.values())
-    blocked_total = sum(b.blocked for b in by_attack.values())
+    proposed_total = sum(b.proposed for b in by_attack.values())
+    blocked_changed_total = wl_total + plan_total
 
     attack_rows_html: list[str] = []
-    for atk, bucket in by_attack.items():
+    for row in class_rows:
         attack_rows_html.append(
             f"""<tr>
-  <td>{esc(atk)}</td>
-  <td class="num">{bucket.rows}</td>
-  <td class="num">{_report_pct(bucket.rows, total_rows)}</td>
-  <td class="num">{bucket.actions}</td>
-  <td class="num">{_report_pct(bucket.actions, total_actions)}</td>
-  <td class="num">{bucket.tampered}</td>
-  <td class="num">{_report_pct(bucket.tampered, bucket.actions)}</td>
-  <td class="num">{bucket.applied}</td>
-  <td class="num">{_report_pct(bucket.applied, bucket.actions)}</td>
-  <td class="num">{bucket.blocked}</td>
-  <td class="num">{_report_pct(bucket.blocked, bucket.actions)}</td>
+  <td>{esc(str(row['attack']))}</td>
+  <td class="num">{row['n']}</td>
+  <td class="num">{row['proposed']}</td>
+  <td class="num">{row['changed']}</td>
+  <td class="num">{row['wl_reject']}</td>
+  <td class="num">{row['plan_reject']}</td>
+  <td class="num">{row['applied']}</td>
+  <td class="num">{row['block_pct_changed']:.1f}</td>
 </tr>"""
         )
 
     tamper_note = (
-        "Tamper enabled — 1–2 whitelisted substitutes per row (≠ anchored plan)."
+        "Tamper enabled — 1–2 units rewritten per row (mix of off-whitelist and plan-drift). "
+        "Block.% of changed is (WL reject + plan reject) / changed (expected 100)."
         if tamper
         else "Tamper disabled — actions applied as planned."
     )
+
+    latency = latency or build_latency_report(ledger, run_id=run_id)
+    store = latency.get("anchor_store") or {}
+    verify = latency.get("chain_verify") or {}
+    latency_rows_html: list[str] = []
+    for row in latency.get("rows") or []:
+        latency_rows_html.append(
+            f"""<tr>
+  <td class="num">{esc(str(row.get('file_row')))}</td>
+  <td>{esc(str(row.get('attack_type') or '—'))}</td>
+  <td class="num">{esc(str(row.get('anchor_ms')))}</td>
+  <td class="num">{esc(str(row.get('verify_ms')))}</td>
+</tr>"""
+        )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -1021,7 +1238,7 @@ def render_attack_wise_report_html(
 <body>
   <div class="wrap">
     <h1>PRAGMA batch evaluation — research report</h1>
-    <p class="sub">Table 2 — results by attack type (count and %)</p>
+    <p class="sub">Enforcement by attack class — whitelist vs plan-list rejects</p>
 
     <div class="card">
       <h2>Run metadata</h2>
@@ -1036,34 +1253,64 @@ def render_attack_wise_report_html(
     </div>
 
     <div class="card">
-      <h2>Table 2 — By attack type</h2>
+      <h2>By attack class</h2>
       <table>
         <thead>
           <tr>
-            <th>Attack type</th>
-            <th>Rows</th><th>% rows</th>
-            <th>Actions</th><th>% actions</th>
-            <th>Tampered</th><th>% tampered*</th>
-            <th>Applied</th><th>% applied*</th>
-            <th>Blocked</th><th>% blocked*</th>
+            <th>Attack</th>
+            <th>n</th>
+            <th>Proposed</th>
+            <th>Changed</th>
+            <th>WL reject</th>
+            <th>Plan reject</th>
+            <th>Applied</th>
+            <th>Block.% of changed</th>
           </tr>
         </thead>
         <tbody>
           {"".join(attack_rows_html)}
           <tr class="total">
             <td>Total</td>
-            <td class="num">{summary.total_rows}</td><td class="num">100.0</td>
-            <td class="num">{summary.total_actions}</td><td class="num">100.0</td>
-            <td class="num">{tampered_total}</td><td class="num">{_report_pct(tampered_total, total_actions)}</td>
-            <td class="num">{applied_total}</td><td class="num">{_report_pct(applied_total, total_actions)}</td>
-            <td class="num">{blocked_total}</td><td class="num">{_report_pct(blocked_total, total_actions)}</td>
+            <td class="num">{summary.total_rows}</td>
+            <td class="num">{proposed_total}</td>
+            <td class="num">{changed_total}</td>
+            <td class="num">{wl_total}</td>
+            <td class="num">{plan_total}</td>
+            <td class="num">{applied_total}</td>
+            <td class="num">{_report_pct(blocked_changed_total, changed_total)}</td>
           </tr>
         </tbody>
       </table>
-      <p class="note">* Tampered / applied / blocked % = within that attack type's actions. Row/action % = share of the whole run.</p>
+      <p class="note">WL reject = Gate 1 (action_not_whitelisted). Plan reject = Gate 2 (action_plan_mismatch). Block.% of changed = (WL + plan) / changed; expected 100% when every rewrite is refused. Caption: all not-allowed rewrites blocked at whitelist; all whitelist-legal drift blocked at plan list.</p>
     </div>
 
-    <footer>Generated by backend/run/file_batch_demo.py — ChainAgentVFL / PRAGMA</footer>
+    <div class="card">
+      <h2>Chain latency</h2>
+      <p class="note">Anchor store = <code>anchor()</code> RPC ms. Verify = <code>getCommitment</code> RPC ms. LLM/RAG times are not included.</p>
+      <dl class="meta">
+        <div><dt>Anchor store n</dt><dd>{store.get('count', 0)}</dd></div>
+        <div><dt>Anchor total ms</dt><dd>{store.get('total_ms', 0)}</dd></div>
+        <div><dt>Anchor mean ms</dt><dd>{store.get('mean_ms', 0)}</dd></div>
+        <div><dt>Verify n</dt><dd>{verify.get('count', 0)}</dd></div>
+        <div><dt>Verify total ms</dt><dd>{verify.get('total_ms', 0)}</dd></div>
+        <div><dt>Verify mean ms</dt><dd>{verify.get('mean_ms', 0)}</dd></div>
+      </dl>
+      <table>
+        <thead>
+          <tr>
+            <th>file_row</th>
+            <th>Attack</th>
+            <th>anchor_ms</th>
+            <th>verify_ms</th>
+          </tr>
+        </thead>
+        <tbody>
+          {"".join(latency_rows_html) if latency_rows_html else "<tr><td colspan='4'>No chain timings for this run.</td></tr>"}
+        </tbody>
+      </table>
+    </div>
+
+    <footer>Generated by backend/run/attack_monitor.py — ChainAgentVFL / PRAGMA</footer>
   </div>
 </body>
 </html>
@@ -1077,6 +1324,7 @@ def write_attack_wise_report_html(
     summary: BatchRunSummary,
     *,
     input_path: Path,
+    latency: dict[str, Any] | None = None,
 ) -> Path:
     generated_at = utc_now_iso()
     html_text = render_attack_wise_report_html(
@@ -1087,6 +1335,7 @@ def write_attack_wise_report_html(
         generated_at=generated_at,
         summary=summary,
         ledger=ledger,
+        latency=latency,
     )
     out = run_dir / "report.html"
     out.write_text(html_text, encoding="utf-8")
@@ -1103,6 +1352,9 @@ def save_run_outputs(
 ) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    class_rows = attack_class_report_rows(ledger)
+    class_report = class_rows + [_class_totals_row(class_rows)]
+    latency_payload = build_latency_report(ledger, run_id=str(meta.get("run_id") or run_dir.name))
     report_payload = {
         "generated_at": utc_now_iso(),
         "run_id": meta.get("run_id"),
@@ -1110,6 +1362,13 @@ def save_run_outputs(
         "apply": meta.get("apply"),
         "apply_mode": meta.get("apply_mode"),
         "tamper": meta.get("tamper"),
+        "tamper_seed": meta.get("tamper_seed"),
+        "by_attack_class": class_report,
+        "chain_latency": {
+            "anchor_store": latency_payload.get("anchor_store"),
+            "chain_verify": latency_payload.get("chain_verify"),
+            "rows": latency_payload.get("rows"),
+        },
         **summary.to_report_dict(),
     }
     report_json_path = run_dir / "report.json"
@@ -1125,6 +1384,7 @@ def save_run_outputs(
             input_path=input_path,
             summary=summary,
             apply_enabled=bool(meta.get("apply")),
+            ledger=ledger,
         ),
         encoding="utf-8",
     )
@@ -1136,6 +1396,12 @@ def save_run_outputs(
                 "generated_at": utc_now_iso(),
                 "meta": meta,
                 "report": summary.to_report_dict(),
+                "by_attack_class": class_report,
+                "chain_latency": {
+                    "anchor_store": latency_payload.get("anchor_store"),
+                    "chain_verify": latency_payload.get("chain_verify"),
+                    "rows": latency_payload.get("rows"),
+                },
                 "rows": [r.to_dict() for r in ledger],
             },
             indent=2,
@@ -1146,17 +1412,19 @@ def save_run_outputs(
     )
 
     print(f"\nOutputs written to: {run_dir}")
-    print(f"  report.json  — summary totals")
+    print(f"  report.json  — summary totals + by-class gates + chain latency")
     print(f"  report.txt   — summary (human-readable)")
     print(f"  ledger.json  — full batch detail ({len(ledger)} row(s))")
     try:
-        write_attack_wise_report_html(run_dir, ledger, meta, summary, input_path=input_path)
-        print(f"  report.html     — attack-wise research report (Table 2)")
+        write_attack_wise_report_html(
+            run_dir, ledger, meta, summary, input_path=input_path, latency=latency_payload
+        )
+        print(f"  report.html     — attack-wise dual-gate report + chain latency")
     except Exception as exc:
         print(f"  (report.html skipped: {exc})")
 
 
-def run_file_batch_demo(args: argparse.Namespace) -> int:
+def run_attack_monitor(args: argparse.Namespace) -> int:
     input_path = Path(args.input_file).expanduser().resolve()
     run_id = new_run_id()
     simulate = {"latency_ms": max(0, args.latency_ms)}
@@ -1218,6 +1486,7 @@ def run_file_batch_demo(args: argparse.Namespace) -> int:
                     apply_mode=args.apply_mode,
                     pause_s=args.pause_between_actions_s,
                     tamper=args.tamper,
+                    tamper_seed=int(getattr(args, "tamper_seed", 42)),
                 )
 
     summary = compute_batch_summary(ledger, apply_enabled=args.apply, attack_keys=attack_keys)
@@ -1227,6 +1496,7 @@ def run_file_batch_demo(args: argparse.Namespace) -> int:
         "apply": args.apply,
         "apply_mode": args.apply_mode,
         "tamper": args.tamper,
+        "tamper_seed": getattr(args, "tamper_seed", 42),
         "rows_processed": len(ledger),
         "output_dir": str(run_dir) if run_dir else None,
         "attack_option_keys": sorted(attack_keys),
@@ -1240,6 +1510,7 @@ def run_file_batch_demo(args: argparse.Namespace) -> int:
         input_path=input_path,
         summary=summary,
         apply_enabled=args.apply,
+        ledger=ledger,
     )
 
     has_failures = summary.pipeline_failures > 0
@@ -1325,7 +1596,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--tamper",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Before apply, substitute whitelisted actions that differ from the saved plan (default: off)",
+        help=(
+            # REVIEW: Mix of off-whitelist (Gate 1) and whitelist-legal plan-drift (Gate 2).
+            "Before apply, rewrite 1-2 planned units per row: mix off-whitelist "
+            "actions (Gate 1) and whitelist-legal plan drift (Gate 2). Default: off"
+        ),
+    )
+    parser.add_argument(
+        "--tamper-seed",
+        type=int,
+        default=42,
+        help="RNG seed mixed with file_row for --tamper rewrites (default: 42)",
     )
     parser.add_argument(
         "--no-output-json",
@@ -1338,7 +1619,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     try:
-        code = run_file_batch_demo(args)
+        code = run_attack_monitor(args)
     except httpx.HTTPStatusError as exc:
         detail = exc.response.text[:800] if exc.response is not None else str(exc)
         print(f"HTTP error {exc.response.status_code if exc.response else '?'}: {detail}", file=sys.stderr)
