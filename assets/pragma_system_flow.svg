@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="800" viewBox="0 0 1600 800" role="img" aria-labelledby="title desc">
+  <title id="title">PRAGMA system flow</title>
+  <desc id="desc">Detect, Reason, Commit, Apply. Domain agents send 64-d embeddings only. Detection classifies and attributes. Reasoning returns a JSON plan. Commit stores SHA-256(P) and whitelist W. Apply admits an action only if whitelist, plan-binding, and digest match.</desc>
+
+  <defs>
+    <style><![CDATA[
+      .sans { font-family: Arial, Helvetica, sans-serif; }
+      .title { font-size: 22px; font-weight: 700; fill: #0A3D73; }
+      .sub { font-size: 13px; font-weight: 400; fill: #5A5A5A; }
+      .hdr { font-size: 15px; font-weight: 700; fill: #FFFFFF; }
+      .boxTitle { font-size: 14px; font-weight: 700; fill: #1A1A1A; }
+      .body { font-size: 13px; font-weight: 400; fill: #1A1A1A; }
+      .muted { font-size: 12px; font-weight: 400; fill: #5A5A5A; }
+      .pill { font-size: 11px; font-weight: 700; fill: #334155; }
+      .go { font-size: 13px; font-weight: 700; fill: #1F6B30; }
+      .stop { font-size: 13px; font-weight: 700; fill: #C42020; }
+      .foot { font-size: 13px; font-weight: 600; fill: #0A3D73; }
+    ]]></style>
+    <marker id="arrBlue" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L9,4 L0,8 z" fill="#0B60BD"/>
+    </marker>
+    <marker id="arrPurple" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L9,4 L0,8 z" fill="#6A2DBF"/>
+    </marker>
+    <marker id="arrOrange" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L9,4 L0,8 z" fill="#D45522"/>
+    </marker>
+    <marker id="arrGreen" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L9,4 L0,8 z" fill="#1F6B30"/>
+    </marker>
+    <marker id="arrRed" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L9,4 L0,8 z" fill="#C42020"/>
+    </marker>
+    <clipPath id="clipDetect"><rect x="24" y="68" width="456" height="40" rx="10"/></clipPath>
+    <clipPath id="clipReason"><rect x="568" y="68" width="456" height="40" rx="10"/></clipPath>
+    <clipPath id="clipCommit"><rect x="1112" y="68" width="464" height="40" rx="10"/></clipPath>
+    <clipPath id="clipDomains"><rect x="24" y="448" width="1056" height="40" rx="10"/></clipPath>
+    <clipPath id="clipApply"><rect x="1112" y="448" width="464" height="40" rx="10"/></clipPath>
+  </defs>
+
+  <rect width="1600" height="800" fill="#FFFFFF"/>
+
+  <text class="sans title" x="800" y="32" text-anchor="middle">PRAGMA system flow</text>
+  <text class="sans sub" x="800" y="52" text-anchor="middle">Detect  &#x2192;  Reason  &#x2192;  Commit  &#x2192;  Apply     &#x00B7;     raw features stay at the party</text>
+
+  <!-- 1 Detect -->
+  <g id="detect">
+    <rect x="24" y="68" width="456" height="340" rx="10" fill="#FBFDFF" stroke="#0B60BD" stroke-width="2"/>
+    <rect x="24" y="68" width="456" height="40" clip-path="url(#clipDetect)" fill="#0B60BD"/>
+    <text class="sans hdr" x="252" y="94" text-anchor="middle">1  Detect   (VFL)</text>
+
+    <rect x="40" y="128" width="132" height="92" rx="8" fill="#EEF6FF" stroke="#0B60BD" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="106" y="158" text-anchor="middle">concat</text>
+    <text class="sans body" x="106" y="180" text-anchor="middle">h in R^192</text>
+    <text class="sans muted" x="106" y="202" text-anchor="middle">64 + 64 + 64</text>
+
+    <rect x="186" y="128" width="140" height="92" rx="8" fill="#FFFFFF" stroke="#0B60BD" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="256" y="158" text-anchor="middle">coordinator MLP</text>
+    <text class="sans body" x="256" y="180" text-anchor="middle">192 &#x2192; 128 &#x2192; K</text>
+    <text class="sans muted" x="256" y="202" text-anchor="middle">y-hat,  conf</text>
+
+    <rect x="340" y="128" width="124" height="92" rx="8" fill="#FFFFFF" stroke="#0B60BD" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="402" y="158" text-anchor="middle">KernelSHAP</text>
+    <text class="sans body" x="402" y="180" text-anchor="middle">distilled student</text>
+    <text class="sans muted" x="402" y="202" text-anchor="middle">p*  domain</text>
+
+    <path d="M172,174 H182" fill="none" stroke="#0B60BD" stroke-width="2" marker-end="url(#arrBlue)"/>
+    <path d="M326,174 H336" fill="none" stroke="#0B60BD" stroke-width="2" marker-end="url(#arrBlue)"/>
+
+    <rect x="40" y="240" width="424" height="60" rx="8" fill="#FFFFFF" stroke="#0B60BD" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="252" y="264" text-anchor="middle">handoff to Reason</text>
+    <text class="sans body" x="252" y="286" text-anchor="middle">y-hat ,  conf ,  p* ,  top features</text>
+
+    <text class="sans muted" x="252" y="328" text-anchor="middle">raw columns stay local; only embeddings leave</text>
+    <text class="sans muted" x="252" y="368" text-anchor="middle">centralized MLP is a baseline, not on the live path</text>
+  </g>
+
+  <!-- 2 Reason -->
+  <g id="reason">
+    <rect x="568" y="68" width="456" height="340" rx="10" fill="#FFFCFF" stroke="#6A2DBF" stroke-width="2"/>
+    <rect x="568" y="68" width="456" height="40" clip-path="url(#clipReason)" fill="#6A2DBF"/>
+    <text class="sans hdr" x="796" y="94" text-anchor="middle">2  Reason   (RAG + LLM)</text>
+
+    <rect x="584" y="128" width="132" height="92" rx="8" fill="#F7F1FF" stroke="#6A2DBF" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="650" y="158" text-anchor="middle">query q</text>
+    <text class="sans body" x="650" y="180" text-anchor="middle">filled template</text>
+    <text class="sans muted" x="650" y="202" text-anchor="middle">class, p*, keywords</text>
+
+    <rect x="730" y="128" width="140" height="92" rx="8" fill="#FFFFFF" stroke="#6A2DBF" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="800" y="158" text-anchor="middle">retrieve + rank</text>
+    <text class="sans body" x="800" y="180" text-anchor="middle">FAISS &#x2192; MMR</text>
+    <text class="sans muted" x="800" y="202" text-anchor="middle">&#x2192; cross-encoder</text>
+
+    <rect x="884" y="128" width="124" height="92" rx="8" fill="#FFFFFF" stroke="#6A2DBF" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="946" y="158" text-anchor="middle">GPT-4o-mini</text>
+    <text class="sans body" x="946" y="180" text-anchor="middle">T = 0.3</text>
+    <text class="sans muted" x="946" y="202" text-anchor="middle">JSON only</text>
+
+    <path d="M716,174 H726" fill="none" stroke="#6A2DBF" stroke-width="2" marker-end="url(#arrPurple)"/>
+    <path d="M870,174 H880" fill="none" stroke="#6A2DBF" stroke-width="2" marker-end="url(#arrPurple)"/>
+
+    <rect x="584" y="240" width="424" height="60" rx="8" fill="#FFFFFF" stroke="#6A2DBF" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="796" y="264" text-anchor="middle">handoff to Commit</text>
+    <text class="sans body" x="796" y="286" text-anchor="middle">plan JSON   &#x00B7;   actions from W[y-hat]</text>
+
+    <text class="sans muted" x="796" y="328" text-anchor="middle">NIST 800-53 / 800-207  &#x00B7;  CIS  &#x00B7;  ATT&amp;CK</text>
+    <text class="sans muted" x="796" y="348" text-anchor="middle">proposal only &#x2014; does not authorize or dispatch</text>
+    <text class="sans muted" x="796" y="388" text-anchor="middle">network_tier = Access / Perimeter / Endpoint</text>
+  </g>
+
+  <!-- 3 Commit -->
+  <g id="commit">
+    <rect x="1112" y="68" width="464" height="340" rx="10" fill="#FFFCF8" stroke="#D45522" stroke-width="2"/>
+    <rect x="1112" y="68" width="464" height="40" clip-path="url(#clipCommit)" fill="#D45522"/>
+    <text class="sans hdr" x="1344" y="94" text-anchor="middle">3  Commit   (ledger)</text>
+
+    <rect x="1128" y="128" width="208" height="92" rx="8" fill="#FFF3ED" stroke="#D45522" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="1232" y="158" text-anchor="middle">canonicalize P</text>
+    <text class="sans body" x="1232" y="180" text-anchor="middle">c = SHA-256(P)</text>
+    <text class="sans muted" x="1232" y="202" text-anchor="middle">32-byte digest only</text>
+
+    <rect x="1352" y="128" width="208" height="92" rx="8" fill="#FFFFFF" stroke="#D45522" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="1456" y="158" text-anchor="middle">AgenticTrustRegistry</text>
+    <text class="sans body" x="1456" y="180" text-anchor="middle">write-once anchor</text>
+    <text class="sans muted" x="1456" y="202" text-anchor="middle">TrustAnchored</text>
+
+    <path d="M1336,174 H1348" fill="none" stroke="#D45522" stroke-width="2" marker-end="url(#arrOrange)"/>
+
+    <rect x="1128" y="240" width="432" height="88" rx="8" fill="#FFFFFF" stroke="#D45522" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="1344" y="270" text-anchor="middle">on-chain whitelist  W[a, u]</text>
+    <text class="sans body" x="1344" y="292" text-anchor="middle">seeded per attack class; not promptable</text>
+    <text class="sans muted" x="1344" y="314" text-anchor="middle">ledger freezes W and c &#x2014; it does not dispatch</text>
+  </g>
+
+  <!-- gutters: Detect 480, Reason 568 (gap 88). Reason 1024, Commit 1112 (gap 88) -->
+  <path d="M480,174 H564" fill="none" stroke="#0B60BD" stroke-width="2.5" marker-end="url(#arrBlue)"/>
+  <rect x="486" y="146" width="72" height="20" rx="10" fill="#FFFFFF" stroke="#0B60BD" stroke-width="1"/>
+  <text class="sans pill" x="522" y="161" text-anchor="middle">y-hat, p*</text>
+
+  <path d="M1024,174 H1108" fill="none" stroke="#6A2DBF" stroke-width="2.5" marker-end="url(#arrPurple)"/>
+  <rect x="1042" y="146" width="48" height="20" rx="10" fill="#FFFFFF" stroke="#6A2DBF" stroke-width="1"/>
+  <text class="sans pill" x="1066" y="161" text-anchor="middle">plan</text>
+
+  <!-- Domain agents -->
+  <g id="domains">
+    <rect x="24" y="448" width="1056" height="300" rx="10" fill="#FFFDF6" stroke="#C9A227" stroke-width="2"/>
+    <path d="M552,508 V448" fill="none" stroke="#0B60BD" stroke-width="2"/>
+    <rect x="24" y="448" width="1056" height="40" clip-path="url(#clipDomains)" fill="#C9A227"/>
+    <text class="sans hdr" x="552" y="474" text-anchor="middle">Enterprise domains     &#x00B7;     CICFlowMeter 88 columns     &#x00B7;     K = 9</text>
+
+    <text class="sans muted" x="40" y="628">traffic</text>
+    <path d="M82,624 H118" fill="none" stroke="#0B60BD" stroke-width="2" marker-end="url(#arrBlue)"/>
+
+    <rect x="124" y="560" width="280" height="108" rx="8" fill="#FFFFFF" stroke="#0B60BD" stroke-width="1.75"/>
+    <text class="sans boxTitle" x="264" y="592" text-anchor="middle">D1  Access / ISP</text>
+    <text class="sans body" x="264" y="616" text-anchor="middle">23 volume / rate columns</text>
+    <text class="sans muted" x="264" y="636" text-anchor="middle">local MLP   d &#x2192; 128 &#x2192; 64</text>
+    <text class="sans muted" x="264" y="654" text-anchor="middle">h1 in R^64</text>
+
+    <rect x="436" y="560" width="280" height="108" rx="8" fill="#FFFFFF" stroke="#0B60BD" stroke-width="1.75"/>
+    <text class="sans boxTitle" x="576" y="592" text-anchor="middle">D2  Perimeter / IDS</text>
+    <text class="sans body" x="576" y="616" text-anchor="middle">32 packet / port columns</text>
+    <text class="sans muted" x="576" y="636" text-anchor="middle">local MLP   d &#x2192; 128 &#x2192; 64</text>
+    <text class="sans muted" x="576" y="654" text-anchor="middle">h2 in R^64</text>
+
+    <rect x="748" y="560" width="280" height="108" rx="8" fill="#FFFFFF" stroke="#0B60BD" stroke-width="1.75"/>
+    <text class="sans boxTitle" x="888" y="592" text-anchor="middle">D3  Endpoint / EDR</text>
+    <text class="sans body" x="888" y="616" text-anchor="middle">42 timing / flag columns</text>
+    <text class="sans muted" x="888" y="636" text-anchor="middle">local MLP   d &#x2192; 128 &#x2192; 64</text>
+    <text class="sans muted" x="888" y="654" text-anchor="middle">h3 in R^64</text>
+
+    <path d="M264,560 V536 H888" fill="none" stroke="#0B60BD" stroke-width="2"/>
+    <path d="M576,560 V536" fill="none" stroke="#0B60BD" stroke-width="2"/>
+    <path d="M888,560 V536" fill="none" stroke="#0B60BD" stroke-width="2"/>
+    <rect x="478" y="508" width="148" height="22" rx="11" fill="#FFFFFF" stroke="#0B60BD" stroke-width="1"/>
+    <text class="sans pill" x="552" y="524" text-anchor="middle">64-d embeddings only</text>
+    <path d="M552,536 V530" fill="none" stroke="#0B60BD" stroke-width="2"/>
+
+    <rect x="124" y="678" width="904" height="54" rx="8" fill="#F4E8C3" stroke="#C9A227" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="576" y="702" text-anchor="middle">control plane     API / gRPC / MCP</text>
+    <text class="sans muted" x="576" y="722" text-anchor="middle">opened only after the Apply gate passes</text>
+  </g>
+
+  <!-- embeddings re-enter above the domain header and into Detect -->
+  <path d="M552,448 V418 H252 V408" fill="none" stroke="#0B60BD" stroke-width="2" marker-end="url(#arrBlue)"/>
+
+  <!-- Commit down to Apply -->
+  <path d="M1344,408 V444" fill="none" stroke="#D45522" stroke-width="2.5" marker-end="url(#arrOrange)"/>
+  <rect x="1320" y="414" width="48" height="20" rx="10" fill="#FFFFFF" stroke="#D45522" stroke-width="1"/>
+  <text class="sans pill" x="1344" y="429" text-anchor="middle">c, W</text>
+
+  <!-- 4 Apply -->
+  <g id="apply">
+    <rect x="1112" y="448" width="464" height="300" rx="10" fill="#FBFFFB" stroke="#1F6B30" stroke-width="2"/>
+    <rect x="1112" y="448" width="464" height="40" clip-path="url(#clipApply)" fill="#1F6B30"/>
+    <text class="sans hdr" x="1344" y="474" text-anchor="middle">4  Apply   (execution gate)</text>
+
+    <rect x="1128" y="508" width="432" height="70" rx="8" fill="#FFFFFF" stroke="#1F6B30" stroke-width="1.5"/>
+    <text class="sans boxTitle" x="1344" y="534" text-anchor="middle">admit u at tier t only if all three hold</text>
+    <text class="sans body" x="1344" y="558" text-anchor="middle">1  W[y-hat, u] = 1     2  u, t bound to plan     3  c = rehash(P)</text>
+
+    <path d="M1344,578 V604" fill="none" stroke="#1F6B30" stroke-width="2"/>
+    <path d="M1344,604 L1388,640 L1344,676 L1300,640 Z" fill="#FFFFFF" stroke="#1F6B30" stroke-width="2"/>
+    <text class="sans boxTitle" x="1344" y="645" text-anchor="middle">gate</text>
+
+    <path d="M1300,640 H1256" fill="none" stroke="#C42020" stroke-width="2" marker-end="url(#arrRed)"/>
+    <rect x="1128" y="610" width="124" height="60" rx="8" fill="#FFF2F2" stroke="#C42020" stroke-width="1.5"/>
+    <text class="sans stop" x="1190" y="634" text-anchor="middle">block</text>
+    <text class="sans muted" x="1190" y="654" text-anchor="middle">review; re-enter</text>
+
+    <path d="M1388,640 H1432" fill="none" stroke="#1F6B30" stroke-width="2" marker-end="url(#arrGreen)"/>
+    <rect x="1436" y="610" width="124" height="60" rx="8" fill="#F0FFF4" stroke="#1F6B30" stroke-width="1.5"/>
+    <text class="sans go" x="1498" y="634" text-anchor="middle">apply u at t</text>
+    <text class="sans muted" x="1498" y="654" text-anchor="middle">receipt on-chain</text>
+
+    <text class="sans muted" x="1344" y="712" text-anchor="middle">SOC / SIEM subscribes to TrustAnchored</text>
+    <text class="sans muted" x="1344" y="732" text-anchor="middle">operator approval does not skip the gate</text>
+  </g>
+
+  <!-- pass dispatch into control plane -->
+  <path d="M1112,705 H1032" fill="none" stroke="#1F6B30" stroke-width="2" marker-end="url(#arrGreen)"/>
+
+  <text class="sans foot" x="800" y="776" text-anchor="middle">handoffs:  Detect emits (y-hat, conf, p*)   &#x2192;   Reason emits plan JSON   &#x2192;   Commit stores SHA-256(P) and W   &#x2192;   Apply requires all three gates</text>
+</svg>

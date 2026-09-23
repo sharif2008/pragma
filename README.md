@@ -47,9 +47,16 @@ This is **hash-only anchoring** (no sensitive data on-chain): the chain provides
 
 ## System design
 
-![PRAGMA end-to-end architecture: Detection, Reasoning and Planning, Blockchain Governance, and Execution and Monitoring](assets/pragma_system_diagram_v3.png)
+![PRAGMA system flow: Detect → Reason → Commit → Apply](assets/pragma_system_flow.svg)
 
-Detect → Reason → Commit → Apply across Access / Perimeter / Endpoint. Domain agents feed a VFL detector and SHAP attribution; a policy-grounded planner drafts a mitigation plan; the plan is hash-anchored on-chain; Apply admits an action only if it is whitelisted, bound to the committed plan, and integrity-checked.
+Detect → Reason → Commit → Apply across Access / Perimeter / Endpoint.
+
+| Layer | What it does | What it hands off |
+|-------|----------------|-------------------|
+| **Detect** | Three local MLPs emit 64-d embeddings; the coordinator concatenates to 192-d and classifies; distilled KernelSHAP names the dominant domain `p*`. | `(y-hat, conf, p*)` |
+| **Reason** | Template query → FAISS / MMR / cross-encoder over a closed policy corpus → slot-filled GPT-4o-mini JSON. Actions must already be in `W[y-hat]`. | `plan` JSON |
+| **Commit** | Canonicalize `P`, write `c = SHA-256(P)` once, keep per-attack whitelist `W` on-chain. Hash only; no dispatch. | `c`, `W` |
+| **Apply** | Admit action `u` at tier `τ` only if whitelist, plan-binding, and digest all match. Else block; operator approval re-enters the same gate. | apply or block |
 
 ## Technologies used
 
