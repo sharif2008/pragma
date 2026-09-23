@@ -45,20 +45,11 @@ The Solidity contract is a **minimal commitment registry**:
 
 This is **hash-only anchoring** (no sensitive data on-chain): the chain provides immutability; the backend provides verification + execution gating.
 
-## System diagram
+## System design
 
-```mermaid
-flowchart LR
-  UI[Operator UI] --> API[Backend API]
+![PRAGMA end-to-end architecture: Detection, Reasoning and Planning, Blockchain Governance, and Execution and Monitoring](assets/pragma_system_diagram_v3.png)
 
-  API --> Detect[VFL detect + SHAP]
-  Detect --> Plan[RAG + LLM plan]
-  Plan --> Trust[Hash-only blockchain anchor]
-  Trust --> Apply[Verify then apply]
-
-  API --- DB[(MySQL)]
-  API --- Files[(Reports + KB)]
-```
+Detect → Reason → Commit → Apply across Access / Perimeter / Endpoint. Domain agents feed a VFL detector and SHAP attribution; a policy-grounded planner drafts a mitigation plan; the plan is hash-anchored on-chain; Apply admits an action only if it is whitelisted, bound to the committed plan, and integrity-checked.
 
 ## Technologies used
 
