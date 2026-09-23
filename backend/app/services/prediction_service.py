@@ -13,11 +13,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.models.domain import JobStatus, ManagedFile, ModelVersion, PredictionJob
-from app.utils.file_utils import remove_path
 from app.services import file_service
-from app.services.ml_training import load_model_bundle
-from app.notebook_runtime.vfl_utils import canonical_attack_type
-from app.services.prediction_shap import (
+from scripts.ml_sklearn import load_model_bundle
+from scripts.vfl import canonical_attack_type
+from scripts.shap import (
     RESULTS_JSON_TOP_SHAP_FEATURES,
     compute_sklearn_tree_shap_per_row,
     limit_shap_per_feature_by_abs,
@@ -130,7 +129,7 @@ def _remove_prediction_output_file(settings: Settings, job: PredictionJob) -> No
     except ValueError:
         logger.warning("Skipping removal of output outside storage_root: %s", job.output_path)
         return
-    remove_path(out_abs)
+    file_service.remove_path(out_abs)
 
 
 def delete_prediction_job(db: Session, settings: Settings, public_id: str) -> None:
@@ -211,7 +210,7 @@ def run_prediction_job_sync(job_db_id: int) -> None:
             proba_class_names: list[str] = []
 
             if bundle.get("kind") == "vfl_torch":
-                from app.services.ml_vfl import predict_vfl_batch, vfl_gradient_x_input_attribution_rows
+                from scripts.ml_vfl import predict_vfl_batch, vfl_gradient_x_input_attribution_rows
 
                 pred_idx, max_p_arr, probs_full = predict_vfl_batch(bundle, X, return_probs=True)
                 classes: list = bundle["label_classes"]

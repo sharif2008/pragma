@@ -19,14 +19,14 @@ from app.db.session import SessionLocal
 from app.models.domain import AgentRunStatus, ManagedFile, ModelVersion
 from app.models.domain import FileKind, JobStatus, PredictionJob
 from app.services import agent_service, file_service, prediction_service
-from app.services.agentic_llm_prompt import (
+from scripts.llm_prompt import (
     build_agentic_decide_user_prompt,
     build_sample_from_prediction_job,
     load_attack_agentic_config,
 )
 from app.services import llm_service
 from app.services import kb_service
-from app.services.rag_templates_row_context import build_row_agent_templates
+from scripts.rag_templates import build_row_agent_templates
 from app.services.run_service import (
     StepTimer,
     emit_event,

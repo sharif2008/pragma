@@ -15,16 +15,15 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import Settings
 from app.models.domain import FileKind, JobStatus, KnowledgeBaseFile, ManagedFile
-from app.rag.chunking import chunk_text, load_document_text
-from app.rag.cross_encoder_rerank import normalize_scores, score_queries_passages_max, score_query_passages
-from app.rag.vector_store import FaissKnowledgeIndex, _normalize
+from scripts.rag_chunking import chunk_text, load_document_text
+from scripts.rag_rerank import normalize_scores, score_queries_passages_max, score_query_passages
+from scripts.rag_store import FaissKnowledgeIndex, _normalize
 from app.services import file_service, prediction_service
-from app.services.rag_templates_from_predictions import build_rag_templates_from_summary
-from app.services.rag_templates_row_context import (
+from scripts.rag_templates import (
+    build_rag_templates_from_summary,
     build_row_agent_templates,
     build_templated_rag_retrieval_query,
 )
-from app.utils.file_utils import remove_path
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +72,7 @@ async def ingest_kb_document(
     chunks = [{"text": t, "source": mf.original_name, "managed_file_public_id": mf.public_id} for t in chunks_raw]
 
     index_dir = settings.storage_root / "vector_db" / mf.public_id
-    remove_path(index_dir)
+    file_service.remove_path(index_dir)
     index_dir.mkdir(parents=True, exist_ok=True)
     store = FaissKnowledgeIndex(index_dir, settings.embedding_model)
     store.build_from_texts(chunks)
@@ -189,10 +188,10 @@ def get_kb(db: Session, public_id: str) -> KnowledgeBaseFile:
 def delete_kb(db: Session, settings: Settings, public_id: str) -> None:
     row = get_kb(db, public_id)
     vdir = settings.storage_root / row.vector_index_dir
-    remove_path(vdir)
+    file_service.remove_path(vdir)
     mf = db.get(ManagedFile, row.managed_file_id)
     if mf:
-        remove_path(file_service.resolved_path(settings, mf))
+        file_service.remove_path(file_service.resolved_path(settings, mf))
         db.delete(mf)
     db.delete(row)
     db.commit()
@@ -222,7 +221,7 @@ def purge_pipeline_run_kb_artifacts(db: Session, settings: Settings) -> dict[str
     if knowledge_dir.is_dir():
         for path in knowledge_dir.iterdir():
             if path.is_file() and is_pipeline_run_artifact_name(path.name):
-                remove_path(path)
+                file_service.remove_path(path)
                 orphan_files.append(path.name)
 
     return {"deleted_kb_public_ids": deleted_ids, "deleted_orphan_files": orphan_files}

@@ -30,7 +30,7 @@ from app.schemas.prediction import (
 )
 from app.services import prediction_service
 from app.services import trust_chain_service
-from app.services.network_domains import (
+from scripts.network_domains import (
     ACCESS_ISP,
     ENDPOINT_EDR,
     PERIMETER_IDS,
@@ -38,9 +38,10 @@ from app.services.network_domains import (
     normalize_domain,
     rewrite_plan_network_tiers,
 )
-from app.services.rag_templates_row_context import resolve_prediction_row
-from app.notebook_runtime.vfl_utils import canonical_attack_type
-from app.utils.file_utils import remove_path
+from scripts.rag_templates import resolve_prediction_row
+from scripts.vfl import canonical_attack_type
+from scripts.apply_gates import decide_apply_gates
+from app.services.file_service import remove_path
 
 logger = logging.getLogger(__name__)
 
@@ -698,23 +699,17 @@ def _build_chain_action_items(
         if whitelist_err:
             item["whitelist_error"] = whitelist_err
 
-        if allowed is not True:
-            item["result"] = "failed" if allowed is False else "skipped"
-            item["failure_reason"] = (
-                "action_not_whitelisted" if allowed is False else "whitelist_unavailable"
-            )
-            items.append(item)
-            continue
-
-        if planned_action and str(planned_action) != action:
-            item["result"] = "failed"
-            item["failure_reason"] = "action_plan_mismatch"
-            items.append(item)
-            continue
-
-        if not integrity_valid:
-            item["result"] = "failed"
-            item["failure_reason"] = "integrity_validation_error"
+        decision = decide_apply_gates(
+            attack_type=attack_type,
+            action=action,
+            planned_action=str(planned_action) if planned_action else None,
+            whitelist_allowed=allowed,
+            integrity_valid=integrity_valid,
+        )
+        item["whitelisted"] = decision.whitelisted if decision.whitelisted is not None else allowed
+        if decision.result != "success":
+            item["result"] = decision.result
+            item["failure_reason"] = decision.failure_reason
             items.append(item)
             continue
 

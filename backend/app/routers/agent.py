@@ -27,12 +27,12 @@ from app.schemas.prediction import (
     TrustAnchorVerifyOut,
 )
 from app.services import agent_service, kb_service, llm_service, prediction_service
-from app.services.agentic_llm_prompt import (
+from scripts.llm_prompt import (
     build_agentic_decide_user_prompt,
     build_sample_from_prediction_job,
     load_attack_agentic_config,
 )
-from app.services.rag_templates_row_context import resolve_prediction_row
+from scripts.rag_templates import resolve_prediction_row
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 

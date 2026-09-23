@@ -59,13 +59,13 @@ except Exception as e:  # pragma: no cover
 
 from app.core.config import Settings, get_settings
 from app.services import llm_service, trust_chain_service
-from app.services.agentic_llm_prompt import (
+from scripts.llm_prompt import (
     LLM_ORCHESTRATION_TOP_SHAP_FEATURES,
     load_attack_agentic_config,
     row_to_shap_explanation,
 )
-from app.services.ml_training import load_model_bundle
-from app.services.prediction_shap import (
+from scripts.ml_sklearn import load_model_bundle
+from scripts.shap import (
     RESULTS_JSON_TOP_SHAP_FEATURES,
     compute_sklearn_tree_shap_per_row,
     limit_shap_per_feature_by_abs,
@@ -255,7 +255,7 @@ def _batch_model_inference(
     out: list[dict[str, Any]] = []
 
     if bundle.get("kind") == "vfl_torch":
-        from app.services import ml_vfl
+        from scripts import ml_vfl
 
         pred_idx, max_p_arr, probs_full = ml_vfl.predict_vfl_batch(bundle, X, return_probs=True)
         classes: list = bundle["label_classes"]
@@ -543,7 +543,7 @@ def _csv_row_to_sample_data(
 
     shap_for_response = _shap_contribution_for_response(top_conditions, shap_source=shap_source)
 
-    # Slim JSON for the LLM user message (see app.services.agentic_llm_prompt orchestration prompt).
+    # Slim JSON for the LLM user message (see scripts.llm_prompt orchestration prompt).
     orchestration_llm_payload: dict[str, Any] = {
         "sample_id": row_index,
         "predicted_label": predicted_label,

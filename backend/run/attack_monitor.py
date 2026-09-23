@@ -46,7 +46,7 @@ RUN_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = RUN_DIR.parent
 
 try:
-    from app.notebook_runtime.vfl_utils import (
+    from scripts.vfl import (
         canonical_attack_type,
         load_attack_option_keys,
         pick_allowed_alternate_action,
@@ -54,7 +54,7 @@ try:
     )
 except ImportError:
     sys.path.insert(0, str(BACKEND_DIR))
-    from app.notebook_runtime.vfl_utils import (
+    from scripts.vfl import (
         canonical_attack_type,
         load_attack_option_keys,
         pick_allowed_alternate_action,
