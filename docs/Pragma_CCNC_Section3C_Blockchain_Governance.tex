@@ -1,0 +1,66 @@
+% III-C Blockchain Governance --- paste-ready subsection.
+% Citations use only keys from the current thebibliography.
+% \ref{sec:reason}, \ref{sec:apply}, \ref{fig:e2e} must exist in the manuscript.
+
+\subsection{Blockchain Governance Layer (Commit)}
+\label{sec:commit}
+
+Section~\ref{sec:reason} forwards a single object $\mathrm{plan}_i$: the Mitigation Plans JSON whose action names were copied from $W[\hat{y}_i]$ and whose network tier is exactly Access~/~ISP, Perimeter~/~IDS, or Endpoint~/~EDR. That object is still a \emph{proposal}. Reasoning is probabilistic. A language model can emit a fluent action that is still harmful on a live path; a poisoned or substituted plan can change between generation and dispatch; a policy paragraph in a prompt can be ignored~\cite{xi2023,lazer2026,chhabra2026}. Autonomous defense therefore needs a pre-execution governance layer that cannot hallucinate mitigations and cannot be talked into accepting them~\cite{karim2025,pendli2025,jan2025}.
+
+A smart contract is a program that lives on a ledger and executes exactly the rules written in its code. Callers submit transactions; the network orders them; every honest replica applies the same function to the same state. We use that property for two jobs only: an unpromptable per-attack whitelist, and a write-once digest of the plan produced for this detection cycle~\cite{zhang2024exploit,chen2024,jin2024}. The contract does not classify traffic, does not retrieve policy, and does not dispatch. Those remain Detect, Reason, and Apply.
+\begin{equation}
+\underbrace{\mathrm{plan}_i}_{\text{III-B}}
+\;\xrightarrow{\mathrm{canonicalize}}\;
+P
+\;\xrightarrow{\mathrm{SHA256}}\;
+c
+\;\xrightarrow{\mathrm{anchor}}\;
+\mathrm{ledger}[k_{\mathrm{agent}},k_{\mathrm{report}}]
+\;\xrightarrow{\mathrm{TrustAnchored}}\;
+\text{SOC / Apply}.
+\label{eq:commit-pipeline}
+\end{equation}
+
+\paragraph{Off-Chain Payload versus On-Chain Digest.}
+After Reason returns, the Mitigation Plans object is persisted off-chain (identity, structured plan, retrieval context). The backend then builds a canonical payload $P$ with fixed keys, sorted lexicographically, compact separators, and UTC timestamps so two encodings of the same report cannot produce two hashes: payload version; report and prediction identities; optional row index (the same Detection row Reason used); creation time; structured $\mathrm{plan}_i$ (threat level, primary and supporting units, tiers, reasoning); and the retrieval context used in the prompt.
+\begin{equation}
+c = \mathrm{SHA256}(\mathrm{canonicalJSON}(P)).
+\label{eq:commitment}
+\end{equation}
+Telemetry, the $192$-d fusion vector, SHAP tables, and free-form model prose are not required on the ledger~\cite{zhang2024exploit}. Only the $32$-byte digest $c$ is written. Confidentiality is the point: an auditor who holds $P$ can re-hash and compare; an observer of the chain cannot reconstruct the flow or the prompt.
+
+\paragraph{Addressing and Keys.}
+The registry never stores human-readable identifiers. Four $\mathtt{bytes32}$ keys are derived before the transaction (Table~\ref{tab:commit-keys}). Lookups are $W[k_a][k_u]$ and $\mathrm{commitments}[k_{\mathrm{agent}}][k_{\mathrm{report}}]$. A paraphrase that Reason was forbidden to emit also fails here: \texttt{limit rate} and \texttt{rate limiting} are different keys.
+
+\begin{table}[t]
+\caption{Hash keys used by the governance registry. Attack and action tokens match the UTF-8 labels used by Detect and Reason.}
+\label{tab:commit-keys}
+\centering
+\begin{tabular}{p{0.18\columnwidth}p{0.36\columnwidth}p{0.36\columnwidth}}
+\hline
+Key & Formation & Role \\
+\hline
+$k_{\mathrm{agent}}$ & SHA-256 of the agent-job identity & Bind the cycle to the requester \\
+$k_{\mathrm{report}}$ & SHA-256 of the report identity & One commitment slot per plan \\
+$k_a$ & $\mathrm{keccak256}(\hat{y}_i)$ & Attack class as the contract sees it \\
+$k_u$ & $\mathrm{keccak256}(u)$ & Exact catalog token (not a paraphrase) \\
+\hline
+\end{tabular}
+\end{table}
+
+\paragraph{Job 1: Per-Attack Whitelist.}
+At deploy, the owner seeds $W[a,u]$ from the same catalog Reason was allowed to name (CICIDS-2017 grouping~\cite{sharafaldin2018}). After seed, ordinary callers cannot add a name. $\mathtt{isActionWhitelisted}(k_a,k_u)$ is a view; it does not depend on the prompt. An action that is legal for DDoS and illegal for the predicted PortScan fails even if the sentence is fluent. That is the failure a policy paragraph cannot close: the model cannot talk a new token onto $W$~\cite{jan2025,singh2025zt}.
+
+\paragraph{Job 2: Write-Once Anchor.}
+$\mathtt{anchor}(k_{\mathrm{agent}},k_{\mathrm{report}},c)$ requires every argument nonzero and $\mathrm{commitments}[k_{\mathrm{agent}}][k_{\mathrm{report}}]=0$. A second write is rejected. The contract emits $\mathtt{TrustAnchored}$. Later readers call $\mathtt{getCommitment}$ and compare to a fresh SHA-256 of the stored $P$. Three outcomes are distinguishable: (i)~hashes match---$P$ is the plan that was committed; (ii)~hashes differ---$P$ was edited after Commit; (iii)~commitment is empty---this cycle was never anchored, so Apply must not proceed.
+
+Immutability here is not ``the blockchain stores the network.'' It is three enforceable facts: the allowed action set for each attack is on-chain and not promptable; the plan for this cycle has a single committed digest; any later apply must bind to both~\cite{alqithami2026,pendli2025}.
+
+\paragraph{What the Contract Will Not Check.}
+$\mathtt{applyAction}(k_a,k_u,k_{\mathrm{agent}},k_{\mathrm{report}})$ is a receipt, not the full gate. On-chain it requires (i)~$W[k_a,k_u]=1$, (ii)~a nonzero commitment for that pair, and (iii)~the unit not already applied. It does not restore $\tau$ or test $u\in\mathrm{plan}(P)$. Those comparisons need the off-chain JSON. Software therefore evaluates, in order, whitelist, plan-binding ($u$ and $\tau$ identical to Reason's unit), and digest ($c_{\mathrm{chain}}=c_{\mathrm{rehash}}$) \emph{before} the receipt transaction. A still-whitelisted action copied from another cycle dies at plan-binding; a rewritten payload dies at the digest. Putting the full JSON on-chain would break the hash-only confidentiality claim. The split is intentional: the ledger freezes $W$ and $c$; Apply restores $\mathrm{plan}_i$ (Fig.~\ref{fig:e2e}).
+
+\paragraph{Governance as a Signal, Not an Actuator.}
+$\mathtt{TrustAnchored}$ is a tamper-evident event that a validated proposal exists. The SOC~/~SIEM~/~monitoring bus is a subscriber, not a vendor-specific product~\cite{chen2024,jin2024}. Review/Approve from an operator is recorded back through the same registry and re-enters retrieve--compare; approval does not skip the gate. The contract freezes what may be done. It does not open API, gRPC, or MCP.
+
+\paragraph{Handoff to Execution and Monitoring.}
+Commit emits $c$, the event, and the keys Section~\ref{sec:apply} will need to retrieve $W[\hat{y}_i]$ and $\mathtt{getCommitment}$. This closes the ungoverned-proposal failure that Section~\ref{sec:reason} left open: $\mathrm{plan}_i$ can no longer be silently replaced by another fluent JSON. It does not close actuation. A still-whitelisted unit aimed at the wrong domain, or a second apply of the same $(k_{\mathrm{agent}},k_{\mathrm{report}},k_u)$, must be refused at the execution gate. Restoring $\tau$, testing $u\in\mathrm{plan}(P)$, and only then calling $\mathtt{applyAction}$ is the failure the Execution and Monitoring Layer exists to close.

@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="880" viewBox="0 0 1600 880" role="img" aria-labelledby="title desc">
+  <title id="title">PRAGMA: Privacy-preserving multi-domain intrusion response</title>
+  <desc id="desc">Architecture: domain agents feed a detect-reason-commit-apply core, which consults a policy corpus, anchors commitments on AgenticTrustRegistry, and dispatches or blocks at the network operator.</desc>
+
+  <defs>
+    <style><![CDATA[
+      .sans { font-family: "Segoe UI", Arial, Helvetica, sans-serif; }
+      .serif { font-family: "Times New Roman", Times, serif; font-style: italic; }
+      .title { font-size: 22px; font-weight: 700; fill: #0A3D73; }
+      .subtitle { font-size: 13px; font-weight: 400; fill: #5A5A5A; }
+      .body { font-size: 14px; font-weight: 400; fill: #1A1A1A; }
+      .muted { font-size: 12px; font-weight: 400; fill: #5A5A5A; }
+      .box-title { font-size: 17px; font-weight: 700; fill: #0A3D73; }
+      .hdr { font-size: 15px; font-weight: 700; fill: #FFFFFF; }
+      .action-go { font-size: 15px; font-weight: 700; fill: #0B60BD; }
+      .action-stop { font-size: 15px; font-weight: 700; fill: #C42020; }
+      .banner-brand { font-size: 18px; font-weight: 700; fill: #FFFFFF; }
+      .banner-tag { font-size: 18px; font-weight: 400; fill: #FFFFFF; }
+    ]]></style>
+
+    <marker id="arrow" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,4 L0,8 z" fill="#0B60BD"/>
+    </marker>
+    <marker id="arrowSm" markerWidth="8" markerHeight="7" refX="7" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L8,3.5 L0,7 z" fill="#0B60BD"/>
+    </marker>
+
+    <clipPath id="clip-detect"><rect x="420" y="120" width="312" height="286" rx="12"/></clipPath>
+    <clipPath id="clip-reason"><rect x="768" y="120" width="312" height="286" rx="12"/></clipPath>
+    <clipPath id="clip-commit"><rect x="420" y="442" width="312" height="286" rx="12"/></clipPath>
+    <clipPath id="clip-apply"><rect x="768" y="442" width="312" height="286" rx="12"/></clipPath>
+  </defs>
+
+  <rect width="1600" height="880" fill="#FFFFFF"/>
+
+  <!-- Domain agents -->
+  <g id="domain-agents">
+    <rect x="36" y="52" width="318" height="728" rx="16" fill="#E8F1FB" stroke="#0B60BD" stroke-width="2.5"/>
+    <text class="sans title" x="195" y="86" text-anchor="middle">Domain agents</text>
+    <text class="sans subtitle" x="195" y="108" text-anchor="middle">(no raw features leave the party)</text>
+
+    <g id="domain-d1">
+      <rect x="58" y="128" width="274" height="158" rx="10" fill="#FFFFFF" stroke="#0B60BD" stroke-width="2"/>
+      <text class="sans" x="195" y="188" text-anchor="middle">
+        <tspan class="serif" font-size="18" fill="#1A1A1A">D&#x2081;</tspan>
+        <tspan class="sans" font-size="16" font-weight="600" fill="#1A1A1A">  Access / ISP</tspan>
+      </text>
+      <text class="sans body" x="195" y="216" text-anchor="middle">23 flow features</text>
+    </g>
+
+    <g id="domain-d2">
+      <rect x="58" y="310" width="274" height="158" rx="10" fill="#FFFFFF" stroke="#0B60BD" stroke-width="2"/>
+      <text class="sans" x="195" y="370" text-anchor="middle">
+        <tspan class="serif" font-size="18" fill="#1A1A1A">D&#x2082;</tspan>
+        <tspan class="sans" font-size="16" font-weight="600" fill="#1A1A1A">  Perimeter / IDS</tspan>
+      </text>
+      <text class="sans body" x="195" y="398" text-anchor="middle">32 flow features</text>
+    </g>
+
+    <g id="domain-d3">
+      <rect x="58" y="492" width="274" height="158" rx="10" fill="#FFFFFF" stroke="#0B60BD" stroke-width="2"/>
+      <text class="sans" x="195" y="552" text-anchor="middle">
+        <tspan class="serif" font-size="18" fill="#1A1A1A">D&#x2083;</tspan>
+        <tspan class="sans" font-size="16" font-weight="600" fill="#1A1A1A">  Endpoint / EDR</tspan>
+      </text>
+      <text class="sans body" x="195" y="580" text-anchor="middle">42 flow features</text>
+    </g>
+
+    <text class="sans muted" x="195" y="698" text-anchor="middle">CICIDS-2017 aligned</text>
+    <text class="sans muted" x="195" y="718" text-anchor="middle">sample IDs, disjoint columns</text>
+  </g>
+
+  <!-- arrows: domain agents to core -->
+  <g id="arrows-in" fill="none" stroke="#0B60BD" stroke-width="2.5" marker-end="url(#arrow)">
+    <line x1="354" y1="207" x2="396" y2="207"/>
+    <line x1="354" y1="389" x2="396" y2="389"/>
+    <line x1="354" y1="571" x2="396" y2="571"/>
+  </g>
+
+  <!-- PRAGMA core -->
+  <g id="pragma-core">
+    <rect x="400" y="28" width="710" height="752" rx="16" fill="#F0F5FB" stroke="#0B60BD" stroke-width="2.5"/>
+    <text class="sans title" x="755" y="62" text-anchor="middle">PRAGMA core</text>
+    <text class="sans subtitle" x="755" y="86" text-anchor="middle">detect &#x2014; reason &#x2014; commit &#x2014; apply</text>
+
+    <g id="stage-detect">
+      <g clip-path="url(#clip-detect)">
+        <rect x="420" y="120" width="312" height="286" fill="#FFFFFF"/>
+        <rect x="420" y="120" width="312" height="52" fill="#0B60BD"/>
+      </g>
+      <rect x="420" y="120" width="312" height="286" rx="12" fill="none" stroke="#0B60BD" stroke-width="2"/>
+      <text class="sans hdr" x="576" y="153" text-anchor="middle">1 Detect (VFL Layer)</text>
+      <text class="sans body" x="576" y="262" text-anchor="middle">Local MLP encoders</text>
+      <text class="sans body" x="576" y="288" text-anchor="middle">64-d embeddings, concat</text>
+      <text class="sans body" x="576" y="314" text-anchor="middle">SHAP names driving tier</text>
+    </g>
+
+    <g id="stage-reason">
+      <g clip-path="url(#clip-reason)">
+        <rect x="768" y="120" width="312" height="286" fill="#FFFFFF"/>
+        <rect x="768" y="120" width="312" height="52" fill="#0B60BD"/>
+      </g>
+      <rect x="768" y="120" width="312" height="286" rx="12" fill="none" stroke="#0B60BD" stroke-width="2"/>
+      <text class="sans hdr" x="924" y="153" text-anchor="middle">2 Reason (LLM Layer)</text>
+      <text class="sans body" x="924" y="262" text-anchor="middle">RAG over policy corpus</text>
+      <text class="sans body" x="924" y="288" text-anchor="middle">GPT-4o-mini JSON plan</text>
+      <text class="sans body" x="924" y="314" text-anchor="middle">tier-assigned actions</text>
+    </g>
+
+    <g id="stage-commit">
+      <g clip-path="url(#clip-commit)">
+        <rect x="420" y="442" width="312" height="286" fill="#FFFFFF"/>
+        <rect x="420" y="442" width="312" height="52" fill="#0B60BD"/>
+      </g>
+      <rect x="420" y="442" width="312" height="286" rx="12" fill="none" stroke="#0B60BD" stroke-width="2"/>
+      <text class="sans hdr" x="576" y="475" text-anchor="middle">3 Commit (Blockchain Layer)</text>
+      <text class="sans body" x="576" y="584" text-anchor="middle">Canonical JSON payload P</text>
+      <text class="sans body" x="576" y="610" text-anchor="middle">SHA-256 digest only</text>
+      <text class="sans body" x="576" y="636" text-anchor="middle">anchor() write-once</text>
+    </g>
+
+    <g id="stage-apply">
+      <g clip-path="url(#clip-apply)">
+        <rect x="768" y="442" width="312" height="286" fill="#FFFFFF"/>
+        <rect x="768" y="442" width="312" height="52" fill="#0B60BD"/>
+      </g>
+      <rect x="768" y="442" width="312" height="286" rx="12" fill="none" stroke="#0B60BD" stroke-width="2"/>
+      <text class="sans hdr" x="924" y="475" text-anchor="middle">4 Apply (Execution Layer)</text>
+      <text class="sans body" x="924" y="584" text-anchor="middle">Whitelist for attack</text>
+      <text class="sans body" x="924" y="610" text-anchor="middle">Plan + tier binding</text>
+      <text class="sans body" x="924" y="636" text-anchor="middle">applyAction or block</text>
+    </g>
+
+    <!-- internal flow: 1 to 2, 2 to 4, 3 to 4 -->
+    <g id="arrows-core" fill="none" stroke="#0B60BD" stroke-width="2.5" marker-end="url(#arrowSm)">
+      <line x1="732" y1="263" x2="764" y2="263"/>
+      <line x1="924" y1="406" x2="924" y2="438"/>
+      <line x1="732" y1="585" x2="764" y2="585"/>
+    </g>
+  </g>
+
+  <!-- arrows: core to right column -->
+  <g id="arrows-out" fill="none" stroke="#0B60BD" stroke-width="2.5" marker-end="url(#arrow)">
+    <line x1="1110" y1="161" x2="1152" y2="161"/>
+    <line x1="1110" y1="415" x2="1152" y2="415"/>
+    <line x1="1110" y1="670" x2="1152" y2="670"/>
+  </g>
+
+  <!-- Right column -->
+  <g id="right-column">
+    <g id="policy-corpus">
+      <rect x="1156" y="52" width="408" height="218" rx="14" fill="#FFFFFF" stroke="#0B60BD" stroke-width="2.5"/>
+      <text class="sans box-title" x="1360" y="108" text-anchor="middle">Policy corpus</text>
+      <text class="sans body" x="1360" y="142" text-anchor="middle">NIST SP 800-53 / 800-207</text>
+      <text class="sans body" x="1360" y="166" text-anchor="middle">CIS Controls v8 &#x00B7; ATT&amp;CK</text>
+      <text class="sans body" x="1360" y="190" text-anchor="middle">FAISS + MiniLM retrieval</text>
+    </g>
+
+    <line x1="1360" y1="270" x2="1360" y2="302" fill="none" stroke="#0B60BD" stroke-width="2.5" marker-end="url(#arrowSm)"/>
+
+    <g id="agentic-trust-registry">
+      <rect x="1156" y="306" width="408" height="218" rx="14" fill="#FFFFFF" stroke="#0B60BD" stroke-width="2.5"/>
+      <text class="sans box-title" x="1360" y="362" text-anchor="middle">AgenticTrustRegistry</text>
+      <text class="sans body" x="1360" y="396" text-anchor="middle">Hardhat &#x00B7; Solidity 0.8.20</text>
+      <text class="sans body" x="1360" y="420" text-anchor="middle">hash-only commitments</text>
+      <text class="sans body" x="1360" y="444" text-anchor="middle">per-attack action whitelist</text>
+    </g>
+
+    <line x1="1360" y1="524" x2="1360" y2="556" fill="none" stroke="#0B60BD" stroke-width="2.5" marker-end="url(#arrowSm)"/>
+
+    <g id="network-operator">
+      <rect x="1156" y="560" width="408" height="220" rx="14" fill="#FFFFFF" stroke="#0B60BD" stroke-width="2.5"/>
+      <text class="sans box-title" x="1360" y="612" text-anchor="middle">Network / operator</text>
+      <text text-anchor="middle" x="1360" y="656">
+        <tspan class="sans action-go">dispatch to tier </tspan>
+        <tspan class="serif action-go" font-size="16">&#x03C4;</tspan>
+        <tspan class="sans action-stop">    block + alert</tspan>
+      </text>
+      <text class="sans muted" x="1360" y="710" text-anchor="middle">Access &#x00B7; Perimeter &#x00B7; Endpoint</text>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <g id="footer">
+    <rect x="36" y="800" width="1528" height="56" rx="6" fill="#0A3D73"/>
+    <text x="800" y="835" text-anchor="middle">
+      <tspan class="sans banner-brand">PRAGMA</tspan>
+      <tspan class="sans banner-tag">  &#x00B7;  Privacy-preserving multi-domain intrusion response</tspan>
+    </text>
+  </g>
+</svg>

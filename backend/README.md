@@ -38,7 +38,7 @@ FastAPI service for versioned files, CSV ML training (including VFL), batch pred
 4. **Tables** — optional before first run; the app also runs SQLAlchemy **`create_all`** on startup:
 
    ```bash
-   python scripts/init_orm_tables.py
+   python scripts/init_db.py
    ```
 
 ## Run the API
@@ -96,7 +96,8 @@ Notes:
 End-to-end demo (recommended): from **`backend/`** with the server running:
 
 ```bash
-python scripts/simulate_network_event_demo.py --base http://127.0.0.1:8000
+python scripts/pipeline.py e2e -- --max-rows 1
+python run/attack_monitor.py
 ```
 
 **Windows:** use **`curl.exe`** (not PowerShell’s `curl` alias). Avoid bash-style `\` line continuations — use a **single line** or `--data-binary @body.json`.
@@ -109,7 +110,7 @@ python scripts/simulate_network_event_demo.py --base http://127.0.0.1:8000
 curl.exe -sS -X POST "http://127.0.0.1:8000/api/v1/simulate/network-event" -H "Content-Type: application/json" -H "Idempotency-Key: demo-event-001" -d "{\"model_version_public_id\":null,\"columns_csv\":\"bidirectional_duration_ms,bidirectional_packets,label\",\"row_csv\":\"100,5,BENIGN\",\"metadata\":{},\"simulate\":{\"latency_ms\":0}}"
 ```
 
-**Fixed feature row** (no header; length must match server `VFL_FIXED_COLUMNS` in `app/routers/simulate.py`): `POST /api/v1/simulate/network-row/simple` with JSON `{"values_csv":"<comma-separated-numbers>","metadata":{},"simulate":{}}` — copy a full `values_csv` from `scripts/simulate_network_event_demo.py` (row without trailing `label`).
+**Fixed feature row** (no header; length must match server `VFL_FIXED_COLUMNS` in `app/routers/simulate.py`): `POST /api/v1/simulate/network-row/simple` with JSON `{"values_csv":"<comma-separated-numbers>","metadata":{},"simulate":{}}` — copy a numeric row from `scripts/generate_csv.py` (omit the trailing `label`).
 
 **After `202` responses**, poll:
 
@@ -122,28 +123,28 @@ curl.exe -sS "http://127.0.0.1:8000/api/v1/runs/<RUN_ID>/events"
 
 ```bash
 cd backend
-python scripts/api_client_demo.py --base http://127.0.0.1:8000
+python scripts/demo_api.py --base http://127.0.0.1:8000
 ```
 
 Uses **`scripts/data/sample_train.csv`** by default.
 
 ## Standalone CLI scripts
 
-Run from **`backend/`**. Notebook-derived helpers live under **`app/notebook_runtime/`**; launchers may `chdir` to the repo root for paths like **`RAG_docs/`**, **`datasets/`**.
+Run from **`backend/`**. Notebook-derived helpers live under **`scripts/`**; launchers may `chdir` to the repo root for paths like **`RAG_docs/`**, **`datasets/`**.
 
 | Script | Role |
 |--------|------|
-| `scripts/api_client_demo.py` | API smoke test |
-| `scripts/simulate_network_event_demo.py` | Simulate network traffic + poll run/events |
-| `scripts/init_orm_tables.py` | Create tables early |
-| `scripts/rag_part1_build_vector_store.py` | RAG index build |
-| `scripts/rag_part2_agent_actions.py` | RAG + action plans |
-| `scripts/vfl_shap_multiclass.py` | VFL SHAP (multiclass) |
-| `scripts/vfl_shap_prediction.py` | VFL SHAP prediction |
-| `scripts/scoring_evaluation.py` | Scoring evaluation |
-| `scripts/generate_sample_csv.py` | Sample CSV |
-| `scripts/build_local_faiss_demo.py` | Local FAISS demo |
-| `scripts/merge_notebook_to_task.py` | Regenerate merged runners from `.ipynb` |
+| `scripts/demo_api.py` | API smoke test |
+| `scripts/pipeline.py` | Paper stages detect-train / rag-index / reason / evaluate / e2e |
+| `scripts/init_db.py` | Create tables early |
+| `scripts/rag_build.py` | RAG index build |
+| `scripts/reason.py` | RAG + action plans |
+| `scripts/detect_train.py` | VFL SHAP (multiclass) |
+| `scripts/detect_predict.py` | VFL SHAP prediction |
+| `scripts/evaluate.py` | Scoring evaluation |
+| `scripts/generate_csv.py` | Sample CSV |
+| `scripts/demo_faiss.py` | Local FAISS demo |
+| `scripts/demo_pipeline.py` | Stdlib Detect→Reason→Apply walkthrough |
 
 Optional **`notebooks/*.ipynb`** — install Jupyter separately if needed.
 

@@ -7,6 +7,8 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from scripts.rag_chunking import RAG_CHUNK_OVERLAP, RAG_CHUNK_SIZE, RAG_TOP_K
+
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -48,9 +50,9 @@ class Settings(BaseSettings):
     # HuggingFace cache root (models, tokenizers, etc.). Keeping this stable avoids re-downloads.
     hf_home: Path = Field(default=_BACKEND_DIR / "storage" / "hf_home", alias="HF_HOME")
 
-    rag_chunk_size: int = 512
-    rag_chunk_overlap: int = 64
-    rag_top_k: int = 5
+    rag_chunk_size: int = RAG_CHUNK_SIZE
+    rag_chunk_overlap: int = RAG_CHUNK_OVERLAP
+    rag_top_k: int = RAG_TOP_K
     # Cross-encoder reranker for multi-query / RAG context chunk selection.
     rag_use_cross_encoder: bool = Field(default=True, alias="RAG_USE_CROSS_ENCODER")
     rag_cross_encoder_model: str = Field(

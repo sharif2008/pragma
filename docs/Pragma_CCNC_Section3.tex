@@ -1,0 +1,113 @@
+% Section III --- paste into the CCNC manuscript.
+% Citations use only keys from the current thebibliography.
+% Point \ref{fig:e2e} at the existing end-to-end system diagram (Fig.~1).
+
+\section{End-to-End: System Design}
+\label{sec:system}
+
+For trustworthy operational defense in a disaggregated enterprise network, we design a unified architecture with four static functional layers, as illustrated in Fig.~\ref{fig:e2e}: (1)~the \emph{Detection Layer}, where complementary observations at Access, Perimeter, and Endpoint are classified without pooling raw telemetry, and attribution names the evidence group that drove the decision; (2)~the \emph{Reasoning and Planning Layer}, where that detection product is turned into a policy-grounded, domain-specific mitigation plan; (3)~the \emph{Blockchain Governance Layer}, where the plan is cryptographically committed and the authorized action set is stored as an unpromptable whitelist; and (4)~the \emph{Execution and Monitoring Layer}, where an execution gate admits an action only if it is authorized for the predicted attack, identical to the committed plan, and integrity-checked against the on-chain digest.
+
+Each network flow is processed in order through Detect, Reason, Commit, and Apply~\cite{li2025}. Reason does not authorize execution. Commit does not dispatch. Apply is the only layer that may touch a live control plane, and only after the gates succeed.
+
+\input{Pragma_CCNC_Section3A_Detection}
+
+\subsection{Reasoning and Planning Layer (Reason)}
+\label{sec:reason}
+
+Section~\ref{sec:detect} closes detection-without-centralization and forwards a structured record, not a narrative: the predicted class $\hat{y}_i$, the detector confidence $\mathrm{conf}_i$, the dominant evidence group $p_i^{\star}$ obtained by summing KernelSHAP over each $64$-dimensional fusion block, the three domain shares, and the top local features by $\lvert\phi\rvert$. That record is still evidence. Knowing the event is a PortScan whose Perimeter block is largest does not name an authorized control, does not say whether Access or Endpoint should move second, and does not bind those choices to a catalog an execution gate can check. An unconstrained language model can invent a fluent mitigation that no playbook allows, or can tell a host-only story for a perimeter-dominated scan~\cite{xi2023,kshetri2025agentic}. We therefore treat Reasoning as a separate layer whose job is to convert the Detection product into one machine-checkable Mitigation Plans object. The layer does not authorize execution and does not write to the ledger; those failures belong to Commit and Apply.
+
+The conversion is a fixed pipeline. After decode, nothing is free-form: the retrieval query is a filled template, ranking is a seven-step recall-then-precision cascade, the prompt is a slot-filled string, and the only accepted response is one JSON object whose action names must already appear in the per-attack catalog $W[\hat{y}_i]$ that Commit will later enforce on-chain~\cite{li2025}.
+\begin{equation}
+(\hat{y}_i,\, p_i^{\star},\, \mathrm{conf}_i,\, \mathrm{SHAP}_i)
+\;\xrightarrow{\mathrm{query}}\;
+q_i
+\;\xrightarrow{\mathrm{retrieve+rank}}\;
+\mathcal{R}_i
+\;\xrightarrow{\mathrm{prompt}}\;
+\pi_i
+\;\xrightarrow{\mathrm{JSON}}\;
+\mathrm{plan}_i.
+\end{equation}
+
+\paragraph{From Detection into a Query.}
+Domain names in every later string are forced to exactly Access~/~ISP, Perimeter~/~IDS, or Endpoint~/~EDR---the same three evidence groups used to split the 88 CICFlowMeter columns and to aggregate SHAP (Fig.~\ref{fig:e2e}). $\hat{y}_i$ selects the allowed-action list $W[\hat{y}_i]$. $\mathrm{conf}_i$ is written into both the query and the task block so intensity (\texttt{Immediate} $\ldots$ \texttt{Low}) tracks the detector rather than the model's tone. $p_i^{\star}$ becomes the sentence ``Dominant network domain: $\ldots$ (contribution: $x\%$)''; top-3 features per domain become retrieval keywords, and only the top-5 features by $\lvert\phi\rvert$ are admitted into the evidence JSON the model may cite. Retrieval does not ask the language model to invent a search string. The operational query is a single template filled from that record. Optional rephrases exist; the evaluated path uses only the template, so two identical Detection records produce the same $q_i$. That determinism is required by the next layer: Commit hashes a plan that must be reproducible from the same evidence.
+
+\paragraph{Policy Index.}
+The corpus is closed---NIST SP~800-53~\cite{nist80053}, NIST SP~800-207~\cite{nist800207}, CIS Controls~\cite{cisv8}, and MITRE ATT\&CK~\cite{mitre_attack}---not an open web~\cite{shajarian2026,fu2026}. Documents are stored parent/child. A parent is a semantic section (the text the planner will read). A child is a short passage used only for nearest-neighbor search (size $384$, overlap $96$, embedding \texttt{all-MiniLM-L6-v2}), tagged with $(\mathrm{parent\_id},\,\mathrm{child\_index},\,\mathrm{source})$. Ranking operates on children; the prompt receives expanded parents.
+
+\paragraph{Retrieve-then-Rank Cascade.}
+Dense search alone is the wrong ranking: a bi-encoder returns topical neighbors and, left unchecked, fills the prompt with near-duplicates from one source. Each step closes a failure of the previous one. (1)~\emph{Dense retrieve:} FAISS oversamples ($\min(300,\,20\times 6)$), keeps $20$ children, converts distance $d$ to $1/(1+d)$, and balances across source files. (2)~\emph{Merge and dedupe} by parent/child identity so overlap does not starve the later budget. (3)~\emph{MMR} with $\lambda=0.5$ keeps up to $60$ children, $\mathrm{MMR}(c)=\lambda\cdot\mathrm{sim}(q,c)-(1-\lambda)\cdot\max_{c'\in S}\mathrm{sim}(c,c')$, so NIST, CIS, and ATT\&CK can coexist. (4)~\emph{Cross-encoder} \texttt{ms-marco-MiniLM-L-6-v2} scores each $(q,\mathrm{passage})$ jointly (passage truncated at $4000$ characters)---vector similarity is a neighborhood, not ``this passage mitigates \emph{this} PortScan at the perimeter.'' It is too expensive for the whole index, which is why (1)--(3) exist. (5)~Keep the top $20$ children. (6)~Expand each to its parent ($12\,000$-character cap); duplicate parents collapse. (7)~Emit the top five numbered sections, or the explicit empty-KB sentence. Retrieval returns guidance; it does not invent action names. $W[\hat{y}_i]$ is a different prompt slot and the same catalog Commit will store on-chain.
+
+\paragraph{Prompt Construction.}
+The user message is one template filled in software before decode~\cite{xi2023,li2025}. The model never sees raw telemetry, never sees the $192$-d fusion vector, and never sees names outside $W[\hat{y}_i]$. Slots are: role and the three exact domain strings; prediction summary; the dominance sentence from $p_i^{\star}$; Detection evidence JSON (top-5 features only); $W[\hat{y}_i]$ plus preferred domains and evidence cues; a per-domain card (role, top-3 features, actions that domain may execute); numbered RAG sections or the empty-KB sentence. The task block requires interpretation on all three domains, a first-mover domain, catalog-only actions, a network tier on each unit, evidence-tied reasoning, priority scaled by $\mathrm{conf}_i$, and empty lists rather than a made-up control. Decoding uses GPT-4o-mini at $T=0.3$; the first ``\{'' through the last ``\}'' is parsed.
+
+\paragraph{Response Schema.}
+The only accepted output is $\mathrm{plan}_i$: $\mathtt{threat\_level}\in\{\mathrm{Critical},\mathrm{High},\mathrm{Medium},\mathrm{Low}\}$; primary and supporting units of the form $\{\mathtt{action},\,\mathtt{network\_tier},\,\mathtt{party\_evidence\_type},\,\mathtt{reasoning}\}$; $\mathtt{all\_actions}$ their union; $\mathtt{overall\_reasoning}$; $\mathtt{execution\_priority}\in\{\mathrm{Immediate},\mathrm{High},\mathrm{Standard},\mathrm{Low}\}$; and $\mathtt{knowledge\_sources\_used}$. The field $\mathtt{action}$ is copied from $W[\hat{y}_i]$ (\texttt{limit rate} remains \texttt{limit rate}). $\mathtt{network\_tier}$ is exactly one of the three domain strings. Primary actions prefer $p_i^{\star}$ unless the evidence contradicts it. A PortScan whose Perimeter share dominates is planned as, for example, \texttt{tarpit scan} and \texttt{harden ports} at Perimeter~/~IDS with supporting \texttt{update ACL} at Access~/~ISP---names legal for PORTSCAN and illegal for BENIGN. Apply will reject any name absent from $W[\hat{y}_i]$ or absent from this object.
+
+\paragraph{Handoff to Blockchain Governance.}
+$\mathrm{plan}_i$ is this layer's only output. It is the off-chain payload $P$ that Section~\ref{sec:commit} will canonicalize and commit as $c=\mathrm{SHA256}(P)$. Reason never calls the contract and never opens a device API. This closes the evidence-to-plan failure that Section~\ref{sec:detect} left open. It does not close the trust failure that follows generation. A fluent, catalog-legal action copied from another cycle, a rewritten network tier, or a payload whose bytes change before dispatch will still look like a valid plan if the next layer only stores text. Binding $W[\hat{y}_i]$ on-chain, writing $c$ once, and refusing any apply that does not re-hash to $c$ is the failure the Blockchain Governance Layer exists to close.
+
+\input{Pragma_CCNC_Section3C_Blockchain_Governance}
+
+\subsection{Execution and Monitoring Layer (Apply)}
+\label{sec:apply}
+
+What fails without this layer: Commit records that a plan existed, but recording is not enforcement. Without an execution gate, an orchestrator could still dispatch a different legal action, a silently edited payload, or a unit aimed at the wrong enterprise domain. Apply is the only place a planned action may touch the live network. After the SOC or core monitoring path is notified, an event listener retrieves the on-chain record, the gate compares that record with policy, and only then may the orchestrator dispatch (Fig.~\ref{fig:e2e}).
+
+\paragraph{Execution Gate.}
+The gate does not invent mitigations. It compares three facts that already exist: (i)~whether action $u$ is on the whitelist $W$ for this attack; (ii)~whether $u$ and its domain $\tau$ (Access, Perimeter, or Endpoint) are the same actions Reason wrote into plan $P$; (iii)~whether a re-hash of the off-chain payload still matches the on-chain digest. In compact form,
+\begin{equation}
+W[a,u]=1 \;\wedge\; u\in\mathrm{plan}(P) \;\wedge\; c_{\mathrm{chain}}=c_{\mathrm{rehash}}.
+\label{eq:apply-gate}
+\end{equation}
+Software evaluates the three checks in that order---whitelist, then plan-binding, then digest---before the registry is asked to record an apply. The on-chain apply then re-checks that the action is still whitelisted, that a commitment exists, and that the same unit has not already been applied. An action that is only plausible, or that is legal for a different attack, fails the whitelist. A still-whitelisted action copied from another cycle fails plan-binding. A silently edited payload fails the digest check.
+
+\paragraph{Per-Attack Whitelist.}
+Labels follow the CICIDS-2017 grouping used by Detect~\cite{sharafaldin2018}. Actions are a constrained catalog, not free-form model text (Table~\ref{tab:whitelist}).
+
+\begin{table}[t]
+\caption{Per-attack action whitelist $W$ at Apply time. Labels follow CICIDS-2017~\cite{sharafaldin2018}; actions are a constrained catalog, not free-form LLM text.}
+\label{tab:whitelist}
+\centering
+\begin{tabular}{p{0.28\columnwidth}p{0.64\columnwidth}}
+\hline
+Attack $a$ & Allowed actions (excerpt) \\
+\hline
+BENIGN & log incident, monitor traffic \\
+DDOS~/~DOS & limit rate, enable scrubbing, block IP, enable syncookies, update ACL \\
+SSHPATATOR~/~FTPPATATOR & fail2ban block, lock account, enforce MFA \\
+PORTSCAN & tarpit scan, harden ports, update ACL \\
+WEBATTACK & apply WAF, virtual patch, isolate service \\
+BOT & captcha challenge, reputation filter \\
+OTHERS & log incident, isolate service, update ACL \\
+\hline
+\end{tabular}
+\end{table}
+
+\paragraph{Reject Path and Human Loop.}
+If the gate does not match, the plan is marked rejected or blocked. The flow goes to operator review, not to the network. Every such outcome is written to the same monitoring archive as a successful apply, so a denial is as visible as an actuation. If an operator later reviews and approves, that approval is recorded back through the governance layer and re-enters the same retrieve--compare path. Approval does not skip the gate.
+
+\paragraph{Success Path.}
+If the gate validates the plan, control passes to the execution agent. That agent invokes the domain-specific interface---API, gRPC, or MCP---for the Access, Perimeter, or Endpoint tier named in the plan. A successful unit is recorded on-chain and refused if presented again. The evaluated executor records receipts rather than driving a live device; a production deployment can replace that stub with the same control-plane fabric that collected the flow. Dispatch is therefore a signed, gated call, not a free-form command bus.
+
+\begin{algorithm}[t]
+\caption{Commit and Apply}
+\label{alg:commit-apply}
+\begin{algorithmic}[1]
+\PROCEDURE{Commit}{$\mathit{agentKey}$, $\mathit{reportKey}$, $c$}
+    \STATE \textbf{require} $c \neq 0$ and not already committed
+    \STATE store commitment $c$
+    \STATE emit trust-anchored
+\ENDPROCEDURE
+\PROCEDURE{Apply}{$a$, $u$, $\tau$, $\mathit{agentKey}$, $\mathit{reportKey}$}
+    \STATE \textbf{require} $\tau$ matches the domain written in $\mathrm{plan}(P)$
+    \STATE \textbf{require} $W[a,u]=1$ \COMMENT{policy ground}
+    \STATE \textbf{require} a commitment exists and this unit is not already applied
+    \STATE \textbf{require} $u \in \mathrm{plan}(P)$ and $c_{\mathrm{chain}}=\mathrm{SHA256}(P)$
+    \STATE mark applied; emit action-applied
+    \STATE dispatch $u$ to domain $\tau$
+\ENDPROCEDURE
+\end{algorithmic}
+\end{algorithm}
+
+Every hop---notify, retrieval, whitelist miss, plan mismatch, human approval, successful apply---emits an audit record back to the monitoring core. The core archive is the operator-visible history; the ledger holds the immutable receipts. This layer guarantees that only a whitelisted, bound, integrity-checked action reaches an agent. It does not claim that the language-model plan was correct.

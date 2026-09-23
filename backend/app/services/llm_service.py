@@ -8,11 +8,11 @@ import re
 from typing import Any
 
 from app.core.config import Settings
-from app.services.agentic_llm_prompt import (
+from scripts.llm_prompt import (
     build_agentic_decide_user_prompt,
     summarize_plan_for_db,
 )
-from app.services.network_domains import rewrite_plan_network_tiers
+from scripts.network_domains import rewrite_plan_network_tiers
 
 logger = logging.getLogger(__name__)
 

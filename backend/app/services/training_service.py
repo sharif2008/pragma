@@ -12,8 +12,7 @@ from app.core.config import Settings, get_settings
 from app.db.session import SessionLocal
 from app.models.domain import FileKind, JobStatus, ManagedFile, ModelVersion, PredictionJob, TrainingJob
 from app.services import file_service
-from app.services.ml_training import train_from_csv
-from app.utils.file_utils import remove_path
+from scripts.ml_sklearn import train_from_csv
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +158,7 @@ def delete_model_version(db: Session, settings: Settings, public_id: str) -> Non
     artifact_abs = settings.storage_root / mv.artifact_path
     db.delete(mv)
     db.commit()
-    remove_path(artifact_abs)
+    file_service.remove_path(artifact_abs)
     logger.info("Deleted model_version public_id=%s", public_id)
 
 
