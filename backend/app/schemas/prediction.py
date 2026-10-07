@@ -262,6 +262,19 @@ class ApplyAgenticReportRequest(BaseModel):
     )
 
 
+class CorrectAgenticReportRequest(BaseModel):
+    """Human-in-the-loop: replace the plan, commit it on-chain, then Apply can retry."""
+
+    threat_level: str | None = Field(default=None, description="Critical / High / Medium / Low. Kept from the old plan if omitted.")
+    primary_actions: list[dict[str, Any]]
+    supporting_actions: list[dict[str, Any]] = Field(default_factory=list)
+    overall_reasoning: str | None = Field(
+        default=None,
+        description="Why the human changed the plan. Hashed on-chain; text stays off-chain.",
+    )
+    note: str | None = Field(default=None, description="Operator note stored off-chain only.")
+
+
 class ExecutionReportSummaryOut(BaseModel):
     id: int
     status: Literal["applied", "failed"]

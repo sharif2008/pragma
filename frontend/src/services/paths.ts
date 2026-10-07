@@ -49,6 +49,7 @@ export const paths = {
     trustAnchorVerify: (anchorId: number) =>
       `/agent/trust-anchors/${encodeURIComponent(String(anchorId))}/verify`,
     applyReport: (publicId: string) => `/agent/reports/${encodeURIComponent(publicId)}/apply`,
+    correctReport: (publicId: string) => `/agent/reports/${encodeURIComponent(publicId)}/correct`,
     applyReportAction: (publicId: string) =>
       `/agent/reports/${encodeURIComponent(publicId)}/apply-action`,
     executionReports: '/agent/execution-reports',

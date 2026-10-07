@@ -21,6 +21,7 @@ from app.schemas.prediction import (
     AgenticReportOut,
     ApplyAgenticActionRequest,
     ApplyAgenticReportRequest,
+    CorrectAgenticReportRequest,
     ExecutionReportDetailOut,
     ExecutionReportListItemOut,
     TrustAnchorListItemOut,
@@ -278,6 +279,19 @@ def verify_trust_anchor(
     if out is None:
         raise HTTPException(404, "Trust anchor not found")
     return out
+
+
+@router.post("/reports/{public_id}/correct", response_model=AgenticReportOut)
+def correct_agent_report(
+    public_id: str,
+    body: CorrectAgenticReportRequest,
+    db: Annotated[Session, Depends(get_db)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> AgenticReportOut:
+    """Human replaces mismatched actions, commits a new on-chain plan, then Apply can retry."""
+    row = agent_service.correct_and_commit_plan(db, settings, public_id, body)
+    out = agent_service.agentic_report_out(db, row)
+    return _enrich_report_out_with_trust_json(settings, row, out)
 
 
 @router.post("/reports/{public_id}/apply", response_model=ExecutionReportDetailOut)

@@ -4,10 +4,10 @@ Batch console demo: read a sample CSV, run prediction + RAG + agentic planning r
 record each row's action set, then apply detection actions (bulk by default).
 
 Apply uses the backend API, which:
-  1. Verifies trust-anchor / on-chain commitment for the report
+  1. Verifies the on-chain plan (getPlan) against the report file
   2. Checks each action against the smart-contract whitelist (attack_type + action label)
-  3. Checks the unit against the committed plan (plan-binding)
-  4. Calls applyAction on-chain only when both gates pass
+  3. Checks the {action, tier} unit against the stored plan (isInPlan)
+  4. Calls markApplied on-chain only when both gates pass
   5. Persists results in agentic execution reports (actions_chain_json)
 
 Usage (from backend/, API + trained model + Hardhat chain recommended):
@@ -698,7 +698,7 @@ def format_report_text(
         lines.extend(
             [
                 "",
-                "Chain latency (anchor store + getCommitment verify; not LLM/RAG)",
+                "Chain latency (storePlan store + getPlan verify; not LLM/RAG)",
                 f"  Anchor store:  n={store.get('count', 0)}  total_ms={store.get('total_ms', 0)}  mean_ms={store.get('mean_ms', 0)}",
                 f"  Chain verify:  n={verify.get('count', 0)}  total_ms={verify.get('total_ms', 0)}  mean_ms={verify.get('mean_ms', 0)}",
                 "  Per row: file_row, attack, anchor_ms, verify_ms",
@@ -1286,7 +1286,7 @@ def render_attack_wise_report_html(
 
     <div class="card">
       <h2>Chain latency</h2>
-      <p class="note">Anchor store = <code>anchor()</code> RPC ms. Verify = <code>getCommitment</code> RPC ms. LLM/RAG times are not included.</p>
+      <p class="note">Store = <code>storePlan</code> RPC ms (until mined). Verify = <code>getPlan</code> RPC ms. LLM/RAG times are not included.</p>
       <dl class="meta">
         <div><dt>Anchor store n</dt><dd>{store.get('count', 0)}</dd></div>
         <div><dt>Anchor total ms</dt><dd>{store.get('total_ms', 0)}</dd></div>

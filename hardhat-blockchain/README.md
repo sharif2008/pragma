@@ -61,33 +61,28 @@ $env:TRUST_REGISTRY_ADDRESS = "0xYourDeployedAddress"
 npm run seed:whitelist
 ```
 
-### Anchor a trust commitment (demo)
+### What the registry stores
 
-The anchor script expects:
-- **`TRUST_REGISTRY_ADDRESS`**: deployed contract address
-- **`AGENT_KEY_BYTES32`**, **`REPORT_KEY_BYTES32`**, **`COMMITMENT_BYTES32`**: `0x`-prefixed 32-byte hex strings
+- **Whitelist** (owner, at deploy): `whitelist[attackType][action]`, e.g. `whitelist["PORTSCAN"]["tarpit scan"] = true`.
+- **Plan** (authorized agent, once per plan id): job id, prediction id, row index, attack type, threat level, primary and supporting `{action, tier}` units, and `sha256(overall_reasoning)`. `storePlan` rejects unknown attacks, non-whitelisted actions, unknown tiers, bad threat levels, duplicates, and more than 10 actions per list.
+- **Apply receipt** (authorized agent): `markApplied(planId, action, tier)` succeeds only for a whitelisted unit that is in the stored plan, and only once.
 
-**Linux / macOS:**
+Only the deployer is an authorized agent by default; add others with `setAgent(address, true)`.
 
-```bash
-TRUST_REGISTRY_ADDRESS=0xYourDeployedAddress \
-AGENT_KEY_BYTES32=0x0000000000000000000000000000000000000000000000000000000000000001 \
-REPORT_KEY_BYTES32=0x0000000000000000000000000000000000000000000000000000000000000002 \
-COMMITMENT_BYTES32=0x0000000000000000000000000000000000000000000000000000000000000003 \
-npm run anchor:local
-```
-
-**Windows (PowerShell):**
+### Store a sample plan (demo)
 
 ```powershell
 $env:TRUST_REGISTRY_ADDRESS = "0xYourDeployedAddress"
-$env:AGENT_KEY_BYTES32 = "0x0000000000000000000000000000000000000000000000000000000000000001"
-$env:REPORT_KEY_BYTES32 = "0x0000000000000000000000000000000000000000000000000000000000000002"
-$env:COMMITMENT_BYTES32 = "0x0000000000000000000000000000000000000000000000000000000000000003"
-npm run anchor:local
+npm run plan:local
 ```
 
-Equivalent: `npx hardhat run scripts/interact.js --network localhost` (with the same env vars).
+Equivalent: `npx hardhat run scripts/interact.js --network localhost`. It stores a sample PORTSCAN plan, reads it back, and marks one action applied.
+
+### Tests
+
+```bash
+npx hardhat test
+```
 
 ### npm scripts reference
 
@@ -97,7 +92,7 @@ Equivalent: `npx hardhat run scripts/interact.js --network localhost` (with the 
 | `npm run node`    | Start local chain on `:8545`     |
 | `npm run deploy:local` | Deploy `AgenticTrustRegistry` and seed action whitelist |
 | `npm run seed:whitelist` | Re-seed whitelist on an existing registry (`TRUST_REGISTRY_ADDRESS`) |
-| `npm run anchor:local` | Call `anchor` / `getCommitment` |
+| `npm run plan:local` | Store a sample plan, read it back, mark one action applied |
 
 ### MetaMask (optional)
 

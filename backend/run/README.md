@@ -45,7 +45,7 @@ run/output/run_20250817_100530_a1b2c3d4/
 | `whitelist_fail_actions` | Actions rejected by smart-contract whitelist (Gate 1) |
 | `labels_mapped_to_others` | Rows whose raw label is not in `attack_options.json` (mapped to `OTHERS`) |
 | `by_attack_class` | Per-class proposed, changed, WL reject, plan reject, applied, block % of changed |
-| `chain_latency` | Anchor store and getCommitment verify ms (per row, total, mean) |
+| `chain_latency` | storePlan store and getPlan verify ms (per row, total, mean) |
 
 ### Run with defaults
 
@@ -120,7 +120,7 @@ The report tracks:
 
 Apply order is **whitelist then plan-binding**. Restart the backend after updating so apply endpoints use that order.
 
-`report.json` / `report.txt` / `report.html` include **anchor store** ms and **getCommitment verify** ms per row, plus run total and mean. There is no separate `latency.txt`.
+`report.json` / `report.txt` / `report.html` include **storePlan store** ms and **getPlan verify** ms per row, plus run total and mean. There is no separate `latency.txt`.
 
 ### Batch report (printed + saved to run folder)
 

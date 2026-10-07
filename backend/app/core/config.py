@@ -72,6 +72,23 @@ class Settings(BaseSettings):
     trust_chain_chain_id: int = Field(default=31337, alias="TRUST_CHAIN_CHAIN_ID")
     trust_chain_payload_version: str = Field(default="v1", alias="TRUST_CHAIN_PAYLOAD_VERSION")
 
+    # Per-tier execution agents (HTTP POST after on-chain markApplied). Empty = stub receipt only.
+    exec_agent_access_url: str | None = Field(default=None, alias="EXEC_AGENT_ACCESS_URL")
+    exec_agent_perimeter_url: str | None = Field(default=None, alias="EXEC_AGENT_PERIMETER_URL")
+    exec_agent_endpoint_url: str | None = Field(default=None, alias="EXEC_AGENT_ENDPOINT_URL")
+    exec_agent_timeout_s: float = Field(default=5.0, alias="EXEC_AGENT_TIMEOUT_S")
+    # Human reviewer key (signs revisePlan for human corrections).
+    trust_chain_reviewer_private_key: str | None = Field(default=None, alias="TRUST_CHAIN_REVIEWER_PRIVATE_KEY")
+    # One executor key per network tier (each signs markApplied for its own tier only).
+    executor_access_private_key: str | None = Field(default=None, alias="EXECUTOR_ACCESS_PRIVATE_KEY")
+    executor_perimeter_private_key: str | None = Field(default=None, alias="EXECUTOR_PERIMETER_PRIVATE_KEY")
+    executor_endpoint_private_key: str | None = Field(default=None, alias="EXECUTOR_ENDPOINT_PRIVATE_KEY")
+    # When set (e.g. http://127.0.0.1:8000), the orchestrator calls tier executors over HTTP;
+    # otherwise it invokes the same executor handlers in-process.
+    executor_base_url: str | None = Field(default=None, alias="EXECUTOR_BASE_URL")
+    # Agent self-correction retries when a plan fails validation before storePlan.
+    agent_plan_max_retries: int = Field(default=2, alias="AGENT_PLAN_MAX_RETRIES")
+
 
 @lru_cache
 def get_settings() -> Settings:

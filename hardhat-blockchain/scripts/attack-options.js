@@ -1,6 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-const { ethers } = require("hardhat");
 
 /** Path to contracts/attack_options.json (bundled with the registry). */
 function attackOptionsPath() {
@@ -17,12 +16,8 @@ function loadAttackOptions() {
   return data;
 }
 
-function keyForLabel(label) {
-  return ethers.keccak256(ethers.toUtf8Bytes(String(label)));
-}
-
 /**
- * Seed on-chain whitelist from attack_options.json:
+ * Seed on-chain whitelist from attack_options.json (plain-text labels):
  * attacks[ATTACK_TYPE] => [ "limit rate", "block IP", ... ]
  */
 async function seedActionWhitelist(registry) {
@@ -35,9 +30,7 @@ async function seedActionWhitelist(registry) {
       console.warn(`Skipping ${attackType}: no actions`);
       continue;
     }
-    const attackKey = keyForLabel(attackType);
-    const actionKeys = actions.map((action) => keyForLabel(action));
-    const tx = await registry.batchWhitelistActions(attackKey, actionKeys);
+    const tx = await registry.addAllowedActions(attackType, actions.map(String));
     await tx.wait();
     total += actions.length;
     console.log(`Whitelisted ${actions.length} action(s) for ${attackType}`);
@@ -50,6 +43,5 @@ async function seedActionWhitelist(registry) {
 module.exports = {
   attackOptionsPath,
   loadAttackOptions,
-  keyForLabel,
   seedActionWhitelist,
 };

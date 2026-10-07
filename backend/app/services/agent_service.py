@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -23,6 +24,7 @@ from app.models.domain import (
 from app.schemas.prediction import (
     AgenticJobOut,
     AgenticReportOut,
+    CorrectAgenticReportRequest,
     ExecutionReportDetailOut,
     ExecutionReportListItemOut,
     TrustAnchorListItemOut,
@@ -38,9 +40,11 @@ from scripts.network_domains import (
     normalize_domain,
     rewrite_plan_network_tiers,
 )
+from scripts.llm_prompt import summarize_plan_for_db
 from scripts.rag_templates import resolve_prediction_row
 from scripts.vfl import canonical_attack_type
 from scripts.apply_gates import decide_apply_gates
+from scripts.execute_dispatch import dispatch_gated_action, domain_agent_for_tier
 from app.services.file_service import remove_path
 
 logger = logging.getLogger(__name__)
@@ -164,40 +168,34 @@ def persist_agentic_report_from_decision(
     db.commit()
     db.refresh(row)
 
-    # Optional: anchor a hash-only commitment on the local chain (non-fatal).
+    # Optional: store the plan on the local chain (non-fatal).
     if settings.trust_chain_enabled:
         try:
-            structured_plan = payload.get("structured_plan")
-            commitment, _canonical_payload = trust_chain_service.compute_trust_commitment_sha256(
-                payload_version=settings.trust_chain_payload_version,
-                agentic_report_public_id=row.public_id,
-                prediction_job_public_id=job.public_id,
-                results_row_index=results_row_index,
-                created_at=row.created_at,
-                raw_llm_response=row.raw_llm_response,
-                rag_context_used=row.rag_context_used,
-                structured_plan=structured_plan,
+            plan_input = trust_chain_service.build_plan_input(
+                structured_plan=payload.get("structured_plan"),
+                job_id=agentic_job_public_id,
+                prediction_id=job.public_id,
+                row_index=results_row_index,
+                attack_type=_plan_attack_type(db, job, results_row_index, agentic_job_id),
             )
-            tx_hash, contract_addr, agent_key_sha, report_key_sha, anchor_ms = (
-                trust_chain_service.anchor_report_commitment_on_chain(
-                    settings=settings,
-                    agentic_job_public_id=agentic_job_public_id,
-                    agentic_report_public_id=row.public_id,
-                    commitment_sha256_hex=commitment,
-                )
+            tx_hash, contract_addr, anchor_ms = trust_chain_service.store_plan_on_chain(
+                settings,
+                plan_id=row.public_id,
+                plan=plan_input,
             )
-            # REVIEW: Persist anchor RPC ms on the report file so GET / latency reports can copy it.
+            payload["chain_plan_id"] = row.public_id
             payload["chain_timing"] = {"anchor_ms": anchor_ms}
             report_abs.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+            # Legacy column names: commitment = reasoning hash; keys = sha256(job id), sha256(plan id).
             anchor = AgenticReportTrustAnchor(
                 agentic_report_id=row.id,
                 chain_id=settings.trust_chain_chain_id,
                 contract_address=contract_addr,
                 tx_hash=tx_hash,
                 payload_version=settings.trust_chain_payload_version,
-                commitment_sha256=commitment,
-                agent_key_sha256=agent_key_sha,
-                report_key_sha256=report_key_sha,
+                commitment_sha256=plan_input.reasoning_hash,
+                agent_key_sha256=hashlib.sha256(plan_input.job_id.encode("utf-8")).hexdigest(),
+                report_key_sha256=hashlib.sha256(row.public_id.encode("utf-8")).hexdigest(),
                 error=None,
             )
             db.add(anchor)
@@ -374,6 +372,35 @@ def delete_agentic_report(db: Session, settings: Settings, public_id: str) -> No
     db.commit()
 
 
+def _load_report_payload(settings: Settings, report: AgenticReport) -> dict[str, Any] | None:
+    if not report.report_path:
+        return None
+    path = settings.storage_root / report.report_path
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _save_report_payload(settings: Settings, report: AgenticReport, payload: dict[str, Any]) -> None:
+    if not report.report_path:
+        return
+    path = settings.storage_root / report.report_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def _chain_plan_id_from_payload(payload: dict[str, Any] | None, report_public_id: str) -> str:
+    if isinstance(payload, dict):
+        pid = str(payload.get("chain_plan_id") or "").strip()
+        if pid:
+            return pid
+    return report_public_id
+
+
 def _structured_plan_from_saved_payload(data: dict[str, Any]) -> Any:
     sp = data.get("structured_plan")
     if sp is not None:
@@ -463,26 +490,26 @@ def verify_trust_anchor_row(db: Session, settings: Settings, anchor_id: int) -> 
     payload_detail: str | None = None
     recomputed: str | None = None
 
+    saved_payload = _load_report_payload(settings, report)
+    chain_plan_id = _chain_plan_id_from_payload(saved_payload, report.public_id)
+
+    on_chain_plan: dict[str, Any] | None = None
     if not anchor_failed and anchor.contract_address.strip():
-        rpc_ok, oc_hex, err, verify_ms = trust_chain_service.read_commitment_from_chain(
+        rpc_ok, on_chain_plan, err, verify_ms = trust_chain_service.read_plan_from_chain(
             settings,
             contract_address=anchor.contract_address,
-            agent_key_sha256_hex=anchor.agent_key_sha256,
-            report_key_sha256_hex=anchor.report_key_sha256,
+            plan_id=chain_plan_id,
         )
         if not rpc_ok:
             chain_valid = None
             chain_detail = err or "RPC error"
-        elif oc_hex is None:
-            chain_valid = None
-            chain_detail = err or "no commitment returned"
+        elif on_chain_plan is None:
+            chain_valid = False
+            chain_detail = err or "plan not stored on chain"
         else:
-            on_chain_hex = oc_hex
-            chain_valid = oc_hex == db_commit
-            chain_detail = None if chain_valid else "on-chain commitment does not match database record"
-            if oc_hex == "0" * 64:
-                chain_valid = False
-                chain_detail = "on-chain commitment is empty (wrong keys or never anchored)"
+            on_chain_hex = on_chain_plan["reasoning_hash"]
+            chain_valid = on_chain_hex == db_commit
+            chain_detail = None if chain_valid else "on-chain reasoning hash does not match database record"
     elif not anchor_failed:
         chain_detail = "missing contract_address"
 
@@ -495,28 +522,28 @@ def verify_trust_anchor_row(db: Session, settings: Settings, anchor_id: int) -> 
                     payload_valid = None
                     payload_detail = "report file is not a JSON object"
                 else:
-                    structured = _structured_plan_from_saved_payload(data)
-                    recomputed, _pl = trust_chain_service.compute_trust_commitment_sha256(
-                        payload_version=anchor.payload_version,
-                        agentic_report_public_id=report.public_id,
-                        prediction_job_public_id=pj.public_id,
-                        results_row_index=report.results_row_index,
-                        created_at=report.created_at,
-                        raw_llm_response=report.raw_llm_response,
-                        rag_context_used=report.rag_context_used,
-                        structured_plan=structured,
+                    expected = trust_chain_service.build_plan_input(
+                        structured_plan=_structured_plan_from_saved_payload(data),
+                        job_id=aj_pub,
+                        prediction_id=pj.public_id,
+                        row_index=report.results_row_index,
+                        attack_type=_plan_attack_type(db, pj, report.results_row_index, report.agentic_job_id),
                     )
-                    recomputed = recomputed.lower()
-                    if len(db_commit) == 64:
-                        payload_valid = recomputed == db_commit
-                        payload_detail = (
-                            None
-                            if payload_valid
-                            else "recomputed hash from report file does not match anchored commitment"
-                        )
-                    else:
+                    recomputed = expected.reasoning_hash.lower()
+                    if len(db_commit) != 64:
                         payload_valid = None
-                        payload_detail = "database has no commitment to compare"
+                        payload_detail = "database has no reasoning hash to compare"
+                    elif recomputed != db_commit:
+                        payload_valid = False
+                        payload_detail = "recomputed reasoning hash from report file does not match stored hash"
+                    elif on_chain_plan is None:
+                        payload_valid = True
+                    else:
+                        diffs = trust_chain_service.plan_input_matches_chain(expected, on_chain_plan)
+                        payload_valid = not diffs
+                        payload_detail = (
+                            None if payload_valid else "report file differs from on-chain plan: " + ", ".join(diffs)
+                        )
             except (OSError, json.JSONDecodeError, TypeError, ValueError) as e:
                 payload_valid = None
                 payload_detail = f"could not read or parse report file: {e}"[:500]
@@ -627,6 +654,17 @@ def _prediction_attack_type(job: PredictionJob | None, results_row_index: int | 
     return canonical_attack_type(label) or None
 
 
+def _plan_attack_type(
+    db: Session, job: PredictionJob | None, results_row_index: int | None, agentic_job_id: int | None
+) -> str | None:
+    """Attack type for the plan: the detector's row label, else the agentic job label."""
+    attack = _prediction_attack_type(job, results_row_index)
+    if attack:
+        return attack
+    aj = db.get(AgenticJob, agentic_job_id) if agentic_job_id else None
+    return str(aj.label).strip() if aj and aj.label else None
+
+
 def _normalize_action_overrides(action_overrides: dict[int, str] | None) -> dict[int, str] | None:
     if not action_overrides:
         return None
@@ -665,21 +703,27 @@ def _build_chain_action_items(
     *,
     attack_type: str | None,
     flat_actions: list[dict[str, Any]],
-    agentic_job_public_id: str | None,
     agentic_report_public_id: str,
     integrity_valid: bool,
+    plan_id: str | None = None,
+    agentic_job_public_id: str | None = None,
 ) -> dict[str, Any]:
+    chain_plan_id = (plan_id or "").strip() or agentic_report_public_id
     items: list[dict[str, Any]] = []
     for idx, action_item in enumerate(flat_actions):
         action = str(action_item.get("action") or "—")
+        tier = str(action_item.get("network_tier") or "")
         planned_action = action_item.get("planned_action")
         item: dict[str, Any] = {
             "index": idx,
             "attack_type": attack_type,
             "action": action,
-            "network_tier": str(action_item.get("network_tier") or ""),
+            "network_tier": tier,
+            "domain_agent": None,
+            "plan_id": chain_plan_id,
             "result": "skipped",
         }
+        item["domain_agent"] = domain_agent_for_tier(tier)
         # REVIEW: Gate order is whitelist then plan-binding so off-list tampers
         # count as action_not_whitelisted, not action_plan_mismatch.
         if planned_action and str(planned_action) != action:
@@ -699,12 +743,25 @@ def _build_chain_action_items(
         if whitelist_err:
             item["whitelist_error"] = whitelist_err
 
+        in_plan: bool | None = None
+        if allowed is True:
+            in_plan, plan_err = trust_chain_service.is_action_in_plan_on_chain(
+                settings,
+                plan_id=chain_plan_id,
+                action=action,
+                tier=tier,
+            )
+            item["in_plan"] = in_plan
+            if plan_err:
+                item["plan_check_error"] = plan_err
+
         decision = decide_apply_gates(
             attack_type=attack_type,
             action=action,
             planned_action=str(planned_action) if planned_action else None,
             whitelist_allowed=allowed,
             integrity_valid=integrity_valid,
+            in_plan=in_plan,
         )
         item["whitelisted"] = decision.whitelisted if decision.whitelisted is not None else allowed
         if decision.result != "success":
@@ -715,14 +772,22 @@ def _build_chain_action_items(
 
         tx_hash, apply_err = trust_chain_service.apply_action_on_chain(
             settings,
-            attack_type=attack_type,
+            plan_id=chain_plan_id,
             action=action,
-            agentic_job_public_id=agentic_job_public_id,
-            agentic_report_public_id=agentic_report_public_id,
+            tier=tier,
         )
         if tx_hash:
             item["result"] = "success"
             item["apply_tx_hash"] = tx_hash
+            item["dispatch"] = dispatch_gated_action(
+                settings,
+                action=action,
+                tier=tier,
+                attack_type=attack_type,
+                plan_id=chain_plan_id,
+                report_id=agentic_report_public_id,
+                job_id=agentic_job_public_id,
+            )
         else:
             item["result"] = "skipped"
             item["failure_reason"] = "chain_apply_unavailable"
@@ -733,7 +798,7 @@ def _build_chain_action_items(
 
 
 def _attach_verify_ms(chain_action_json: Any, verify: Any) -> None:
-    """Copy getCommitment RPC ms onto the chain JSON returned to apply clients."""
+    """Copy getPlan RPC ms onto the chain JSON returned to apply clients."""
     # REVIEW: Latency report reads verify_ms from apply JSON / actions_chain_json.
     if not isinstance(chain_action_json, dict) or verify is None:
         return
@@ -834,6 +899,128 @@ def _failed_tier_exec_from_structured(structured: Any, failure_reason: str) -> t
     )
 
 
+def correct_and_commit_plan(
+    db: Session,
+    settings: Settings,
+    report_public_id: str,
+    body: CorrectAgenticReportRequest,
+) -> AgenticReport:
+    """Human replaces the plan after an apply mismatch, then storePlan so Apply can retry."""
+    from fastapi import HTTPException
+
+    report = get_agentic_report(db, report_public_id)
+    payload = _load_report_payload(settings, report) or {}
+    old_plan = _structured_plan_from_saved_payload(payload)
+    if not isinstance(old_plan, dict):
+        old_plan = {}
+
+    threat = (body.threat_level or old_plan.get("threat_level") or "Medium")
+    reasoning = (
+        body.overall_reasoning
+        or f"Human-corrected plan. {str(body.note or '').strip()}".strip()
+    )
+    structured = rewrite_plan_network_tiers(
+        {
+            "threat_level": threat,
+            "primary_actions": list(body.primary_actions),
+            "supporting_actions": list(body.supporting_actions),
+            "overall_reasoning": reasoning,
+            "all_actions": [
+                str(x.get("action") or "")
+                for x in list(body.primary_actions) + list(body.supporting_actions)
+                if isinstance(x, dict)
+            ],
+            "execution_priority": old_plan.get("execution_priority") or "Standard",
+            "knowledge_sources_used": list(old_plan.get("knowledge_sources_used") or [])
+            + ["human_correction"],
+        }
+    )
+    pj = db.get(PredictionJob, report.prediction_job_id)
+    aj = db.get(AgenticJob, report.agentic_job_id) if report.agentic_job_id else None
+    if not pj:
+        raise HTTPException(400, "Prediction job missing for this report")
+
+    try:
+        plan_input = trust_chain_service.build_plan_input(
+            structured_plan=structured,
+            job_id=aj.public_id if aj else None,
+            prediction_id=pj.public_id,
+            row_index=report.results_row_index,
+            attack_type=_plan_attack_type(db, pj, report.results_row_index, report.agentic_job_id),
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+    corrections = payload.get("human_corrections")
+    if not isinstance(corrections, list):
+        corrections = []
+    rev = len(corrections) + 1
+    new_plan_id = f"{report.public_id}_c{rev}"
+
+    if settings.trust_chain_enabled:
+        try:
+            tx_hash, contract_addr, store_ms = trust_chain_service.store_plan_on_chain(
+                settings, plan_id=new_plan_id, plan=plan_input
+            )
+        except Exception as e:
+            raise HTTPException(400, f"on-chain storePlan rejected: {e}") from e
+    else:
+        tx_hash, contract_addr, store_ms = "", str(settings.trust_chain_contract_address or ""), 0.0
+
+    summary, rec = summarize_plan_for_db(structured, json.dumps(structured))
+    corrections.append(
+        {
+            "revision": rev,
+            "plan_id": new_plan_id,
+            "note": body.note,
+            "tx_hash": tx_hash,
+            "previous_plan_id": _chain_plan_id_from_payload(payload, report.public_id),
+        }
+    )
+    payload["structured_plan"] = structured
+    payload["raw_llm_response"] = json.dumps(structured, indent=2, ensure_ascii=False)
+    payload["chain_plan_id"] = new_plan_id
+    payload["human_corrections"] = corrections
+    payload["chain_timing"] = {"anchor_ms": store_ms, "correction_revision": rev}
+    _save_report_payload(settings, report, payload)
+
+    report.summary = summary
+    report.recommended_action = rec
+    report.raw_llm_response = payload["raw_llm_response"]
+    db.add(report)
+
+    anchor = db.scalar(
+        select(AgenticReportTrustAnchor).where(AgenticReportTrustAnchor.agentic_report_id == report.id)
+    )
+    if anchor is None:
+        anchor = AgenticReportTrustAnchor(agentic_report_id=report.id)
+    anchor.chain_id = settings.trust_chain_chain_id
+    anchor.contract_address = contract_addr or str(settings.trust_chain_contract_address or "")
+    anchor.tx_hash = tx_hash
+    anchor.payload_version = settings.trust_chain_payload_version
+    anchor.commitment_sha256 = plan_input.reasoning_hash
+    anchor.agent_key_sha256 = hashlib.sha256(plan_input.job_id.encode("utf-8")).hexdigest()
+    anchor.report_key_sha256 = hashlib.sha256(new_plan_id.encode("utf-8")).hexdigest()
+    anchor.error = None if tx_hash else "trust chain disabled; plan stored off-chain only"
+    db.add(anchor)
+
+    existing = db.scalar(
+        select(AgenticReportExecutionReport).where(
+            AgenticReportExecutionReport.agentic_report_id == report.id
+        )
+    )
+    if existing:
+        existing.status = "failed"
+        existing.applied_at = None
+        existing.error_reason = "awaiting_human_retry"
+        existing.error_detail = f"Human committed revision {rev} as {new_plan_id}; re-run Apply"
+        db.add(existing)
+
+    db.commit()
+    db.refresh(report)
+    return report
+
+
 def apply_agentic_report_action(
     db: Session, settings: Settings, report_public_id: str, action_index: int, *, action_override: str | None = None
 ) -> ExecutionReportDetailOut:
@@ -847,16 +1034,9 @@ def apply_agentic_report_action(
     pj = db.get(PredictionJob, report.prediction_job_id)
     aj = db.get(AgenticJob, report.agentic_job_id) if report.agentic_job_id else None
 
-    structured: Any = None
-    if report.report_path:
-        path = settings.storage_root / report.report_path
-        if path.is_file():
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(data, dict):
-                    structured = _structured_plan_from_saved_payload(data)
-            except Exception:
-                structured = None
+    payload = _load_report_payload(settings, report)
+    structured = _structured_plan_from_saved_payload(payload) if payload else None
+    chain_plan_id = _chain_plan_id_from_payload(payload, report.public_id)
 
     flat = _flat_actions_from_structured_plan(structured)
     if action_index < 0 or action_index >= len(flat):
@@ -866,6 +1046,7 @@ def apply_agentic_report_action(
     attack_type = _prediction_attack_type(pj, report.results_row_index) or (
         str(aj.label).strip() if aj and aj.label else None
     )
+    job_pub = aj.public_id if aj else None
     per_action_overrides = (
         {action_index: action_override.strip()}
         if action_override and str(action_override).strip()
@@ -876,9 +1057,10 @@ def apply_agentic_report_action(
         settings,
         attack_type=attack_type,
         flat_actions=chain_flat,
-        agentic_job_public_id=aj.public_id if aj else None,
         agentic_report_public_id=report.public_id,
         integrity_valid=False,
+        plan_id=chain_plan_id,
+        agentic_job_public_id=job_pub,
     )
     if isinstance(chain_action_json.get("items"), list) and chain_action_json["items"]:
         chain_action_json["items"][0]["index"] = action_index
@@ -932,9 +1114,10 @@ def apply_agentic_report_action(
         settings,
         attack_type=attack_type,
         flat_actions=_flat_actions_with_overrides([flat[action_index]], per_action_overrides),
-        agentic_job_public_id=aj.public_id if aj else None,
         agentic_report_public_id=report.public_id,
         integrity_valid=integrity_overall == "valid",
+        plan_id=chain_plan_id,
+        agentic_job_public_id=job_pub,
     )
     if isinstance(chain_action_json.get("items"), list) and chain_action_json["items"]:
         chain_action_json["items"][0]["index"] = action_index
@@ -1072,16 +1255,10 @@ def apply_agentic_report(
     pj = db.get(PredictionJob, report.prediction_job_id)
     aj = db.get(AgenticJob, report.agentic_job_id) if report.agentic_job_id else None
 
-    structured: Any = None
-    if report.report_path:
-        path = settings.storage_root / report.report_path
-        if path.is_file():
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(data, dict):
-                    structured = _structured_plan_from_saved_payload(data)
-            except Exception:
-                structured = None
+    payload = _load_report_payload(settings, report)
+    structured = _structured_plan_from_saved_payload(payload) if payload else None
+    chain_plan_id = _chain_plan_id_from_payload(payload, report.public_id)
+    job_pub = aj.public_id if aj else None
     flat = _flat_actions_from_structured_plan(structured)
     chain_flat = _flat_actions_with_overrides(flat, action_overrides)
     attack_type = _prediction_attack_type(pj, report.results_row_index) or (
@@ -1112,9 +1289,10 @@ def apply_agentic_report(
                 settings,
                 attack_type=attack_type,
                 flat_actions=chain_flat,
-                agentic_job_public_id=aj.public_id if aj else None,
                 agentic_report_public_id=report.public_id,
                 integrity_valid=False,
+                plan_id=chain_plan_id,
+                agentic_job_public_id=job_pub,
             ),
             error_reason="integrity_validation_error",
             error_detail="Trust anchor row missing for this report",
@@ -1158,9 +1336,10 @@ def apply_agentic_report(
         settings,
         attack_type=attack_type,
         flat_actions=chain_flat,
-        agentic_job_public_id=aj.public_id if aj else None,
         agentic_report_public_id=report.public_id,
         integrity_valid=apply_ok,
+        plan_id=chain_plan_id,
+        agentic_job_public_id=job_pub,
     )
     _attach_verify_ms(chain_action_json, verify)
 

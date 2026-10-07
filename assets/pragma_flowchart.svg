@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="1280" viewBox="0 0 1020 1280">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#000"/>
+    </marker>
+    <style>
+      .title { font: 700 34px Arial, sans-serif; fill:#000; }
+      .subtitle { font: italic 16px Arial, sans-serif; fill:#000; }
+      .head { font: 700 22px Arial, sans-serif; fill:#000; }
+      .body { font: 16px Arial, sans-serif; fill:#000; }
+      .small { font: 700 15px Arial, sans-serif; fill:#000; }
+      .box { fill:#fff; stroke:#000; stroke-width:3; rx:18; }
+      .hitl { fill:#fff; stroke:#000; stroke-width:3; stroke-dasharray:11 7; rx:18; }
+      .arrow { stroke:#000; stroke-width:3; fill:none; marker-end:url(#arrow); }
+      .loop { stroke:#000; stroke-width:3; fill:none; stroke-dasharray:11 7; marker-end:url(#arrow); }
+      .icon { stroke:#000; stroke-width:4; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+    </style>
+  </defs>
+
+  <rect width="1020" height="1280" fill="#fff"/>
+
+  <text x="400" y="48" text-anchor="middle" class="title">PRAGMA — Flowchart View</text>
+  <text x="400" y="76" text-anchor="middle" class="subtitle">
+    Gate is the only branch. A human loop re-enters — it never skips.
+  </text>
+
+  <!-- Start -->
+  <rect x="210" y="100" width="380" height="90" class="box"/>
+  <path d="M245 125 h35 l15 15 v42 h-50 z M280 125 v18 h15 M257 158 h25 M257 172 h25"
+        class="icon"/>
+  <text x="430" y="154" text-anchor="middle" class="head">Network Flow Arrives</text>
+
+  <path d="M400 190 V235" class="arrow"/>
+
+  <!-- 1 Detect -->
+  <rect x="150" y="235" width="500" height="118" class="box"/>
+  <path d="M195 322 V288 M215 322 V274 M235 322 V260 M185 322 H250"
+        class="icon"/>
+  <text x="400" y="280" text-anchor="middle" class="head">1. Detect</text>
+  <text x="400" y="308" text-anchor="middle" class="body">VFL classifies the flow</text>
+  <text x="400" y="330" text-anchor="middle" class="body">SHAP attributes evidence</text>
+
+  <path d="M400 353 V398" class="arrow"/>
+
+  <!-- 2 Reason -->
+  <rect x="150" y="398" width="500" height="118" class="box"/>
+  <path d="M195 428 h45 v60 h-45 z M205 444 h25 M205 459 h25 M205 474 h17"
+        class="icon"/>
+  <text x="400" y="443" text-anchor="middle" class="head">2. Reason</text>
+  <text x="400" y="471" text-anchor="middle" class="body">RAG + LLM drafts</text>
+  <text x="400" y="493" text-anchor="middle" class="body">mitigation plan</text>
+
+  <path d="M400 516 V561" class="arrow"/>
+
+  <!-- 3 Commit -->
+  <rect x="150" y="561" width="500" height="128" class="box"/>
+  <path d="M188 635 l28-28 c9-9 22-9 31 0 l5 5 c9 9 9 22 0 31 l-14 14
+           M243 610 l-28 28 c-9 9-22 9-31 0 l-5-5 c-9-9-9-22 0-31 l14-14"
+        class="icon"/>
+  <text x="400" y="605" text-anchor="middle" class="head">3. Commit</text>
+  <text x="400" y="633" text-anchor="middle" class="body">storePlan</text>
+  <text x="400" y="656" text-anchor="middle" class="body">on the blockchain</text>
+
+  <path d="M400 689 V734" class="arrow"/>
+
+  <!-- Gate -->
+  <polygon points="400,734 545,839 400,944 255,839"
+           fill="#fff" stroke="#000" stroke-width="3"/>
+  <path d="M382 796 q18-18 36 0 v27 q-18 18-36 0 z" class="icon"/>
+  <text x="400" y="848" text-anchor="middle" class="head">Gate</text>
+  <text x="400" y="872" text-anchor="middle" class="body">whitelist +</text>
+  <text x="400" y="894" text-anchor="middle" class="body">action match?</text>
+
+  <!-- Yes -->
+  <text x="418" y="966" class="small">Yes</text>
+  <path d="M400 944 V989" class="arrow"/>
+
+  <!-- 4 Apply -->
+  <rect x="150" y="989" width="500" height="112" class="box"/>
+  <circle cx="215" cy="1045" r="26" class="icon"/>
+  <circle cx="215" cy="1045" r="9" class="icon"/>
+  <path d="M215 1010 v11 M215 1069 v11 M181 1045 h11 M238 1045 h11
+           M191 1021 l8 8 M231 1061 l8 8 M239 1021 l-8 8 M199 1061 l-8 8"
+        class="icon"/>
+  <text x="430" y="1032" text-anchor="middle" class="head">4. Apply</text>
+  <text x="430" y="1060" text-anchor="middle" class="body">Execute action via</text>
+  <text x="430" y="1082" text-anchor="middle" class="body">API / gRPC / MCP</text>
+
+  <path d="M400 1101 V1144" class="arrow"/>
+
+  <!-- Executed -->
+  <rect x="210" y="1144" width="380" height="88" class="box"/>
+  <path d="M245 1165 h35 l15 15 v40 h-50 z M280 1165 v18 h15
+           M255 1200 l10 10 20-22" class="icon"/>
+  <text x="430" y="1186" text-anchor="middle" class="head">Action Executed</text>
+  <text x="430" y="1212" text-anchor="middle" class="head">&amp; Logged</text>
+
+  <!-- No: Gate → Human-in-the-Loop -->
+  <text x="560" y="824" class="small">No</text>
+  <path d="M545 839 H690" class="arrow"/>
+
+  <!-- Human-in-the-Loop -->
+  <rect x="690" y="742" width="300" height="194" class="hitl"/>
+  <circle cx="840" cy="772" r="11" fill="#000"/>
+  <circle cx="814" cy="780" r="9" fill="#000"/>
+  <circle cx="866" cy="780" r="9" fill="#000"/>
+  <path d="M823 802 q17-18 34 0 v18 h-34 z
+           M800 806 q12-14 24 0 v14 h-24 z
+           M856 806 q12-14 24 0 v14 h-24 z" fill="#000"/>
+  <text x="840" y="848" text-anchor="middle" class="head">Human-in-the-Loop</text>
+  <text x="840" y="874" text-anchor="middle" class="body">Operator Review</text>
+  <text x="840" y="898" text-anchor="middle" class="body">Approve, then re-enter</text>
+  <text x="840" y="920" text-anchor="middle" class="body">(never skips the gate)</text>
+
+  <!-- Loop back to Commit -->
+  <path d="M840 742 V625 H650" class="loop"/>
+  <text x="848" y="680" class="small">re-enter</text>
+</svg>

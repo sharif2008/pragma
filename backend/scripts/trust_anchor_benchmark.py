@@ -9,8 +9,8 @@ CSV → agent → on-chain trust-anchor benchmark (PRAGMA-style timings).
 - Auto-build **one** template RAG query from label + confidence + those conditions (no LLM-based query refinement — template only)
 - Retrieve KB context via lightweight TF-IDF (meta.json only; no SentenceTransformers) unless ``--no-rag``. By default only chunks whose ingest ``source`` is a **.pdf** are scored (use ``--rag-all-sources`` for .md/.txt/.json too)
 - Call the agent once with the same ``sample_data`` shape as the API (prediction_row + SHAP-style top-5 for the LLM)
-- Anchor a hash-only commitment on-chain via AgenticTrustRegistry (Hardhat / permissioned-style Ethereum)
-- Validate by reading commitment back from chain and recomputing hash from the canonical payload
+- Store the plan on-chain via AgenticTrustRegistry.storePlan (attack, threat level, {action, tier} units, reasoning hash)
+- Validate by reading the plan back with getPlan and comparing every field
 - Track per-step timings and emit a per-row report table
 
 Default output: ``storage/reports/csv_trust_anchor_<dataset>_<timestamp>.csv`` plus a matching
@@ -33,7 +33,6 @@ if _backend_root not in sys.path:
 
 import argparse
 import asyncio
-import hashlib
 import json
 import math
 import re
@@ -59,6 +58,7 @@ except Exception as e:  # pragma: no cover
 
 from app.core.config import Settings, get_settings
 from app.services import llm_service, trust_chain_service
+from scripts.vfl import canonical_attack_type
 from scripts.llm_prompt import (
     LLM_ORCHESTRATION_TOP_SHAP_FEATURES,
     load_attack_agentic_config,
@@ -1152,62 +1152,66 @@ Use --no-deploy-contract to reuse TRUST_CHAIN_CONTRACT_ADDRESS from the environm
         agent_ms = _perf_ms(t_agent0, t_agent1)
         _print_step("agent_decide (LLM/mock)", agent_ms)
 
-        # 4) Parse plan + compute commitment payload (hash) — then anchor on-chain
+        # 4) Parse plan + build the on-chain plan (reasoning hash) — then storePlan
         t_payload0 = time.perf_counter()
         structured_plan = _parse_structured_plan(decision.get("raw_llm_response"))
-        created_at = _now_utc()
-        commitment_sha256, canonical_payload = trust_chain_service.compute_trust_commitment_sha256(
-            payload_version=settings.trust_chain_payload_version,
-            agentic_report_public_id=f"csv_row_{i}",
-            prediction_job_public_id=str(csv_path.name),
-            results_row_index=i,
-            created_at=created_at,
-            raw_llm_response=decision.get("raw_llm_response"),
-            rag_context_used=(decision.get("rag_context_used") or rag_context),
-            structured_plan=structured_plan,
-        )
+        plan_id = f"csv_row_{i}"
+        plan_err: str | None = None
+        try:
+            plan_input = trust_chain_service.build_plan_input(
+                structured_plan=structured_plan,
+                job_id="csv_benchmark",
+                prediction_id=str(csv_path.name),
+                row_index=i,
+                attack_type=canonical_attack_type(predicted_label),
+            )
+        except ValueError as e:
+            plan_input = None
+            plan_err = str(e)
         t_payload1 = time.perf_counter()
         commitment_ms = _perf_ms(t_payload0, t_payload1)
-        _print_step("parse + commitment (sha256)", commitment_ms, f"sha256={_short_hex(commitment_sha256, 16)}")
-
-        t_chain0 = time.perf_counter()
-        tx_hash, contract_addr2, agent_key_sha, report_key_sha, _anchor_ms = trust_chain_service.anchor_report_commitment_on_chain(
-            settings=settings,
-            agentic_job_public_id="csv_benchmark",
-            agentic_report_public_id=f"csv_row_{i}",
-            commitment_sha256_hex=commitment_sha256,
+        _print_step(
+            "parse + reasoning hash (sha256)",
+            commitment_ms,
+            f"sha256={_short_hex(plan_input.reasoning_hash, 16)}" if plan_input else f"invalid plan: {plan_err}",
         )
+
+        tx_hash = ""
+        contract_addr2 = ""
+        t_chain0 = time.perf_counter()
+        if plan_input is not None:
+            try:
+                tx_hash, contract_addr2, _store_ms = trust_chain_service.store_plan_on_chain(
+                    settings, plan_id=plan_id, plan=plan_input
+                )
+            except Exception as e:
+                plan_err = str(e)[:300]
         t_chain1 = time.perf_counter()
         chain_ms = _perf_ms(t_chain0, t_chain1)
-        _print_step("anchor on-chain (tx)", chain_ms, f"tx={_short_hex(tx_hash, 14)}")
+        _print_step(
+            "storePlan on-chain (tx)",
+            chain_ms,
+            f"tx={_short_hex(tx_hash, 14)}" if tx_hash else f"not stored: {plan_err}",
+        )
 
-        # 5) Validate: read from chain + recompute from canonical payload
+        # 5) Validate: read the plan back and compare every field
         t_val0 = time.perf_counter()
-        rpc_ok, on_chain_hex, err, _verify_ms = trust_chain_service.read_commitment_from_chain(
-            settings,
-            contract_address=contract_addr2,
-            agent_key_sha256_hex=agent_key_sha,
-            report_key_sha256_hex=report_key_sha,
-        )
-        chain_valid = bool(rpc_ok and on_chain_hex and on_chain_hex.lower() == commitment_sha256.lower())
-        if not rpc_ok and err:
-            chain_valid = False
-
-        # Recompute payload hash deterministically (same canonicalization rules)
-        canonical_rejson = json.dumps(
-            canonical_payload,
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-        )
-        recomputed_sha256 = hashlib.sha256(canonical_rejson.encode("utf-8")).hexdigest()
-        payload_valid = recomputed_sha256.lower() == commitment_sha256.lower()
+        chain_valid = False
+        payload_valid = False
+        err: str | None = plan_err
+        if tx_hash and plan_input is not None:
+            rpc_ok, on_chain_plan, err, _verify_ms = trust_chain_service.read_plan_from_chain(
+                settings, contract_address=contract_addr2, plan_id=plan_id
+            )
+            if rpc_ok and on_chain_plan is not None:
+                chain_valid = on_chain_plan["reasoning_hash"] == plan_input.reasoning_hash.lower()
+                payload_valid = not trust_chain_service.plan_input_matches_chain(plan_input, on_chain_plan)
         t_val1 = time.perf_counter()
         val_ms = _perf_ms(t_val0, t_val1)
         _print_step(
-            "validate (read + rehash)",
+            "validate (getPlan + compare)",
             val_ms,
-            f"chain_ok={chain_valid}  payload_ok={payload_valid}" + (f"  rpc_err={err}" if err else ""),
+            f"chain_ok={chain_valid}  payload_ok={payload_valid}" + (f"  err={err}" if err else ""),
         )
 
         executed = bool(chain_valid and payload_valid)

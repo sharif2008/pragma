@@ -7,7 +7,7 @@
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
     "seed:whitelist": "hardhat run scripts/seed-whitelist.js --network localhost",
-    "anchor:local": "hardhat run scripts/interact.js --network localhost"
+    "plan:local": "hardhat run scripts/interact.js --network localhost"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

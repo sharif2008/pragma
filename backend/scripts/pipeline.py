@@ -103,7 +103,7 @@ def _print_list() -> None:
     print("  scripts/demo_pipeline.py      stdlib Detect->Reason->Apply walkthrough (no chain)")
     print("  notebooks/00_pipeline.ipynb           train, SHAP, RAG, plans, scoring")
     print("  scripts/trust_anchor_benchmark.py  offline CSV->RAG->LLM->anchor timings (no API)")
-    print("  scripts/test_trust_chain.py        Hardhat smoke (anchor / getCommitment)")
+    print("  scripts/test_trust_chain.py        Hardhat smoke (storePlan / getPlan / markApplied)")
     print("  run/attack_monitor.py              same as stage e2e")
 
 

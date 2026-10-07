@@ -104,6 +104,23 @@ export async function applyAgenticReport(publicId: string): Promise<ExecutionRep
   return requestJson<ExecutionReportDetailOut>(paths.agent.applyReport(publicId), { method: 'POST' });
 }
 
+export async function correctAgenticReport(
+  publicId: string,
+  body: {
+    primary_actions: Array<Record<string, unknown>>;
+    supporting_actions?: Array<Record<string, unknown>>;
+    threat_level?: string;
+    overall_reasoning?: string;
+    note?: string;
+  }
+): Promise<AgenticReportOut> {
+  return requestJson<AgenticReportOut>(paths.agent.correctReport(publicId), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 export async function applyAgenticReportAction(
   publicId: string,
   actionIndex: number
