@@ -21,6 +21,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 
 # Import utility functions
+from scripts.env import archive_older_runs, new_run_dir, resolve_model_dir, resolve_sample_csv
 from scripts.vfl import simplify_label, FIXED_PARTY_NAMES, FIXED_AGENT_NAMES, get_agent_names
 
 # Import model classes
@@ -33,16 +34,12 @@ from scripts.vfl_models import VFLModel, AgentMetaModel
 # -----------------------------
 # joblib and Path are imported in cell 0
 
-# Model directory
-MODEL_DIR = Path("model")
+MODEL_DIR = resolve_model_dir(require_checkpoint=True)
 
 print("="*80)
 print("LOADING SAVED MODEL AND METADATA")
 print("="*80)
-
-# Check if model directory exists
-if not MODEL_DIR.exists():
-    raise FileNotFoundError(f"Model directory '{MODEL_DIR}' not found! Please train the model first using 01_detect_train.ipynb")
+print(f"Model directory: {MODEL_DIR}")
 
 # Load metadata first (contains all configuration)
 metadata_path = MODEL_DIR / "model_metadata.json"
@@ -162,12 +159,9 @@ except NameError:
     # agent_names doesn't exist, initialize it
     agent_names = get_agent_names()
 
-# Configuration
-INPUTS_DIR = Path("inputs")
-INPUTS_DIR.mkdir(exist_ok=True)
-SAMPLE_CSV_PATH = INPUTS_DIR / "sample.csv"
-OUTPUT_DIR = Path("outputs")
-OUTPUT_DIR.mkdir(exist_ok=True)
+SAMPLE_CSV_PATH = resolve_sample_csv()
+OUTPUT_DIR = new_run_dir("detect-predict")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 print("="*80)
 print("LOADING SAMPLE DATA AND PREDICTING")
@@ -175,7 +169,7 @@ print("="*80)
 
 # Load sample CSV file
 if not SAMPLE_CSV_PATH.exists():
-    raise FileNotFoundError(f"Sample CSV file not found: {SAMPLE_CSV_PATH}\nPlease ensure sample.csv exists in the 'inputs' folder.")
+    raise FileNotFoundError(f"Sample CSV file not found: {SAMPLE_CSV_PATH}")
 
 sample_df = pd.read_csv(SAMPLE_CSV_PATH)
 print(f"✓ Loaded {len(sample_df)} rows from {SAMPLE_CSV_PATH}")
@@ -460,6 +454,9 @@ print(f"All results saved to: {OUTPUT_DIR}")
 print(f"  - Summary CSV: {summary_file.name}")
 print(f"  - Detailed JSON: {detailed_file.name}")
 print(f"  - Decision Summary: {decision_file.name}")
+archived = archive_older_runs("detect-predict", keep=OUTPUT_DIR)
+if archived:
+    print(f"Archived {len(archived)} prior predict run(s) under {OUTPUT_DIR.parent / 'archive'}")
 print("="*80)
 # -----------------------------
 

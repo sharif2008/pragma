@@ -27,7 +27,7 @@ from scripts.network_domains import (
     normalize_domain,
     pragma_domain_from_tier_data,
 )
-from scripts.shap import limit_shap_per_feature_by_abs
+from scripts.shap_payload import limit_shap_per_feature_by_abs
 from scripts.rag_templates import top_shap_features_by_agent
 
 _LLM_RAG_SECTIONS_IN_PROMPT = 10
@@ -395,6 +395,7 @@ def create_agentic_orchestration_prompt(
     *,
     include_knowledge_base: bool = True,
     extra_agentic_notes: str | None = None,
+    include_conditions: bool = True,
 ) -> str:
     """Same contract as notebook ``create_prompt`` (orchestration JSON plan)."""
     # Keep Prediction summary lines in sync with ``prediction_row`` (same row as the JSON block below).
@@ -477,14 +478,18 @@ def create_agentic_orchestration_prompt(
             actions = tier_allowed_actions(tier_data)
             domain = pragma_domain_from_tier_data(bucket, tier_data)
             tier_feats: list[Any] = []
-            if isinstance(tf, dict):
+            if include_conditions and isinstance(tf, dict):
                 raw_feats = tf.get(domain) or tf.get(bucket) or []
                 tier_feats = list(raw_feats) if isinstance(raw_feats, list) else []
             agentic_context += f"\n{domain}:\n"
             desc = tier_data.get("description")
             if isinstance(desc, str) and desc.strip():
                 agentic_context += f"  - Role: {desc.strip()}\n"
-            agentic_context += f"  - Top evidence features (top 3): {', '.join(str(x) for x in tier_feats) if tier_feats else 'none'}\n"
+            if include_conditions:
+                agentic_context += (
+                    f"  - Top evidence features (top 3): "
+                    f"{', '.join(str(x) for x in tier_feats) if tier_feats else 'none'}\n"
+                )
             agentic_context += f"  - Allowed domain actions: {', '.join(actions)}\n"
 
     if extra_agentic_notes and str(extra_agentic_notes).strip():
@@ -507,22 +512,29 @@ def create_agentic_orchestration_prompt(
     else:
         rag_context = "\n\nKnowledge base was not included in this request.\n"
 
-    network_tier_info = ""
-    if dominant_tier or dominant_party:
-        dom = format_tier_for_prompt(str(dominant_tier or dominant_party))
-        network_tier_info = (
-            f"\n- Dominant network domain: {dom} "
-            f"(contribution: {dominant_pct:.1f}%)"
-        )
-
-    slim = sample_data.get("orchestration_llm_payload")
-    if isinstance(slim, dict) and slim:
-        sample_data_json = json.dumps(
-            _relabel_tiers_for_llm_json(slim), indent=2, ensure_ascii=False, default=str
-        )
+    if include_conditions:
+        network_tier_info = ""
+        if dominant_tier or dominant_party:
+            dom = format_tier_for_prompt(str(dominant_tier or dominant_party))
+            network_tier_info = (
+                f"\n- Dominant network domain: {dom} "
+                f"(contribution: {dominant_pct:.1f}%)"
+            )
+        slim = sample_data.get("orchestration_llm_payload")
+        if isinstance(slim, dict) and slim:
+            sample_data_json = json.dumps(
+                _relabel_tiers_for_llm_json(slim), indent=2, ensure_ascii=False, default=str
+            )
+        else:
+            sample_data_json = json.dumps(
+                _relabel_tiers_for_llm_json(sample_data), indent=2, ensure_ascii=False, default=str
+            )
     else:
+        network_tier_info = "\n- (no SHAP conditions)"
         sample_data_json = json.dumps(
-            _relabel_tiers_for_llm_json(sample_data), indent=2, ensure_ascii=False, default=str
+            {"predicted_label": predicted_label, "confidence": confidence},
+            indent=2,
+            ensure_ascii=False,
         )
 
     return AGENTIC_ORCHESTRATION_LLM_USER_PROMPT_TEMPLATE.format(

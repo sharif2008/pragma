@@ -16,7 +16,7 @@ from app.models.domain import JobStatus, ManagedFile, ModelVersion, PredictionJo
 from app.services import file_service
 from scripts.ml_sklearn import load_model_bundle
 from scripts.vfl import canonical_attack_type
-from scripts.shap import (
+from scripts.shap_payload import (
     RESULTS_JSON_TOP_SHAP_FEATURES,
     compute_sklearn_tree_shap_per_row,
     limit_shap_per_feature_by_abs,

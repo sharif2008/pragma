@@ -29,7 +29,14 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 # Import utility functions
-from scripts.env import AGENTIC_FEATURES_JSON
+from scripts.env import (
+    AGENTIC_FEATURES_JSON,
+    archive_older_runs,
+    new_run_dir,
+    resolve_datasets_dir,
+)
+
+TRAIN_DIR = new_run_dir("detect-train")
 from scripts.vfl import (
     simplify_label,
     categorize_feature_by_evidence,
@@ -55,8 +62,7 @@ from scripts.vfl_models import (
 
 # 1. Load Dataset & Extract Multi-Class Labels
 # -----------------------------
-# Dataset folder path
-DATASETS_FOLDER = Path("datasets")
+DATASETS_FOLDER = resolve_datasets_dir()
 
 # Find all CSV files in the datasets folder (only standard .csv files)
 csv_files = [f for f in DATASETS_FOLDER.glob("*.csv") if f.suffix == ".csv"]
@@ -132,7 +138,7 @@ print(f"Label distribution:\n{df[label_col].value_counts().sort_index()}")
 
 # 2. Agent-Based Vertical Feature Partition (from agentic_features.json)
 # -----------------------------
-# Features are split by RAN / Edge / Core agents; names and actions from JSON.
+# Features are split by Access / Perimeter / Endpoint (JSON keys RAN / Edge / Core).
 # vfl imports are in Cell 0
 
 non_feature_cols = ["Flow ID", "Src IP", "Dst IP", "Timestamp", "label", "label_numeric", "label_simplified"]
@@ -149,9 +155,10 @@ agent1_features, agent2_features, agent3_features, feature_categories = split_fe
     all_features, agent_definitions
 )
 
-print(f"\nAgent 1 (RAN): {len(agent1_features)} features")
-print(f"Agent 2 (Edge): {len(agent2_features)} features")
-print(f"Agent 3 (Core): {len(agent3_features)} features")
+_party_labels = agent_definitions["agent_names"]
+print(f"\nAgent 1 ({_party_labels[0]}): {len(agent1_features)} features")
+print(f"Agent 2 ({_party_labels[1]}): {len(agent2_features)} features")
+print(f"Agent 3 ({_party_labels[2]}): {len(agent3_features)} features")
 
 agent_sizes = [len(agent1_features), len(agent2_features), len(agent3_features)]
 total_features = sum(agent_sizes)
@@ -376,7 +383,7 @@ def train_vfl(model, x_train_parts, y_train, x_val_parts, y_val,
                 best_model_state = model.state_dict().copy()
                 print(f"[VFL] Epoch {epoch:3d} | Train Loss: {train_loss.item():.4f} | "
                       f"Val Loss: {val_loss:.4f} | Val F1: {val_f1:.4f} | "
-                      f"Val Rec: {val_rec:.4f} | LR: {current_lr:.6f} | ✓ BEST")
+                      f"Val Rec: {val_rec:.4f} | LR: {current_lr:.6f} | [ok] BEST")
             else:
                 patience_counter += 1
                 print(f"[VFL] Epoch {epoch:3d} | Train Loss: {train_loss.item():.4f} | "
@@ -473,6 +480,9 @@ print("Rows = True labels, Columns = Predicted labels")
 class_names = [label_mapping_dict.get(i, f"Class_{i}") for i in range(num_classes)]
 print("Classes:", class_names)
 print(cm)
+vfl_cls_report = classification_report(
+    y_test_np, y_test_pred, target_names=class_names, output_dict=True, zero_division=0
+)
 
 # Save VFL performance metrics
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -480,7 +490,7 @@ vfl_perf_df = pd.DataFrame({
     "Metric": ["Accuracy", "Macro_Recall", "Macro_F1", "Best_Val_F1", "Best_Epoch"],
     "Value": [acc, rec, f1, best_val_f1, best_epoch]
 })
-vfl_perf_filename = f"outputs/vfl_shap_performance_{timestamp}.csv"
+vfl_perf_filename = str(TRAIN_DIR / f"vfl_shap_performance_{timestamp}.csv")
 vfl_perf_df.to_csv(vfl_perf_filename, index=False)
 print(f"\nVFL Performance saved to {vfl_perf_filename}")
 
@@ -497,6 +507,11 @@ vfl_results = {
     "embed_dim": embed_dim,
     "hidden_dim": hidden_dim,
     "num_agents": 3,
+    "party_names": list(agent_names),
+    "party_feature_counts": [len(agent1_features), len(agent2_features), len(agent3_features)],
+    "class_names": class_names,
+    "confusion_matrix": cm.tolist(),
+    "classification_report": vfl_cls_report,
     "train_size": len(y_train),
     "val_size": len(y_val),
     "test_size": len(y_test),
@@ -611,7 +626,7 @@ def train_standard_nn(model, x_train, y_train, x_val, y_val,
                 best_model_state = model.state_dict().copy()
                 print(f"[STD] Epoch {epoch:3d} | Train Loss: {train_loss.item():.4f} | "
                       f"Val Loss: {val_loss:.4f} | Val F1: {val_f1:.4f} | "
-                      f"Val Rec: {val_rec:.4f} | LR: {current_lr:.6f} | ✓ BEST")
+                      f"Val Rec: {val_rec:.4f} | LR: {current_lr:.6f} | [ok] BEST")
             else:
                 patience_counter += 1
                 print(f"[STD] Epoch {epoch:3d} | Train Loss: {train_loss.item():.4f} | "
@@ -687,6 +702,9 @@ print("Rows = True labels, Columns = Predicted labels")
 class_names = [label_mapping_dict.get(i, f"Class_{i}") for i in range(num_classes)]
 print("Classes:", class_names)
 print(cm_standard)
+standard_cls_report = classification_report(
+    y_test_np, y_test_pred_standard, target_names=class_names, output_dict=True, zero_division=0
+)
 
 # Store standard NN results for comparison
 standard_results = {
@@ -698,6 +716,9 @@ standard_results = {
     "best_epoch": int(standard_best_epoch),
     "best_val_loss": float(standard_best_val_loss),
     "num_classes": num_classes,
+    "class_names": class_names,
+    "confusion_matrix": cm_standard.tolist(),
+    "classification_report": standard_cls_report,
     "input_dim": X_train_standard.shape[1],
     "hidden_dims": [256, 128, 64],
     "train_size": len(y_train),
@@ -728,6 +749,8 @@ comparison_data = {
         "timestamp": timestamp,
         "dataset_info": {
             "total_features": len(all_features_list),
+            "party_names": list(agent_names),
+            "party_feature_counts": [len(agent1_features), len(agent2_features), len(agent3_features)],
             "num_classes": num_classes,
             "train_size": len(y_train),
             "val_size": len(y_val),
@@ -738,10 +761,10 @@ comparison_data = {
     "vfl_model": vfl_results,
     "standard_nn_model": standard_results,
     "comparison": {
-        "accuracy_diff": float(standard_acc - acc),
-        "recall_diff": float(standard_rec - rec),
-        "f1_diff": float(standard_f1 - f1),
-        "val_f1_diff": float(standard_best_val_f1 - best_val_f1),
+        "accuracy_diff": float(acc - standard_acc),
+        "recall_diff": float(rec - standard_rec),
+        "f1_diff": float(f1 - standard_f1),
+        "val_f1_diff": float(best_val_f1 - standard_best_val_f1),
         "best_accuracy": "VFL" if acc > standard_acc else "Standard_NN",
         "best_f1": "VFL" if f1 > standard_f1 else "Standard_NN",
         "best_recall": "VFL" if rec > standard_rec else "Standard_NN"
@@ -749,10 +772,16 @@ comparison_data = {
 }
 
 # Save comparison as JSON
-comparison_json_path = f"outputs/model_comparison_{timestamp}.json"
+comparison_json_path = str(TRAIN_DIR / f"model_comparison_{timestamp}.json")
 with open(comparison_json_path, 'w', encoding='utf-8') as f:
-    json.dump(comparison_data, f, indent=2, ensure_ascii=False)
-print(f"✓ Comparison JSON saved to {comparison_json_path}")
+    json.dump(
+        comparison_data,
+        f,
+        indent=2,
+        ensure_ascii=False,
+        default=lambda o: o.item() if hasattr(o, "item") else str(o),
+    )
+print(f"[ok] Comparison JSON saved to {comparison_json_path}")
 
 # Create CSV comparison table
 comparison_df = pd.DataFrame([
@@ -775,12 +804,27 @@ comparison_df = pd.DataFrame([
         "Best_Epoch": standard_results["best_epoch"],
         "Best_Val_Loss": standard_results["best_val_loss"],
         "Architecture": f"Standard NN (hidden_dims={standard_results['hidden_dims']})"
-    }
+    },
+    {
+        "Model": "Difference (VFL - NN)",
+        "Accuracy": float(acc - standard_acc),
+        "Macro_Recall": float(rec - standard_rec),
+        "Macro_F1": float(f1 - standard_f1),
+        "Best_Val_F1": float(best_val_f1 - standard_best_val_f1),
+        "Best_Epoch": "",
+        "Best_Val_Loss": "",
+        "Architecture": "",
+    },
 ])
 
-comparison_csv_path = f"outputs/model_comparison_{timestamp}.csv"
+comparison_csv_path = str(TRAIN_DIR / f"model_comparison_{timestamp}.csv")
 comparison_df.to_csv(comparison_csv_path, index=False)
-print(f"✓ Comparison CSV saved to {comparison_csv_path}")
+print(f"[ok] Comparison CSV saved to {comparison_csv_path}")
+cm_vfl_csv = str(TRAIN_DIR / f"confusion_vfl_{timestamp}.csv")
+cm_nn_csv = str(TRAIN_DIR / f"confusion_nn_{timestamp}.csv")
+pd.DataFrame(cm, index=class_names, columns=class_names).to_csv(cm_vfl_csv)
+pd.DataFrame(cm_standard, index=class_names, columns=class_names).to_csv(cm_nn_csv)
+print(f"[ok] Confusion matrices saved to {cm_vfl_csv} and {cm_nn_csv}")
 
 # Create detailed text report
 report_lines = []
@@ -809,9 +853,9 @@ report_lines.append(f"Architecture: Vertical Federated Learning (3 agents)")
 report_lines.append(f"  - Embedding Dimension: {vfl_results['embed_dim']}")
 report_lines.append(f"  - Hidden Dimension: {vfl_results['hidden_dim']}")
 report_lines.append(f"  - Number of Agents: {vfl_results['num_agents']}")
-report_lines.append(f"  - Agent 1 Features: {len(agent1_features)}")
-report_lines.append(f"  - Agent 2 Features: {len(agent2_features)}")
-report_lines.append(f"  - Agent 3 Features: {len(agent3_features)}")
+report_lines.append(f"  - {agent_names[0]} Features: {len(agent1_features)}")
+report_lines.append(f"  - {agent_names[1]} Features: {len(agent2_features)}")
+report_lines.append(f"  - {agent_names[2]} Features: {len(agent3_features)}")
 report_lines.append("")
 report_lines.append("Performance Metrics:")
 report_lines.append(f"  - Test Accuracy: {vfl_results['accuracy']:.4f}")
@@ -852,15 +896,22 @@ report_lines.append(f"  - Early Stop Patience: {standard_results['training_param
 report_lines.append("")
 report_lines.append("Note: Standard NN uses IDENTICAL training parameters as VFL for fair comparison")
 report_lines.append("")
+report_lines.append("VFL confusion matrix (rows=true, cols=pred):")
+report_lines.append("Classes: " + ", ".join(class_names))
+report_lines.append(str(cm))
+report_lines.append("")
+report_lines.append("Standard NN confusion matrix (rows=true, cols=pred):")
+report_lines.append(str(cm_standard))
+report_lines.append("")
 
 # Comparison Summary
 report_lines.append("="*80)
 report_lines.append("COMPARISON SUMMARY")
 report_lines.append("="*80)
-report_lines.append(f"Accuracy Difference (Standard_NN - VFL): {comparison_data['comparison']['accuracy_diff']:+.4f}")
-report_lines.append(f"Recall Difference (Standard_NN - VFL): {comparison_data['comparison']['recall_diff']:+.4f}")
-report_lines.append(f"F1 Difference (Standard_NN - VFL): {comparison_data['comparison']['f1_diff']:+.4f}")
-report_lines.append(f"Validation F1 Difference (Standard_NN - VFL): {comparison_data['comparison']['val_f1_diff']:+.4f}")
+report_lines.append(f"Accuracy Difference (VFL - NN): {comparison_data['comparison']['accuracy_diff']:+.4f}")
+report_lines.append(f"Recall Difference (VFL - NN): {comparison_data['comparison']['recall_diff']:+.4f}")
+report_lines.append(f"F1 Difference (VFL - NN): {comparison_data['comparison']['f1_diff']:+.4f}")
+report_lines.append(f"Validation F1 Difference (VFL - NN): {comparison_data['comparison']['val_f1_diff']:+.4f}")
 report_lines.append("")
 report_lines.append("Best Performing Model:")
 report_lines.append(f"  - Best Accuracy: {comparison_data['comparison']['best_accuracy']}")
@@ -870,10 +921,10 @@ report_lines.append("")
 report_lines.append("="*80)
 
 # Save text report
-report_text_path = f"outputs/model_comparison_report_{timestamp}.txt"
+report_text_path = str(TRAIN_DIR / f"model_comparison_report_{timestamp}.txt")
 with open(report_text_path, 'w', encoding='utf-8') as f:
     f.write('\n'.join(report_lines))
-print(f"✓ Comparison report saved to {report_text_path}")
+print(f"[ok] Comparison report saved to {report_text_path}")
 
 # Print summary to console
 print("\n" + "="*80)
@@ -888,7 +939,7 @@ print(f"  F1 Score: {comparison_data['comparison']['best_f1']}")
 print(f"  Recall: {comparison_data['comparison']['best_recall']}")
 print("="*80)
 
-print(f"\n✓ All comparison files saved with timestamp: {timestamp}")
+print(f"\n[ok] All comparison files saved with timestamp: {timestamp}")
 # -----------------------------
 
 # 8. Build Agent-Level Meta-Features (Full Embeddings)
@@ -988,9 +1039,8 @@ else:
 # -----------------------------
 # joblib and Path are now imported at the top (cell 0)
 
-# Create model directory if it doesn't exist
-MODEL_DIR = Path("model")
-MODEL_DIR.mkdir(exist_ok=True)
+MODEL_DIR = TRAIN_DIR
+MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 print("="*80)
 print("SAVING BEST MODEL AND METADATA")
@@ -1010,7 +1060,7 @@ torch.save({
     'best_val_f1': best_val_f1,
     'best_val_loss': best_val_loss
 }, vfl_model_path)
-print(f"✓ VFL model saved to {vfl_model_path}")
+print(f"[ok] VFL model saved to {vfl_model_path}")
 
 # Save meta-model
 meta_model_path = MODEL_DIR / "meta_model_best.pth"
@@ -1022,7 +1072,7 @@ torch.save({
         'hidden_dim': 128
     }
 }, meta_model_path)
-print(f"✓ Meta-model saved to {meta_model_path}")
+print(f"[ok] Meta-model saved to {meta_model_path}")
 
 # Save scalers (using joblib for sklearn objects)
 scaler1_path = MODEL_DIR / "scaler1.pkl"
@@ -1031,7 +1081,7 @@ scaler3_path = MODEL_DIR / "scaler3.pkl"
 joblib.dump(scaler1, scaler1_path)
 joblib.dump(scaler2, scaler2_path)
 joblib.dump(scaler3, scaler3_path)
-print(f"✓ Scalers saved to {scaler1_path}, {scaler2_path}, {scaler3_path}")
+print(f"[ok] Scalers saved to {scaler1_path}, {scaler2_path}, {scaler3_path}")
 
 # Save feature lists and label mapping
 metadata = {
@@ -1068,7 +1118,7 @@ metadata = {
 metadata_path = MODEL_DIR / "model_metadata.json"
 with open(metadata_path, 'w', encoding='utf-8') as f:
     json.dump(metadata, f, indent=2, ensure_ascii=False)
-print(f"✓ Metadata saved to {metadata_path}")
+print(f"[ok] Metadata saved to {metadata_path}")
 
 # Save SHAP explainer background (for faster prediction)
 # This is the background data used for SHAP explanations
@@ -1078,7 +1128,7 @@ shap_background = X_train_meta[bg_idx].detach().cpu().numpy()
 
 shap_background_path = MODEL_DIR / "shap_background.npy"
 np.save(shap_background_path, shap_background)
-print(f"✓ SHAP background saved to {shap_background_path} (shape: {shap_background.shape})")
+print(f"[ok] SHAP background saved to {shap_background_path} (shape: {shap_background.shape})")
 
 print("\n" + "="*80)
 print("MODEL SAVE SUMMARY")
@@ -1279,7 +1329,7 @@ for i, name in enumerate(agent_names):
         "Mean_contrib_All": m_pct,
     })
 global_df = pd.DataFrame(global_rows)
-global_filename = f"outputs/vfl_shap_global_summary_{timestamp}.csv"
+global_filename = str(TRAIN_DIR / f"vfl_shap_global_summary_{timestamp}.csv")
 global_df.to_csv(global_filename, index=False)
 
 # Per-class SHAP analysis
@@ -1315,7 +1365,7 @@ for class_idx in range(num_classes):
         })
     
     class_df = pd.DataFrame(class_rows)
-    class_filename = f"summary/vfl_shap_{class_name.lower()}_summary_{timestamp}.csv"
+    class_filename = str(TRAIN_DIR / f"vfl_shap_{class_name.lower()}_summary_{timestamp}.csv")
     class_df.to_csv(class_filename, index=False)
 
 # Find dominant agent per class
@@ -1336,4 +1386,9 @@ for class_idx in range(num_classes):
     top_agent_share = float(mean_pct_class[top_agent_idx]) * 100.0
     
     print(f"{class_name}: {top_agent_name} ({top_agent_share:.2f}%)")
+
+archived = archive_older_runs("detect-train", keep=TRAIN_DIR)
+if archived:
+    print(f"Archived {len(archived)} prior train run(s) under {TRAIN_DIR.parent / 'archive'}")
+print(f"Latest train run: {TRAIN_DIR}")
 # -----------------------------

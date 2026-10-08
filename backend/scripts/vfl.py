@@ -264,7 +264,7 @@ def load_agent_definitions(json_path):
 
     Returns:
         dict: {
-            "agent_names": ["RAN", "Edge", "Core"],
+            "agent_names": ["Access / ISP", "Perimeter / IDS", "Endpoint / EDR"],
             "agent_features": [list, list, list],  # 3 lists of feature names (logged_features)
             "agent_domains": list of description strings,
             "agent_actions": [list, list, list],   # action_capabilities per agent
@@ -276,16 +276,22 @@ def load_agent_definitions(json_path):
         raise FileNotFoundError(f"Agent definitions file not found: {path}")
     raw = json.loads(path.read_text(encoding="utf-8"))
 
+    from scripts.network_domains import STORAGE_TO_DOMAIN
+
     agents = raw.get("agents") or {}
     agent_order = ["RAN", "Edge", "Core"]
-    agent_names = [n for n in agent_order if n in agents]
+    agent_names = []
     agent_features = []
     agent_domains = []
     agent_actions = []
     for name in agent_order:
+        if name not in agents:
+            continue
         a = agents.get(name) or {}
+        display = str(a.get("pragma_domain") or STORAGE_TO_DOMAIN.get(name) or name).strip()
+        agent_names.append(display)
         agent_features.append(list(a.get("logged_features") or []))
-        agent_domains.append(a.get("description") or name)
+        agent_domains.append(a.get("description") or display)
         agent_actions.append(list(a.get("action_capabilities") or []))
 
     feature_categories = {

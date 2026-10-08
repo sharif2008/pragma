@@ -21,14 +21,14 @@ curl http://127.0.0.1:8000/health
 
 Reads a VFL feature CSV **one row at a time**, runs prediction → RAG → agentic planning for each row, records the planned action set, then **applies actions** through the API (whitelist check + on-chain apply when configured).
 
-**Defaults:** input `run/data/sample.csv`, **apply enabled**, **bulk** apply mode, output under `run/output/run_{timestamp}_{id}/`.
+**Defaults:** input `run/data/sample.csv`, **apply enabled**, **bulk** apply mode, output under `experiments/e2e/run_{timestamp}_{id}/` (repo root).
 
 **Label rule:** every prediction is normalized to one key from `attack_options.json` (same catalog as `hardhat-blockchain/contracts/attack_options.json` / on-chain whitelist). Examples: `Web Attack – Brute Force` → `WEBATTACK`, `Infiltration` → `OTHERS`.
 
 Each invocation creates one **flat** run folder (no per-row subfolders):
 
 ```
-run/output/run_20250817_100530_a1b2c3d4/
+experiments/e2e/run_20250817_100530_a1b2c3d4/
   report.json         # summary totals + by_attack_class + chain_latency
   report.txt          # same summary, human-readable (includes latency)
   report.html         # attack-class dual-gate table + chain latency

@@ -41,31 +41,31 @@ from typing import Any
 
 import httpx
 
-# REVIEW: This script is run/attack_monitor.py; data and output stay under run/.
+# REVIEW: This script is run/attack_monitor.py; input stays under run/data, ledgers under experiments/e2e/.
 RUN_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = RUN_DIR.parent
-
-try:
-    from scripts.vfl import (
-        canonical_attack_type,
-        load_attack_option_keys,
-        pick_allowed_alternate_action,
-        pick_disallowed_action,
-    )
-except ImportError:
-    sys.path.insert(0, str(BACKEND_DIR))
-    from scripts.vfl import (
-        canonical_attack_type,
-        load_attack_option_keys,
-        pick_allowed_alternate_action,
-        pick_disallowed_action,
-    )
+# `python run/attack_monitor.py` puts this file's directory on sys.path[0], not backend/.
+# Also drop a stale `scripts` namespace (repo-root scripts/) so backend/scripts/vfl.py wins.
+_backend = str(BACKEND_DIR)
+if sys.path[:1] != [_backend]:
+    while _backend in sys.path:
+        sys.path.remove(_backend)
+    sys.path.insert(0, _backend)
+for _name in [k for k in list(sys.modules) if k == "scripts" or k.startswith("scripts.")]:
+    del sys.modules[_name]
+from scripts.env import experiment_dir
+from scripts.vfl import (
+    canonical_attack_type,
+    load_attack_option_keys,
+    pick_allowed_alternate_action,
+    pick_disallowed_action,
+)
 
 TERMINAL_RUN_STATUSES = frozenset({"completed", "failed", "partial", "needs_input"})
 
 PROJECT_DIR = BACKEND_DIR.parent
 DEFAULT_DATA_DIR = RUN_DIR / "data"
-DEFAULT_OUTPUT_DIR = RUN_DIR / "output"
+DEFAULT_OUTPUT_DIR = experiment_dir("e2e")
 DEFAULT_INPUT_FILE = DEFAULT_DATA_DIR / "sample.csv"
 
 

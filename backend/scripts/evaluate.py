@@ -21,7 +21,7 @@ _BACKEND = Path(__file__).resolve().parents[1]
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
-from scripts.env import AGENTIC_FEATURES_JSON, ATTACK_OPTIONS_JSON
+from scripts.env import AGENTIC_FEATURES_JSON, ATTACK_OPTIONS_JSON, experiment_dir
 
 # --- Load attack / agent catalogs from backend/storage ---
 with open(ATTACK_OPTIONS_JSON, "r", encoding="utf-8") as f:
@@ -133,7 +133,7 @@ sbert_model = SentenceTransformer('all-MiniLM-L6-v2')
 print("Libraries imported successfully!")
 
 # Configuration
-RAG_DOCS_DIR = Path("RAG_docs/action_plans")
+RAG_DOCS_DIR = experiment_dir("reason") / "action_plans"
 REFERENCE_TEXT = "Rate limiting on RAN. Rate limiting on Edge. Rate limiting on Core. Traffic scrubbing on Core. Blackhole routing on Core. ACL update on RAN. ACL update on Edge. ACL update on Core. IP blocking on RAN. IP blocking on Edge. IP blocking on Core."
 
 print(f"Action plans directory: {RAG_DOCS_DIR}")
@@ -468,8 +468,8 @@ else:
 
 # Save detailed results to JSON
 if scoring_results:
-    # Create scoring directory under RAG_docs
-    scoring_dir = Path("RAG_docs/scoring")
+    # Write scoring results under experiments/evaluate/
+    scoring_dir = experiment_dir("evaluate")
     scoring_dir.mkdir(parents=True, exist_ok=True)
     
     output_file = scoring_dir / "scoring_results.json"

@@ -10,7 +10,7 @@ _BACKEND = Path(__file__).resolve().parents[1]
 if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
-from scripts.env import load_project_dotenv
+from scripts.env import experiment_dir, load_project_dotenv, resolve_latest_predict_dir
 from scripts.rag_rerank import get_cross_encoder, score_query_passages
 from openai import OpenAI
 
@@ -31,9 +31,9 @@ from scripts.rag_io import (
 
 from scripts.llm_prompt import create_agentic_orchestration_prompt
 
-VECTOR_STORE_DIR = Path("RAG_docs/vector_store")
-PREDICTIONS_DIR = Path("RAG_docs/predictions")
-RESULTS_DIR = Path("RAG_docs/action_plans")
+VECTOR_STORE_DIR = experiment_dir("rag-index") / "vector_store"
+PREDICTIONS_DIR = resolve_latest_predict_dir(require=False)
+RESULTS_DIR = experiment_dir("reason") / "action_plans"
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 vector_store = None
@@ -370,6 +370,7 @@ def retrieve_rag_context_multi(
     rerank_k: int = _DEFAULT_RERANK_K,
     lambda_mult: float = 0.5,
     max_parent_chars: int = 12000,
+    use_ranking: bool = True,
 ) -> Tuple[List[Dict[str, Any]], List[List[Dict[str, Any]]]]:
     """Full retrieval pipeline (functional):
 
@@ -419,28 +420,38 @@ def retrieve_rag_context_multi(
     # Use the first query as the anchor for MMR/reranking.
     anchor_query = qs[0]
 
-    mmr_pool = mmr_select(
-        vector_store,
-        anchor_query,
-        merged,
-        k=int(mmr_k),
-        lambda_mult=float(lambda_mult),
-    )
-    print(
-        f"[RAG pipeline] Step 3 — MMR: {len(mmr_pool)} child chunks "
-        f"(k_mmr={mmr_k}, input {len(merged)})"
-    )
+    if use_ranking:
+        mmr_pool = mmr_select(
+            vector_store,
+            anchor_query,
+            merged,
+            k=int(mmr_k),
+            lambda_mult=float(lambda_mult),
+        )
+        print(
+            f"[RAG pipeline] Step 3 — MMR: {len(mmr_pool)} child chunks "
+            f"(k_mmr={mmr_k}, input {len(merged)})"
+        )
 
-    reranked = rerank_with_cross_encoder(anchor_query, mmr_pool)
-    print(
-        f"[RAG pipeline] Step 4 — CrossEncoder rerank: {len(reranked)} scored chunks"
-    )
+        reranked = rerank_with_cross_encoder(anchor_query, mmr_pool)
+        print(
+            f"[RAG pipeline] Step 4 — CrossEncoder rerank: {len(reranked)} scored chunks"
+        )
 
-    top_children = reranked[: int(rerank_k)]
-    print(
-        f"[RAG pipeline] Step 5 — top by rerank: {len(top_children)} child chunks "
-        f"(cap rerank_k={rerank_k})"
-    )
+        top_children = reranked[: int(rerank_k)]
+        print(
+            f"[RAG pipeline] Step 5 — top by rerank: {len(top_children)} child chunks "
+            f"(cap rerank_k={rerank_k})"
+        )
+    else:
+        top_children = merged[: int(rerank_k)]
+        for c in top_children:
+            if c.get("rerank_score") is None:
+                c["rerank_score"] = float(c.get("vector_score", 0.0) or 0.0)
+        print(
+            f"[RAG pipeline] Steps 3–5 skipped (ranking off): dense top "
+            f"{len(top_children)} children by vector score (cap rerank_k={rerank_k})"
+        )
 
     final_sections = expand_parent_sections(
         top_children,
@@ -505,10 +516,16 @@ def _top_features_for_tier(
     top_n: int = 3,
     score_key: str = "pct_contribution",
 ) -> List[str]:
-    """Deterministic top-N feature names for a tier (RAN/Edge/Core)."""
+    """Deterministic top-N feature names for a domain (paper labels or RAN/Edge/Core)."""
     shap_expl = sample.get("shap_explanation", {}) or {}
     feat_contribs = shap_expl.get("feature_contributions", {}) or {}
     feats = feat_contribs.get(tier, {}) or {}
+    if not feats:
+        from scripts.network_domains import DOMAIN_TO_STORAGE, STORAGE_TO_DOMAIN, normalize_domain
+
+        alt = STORAGE_TO_DOMAIN.get(tier) or DOMAIN_TO_STORAGE.get(tier) or normalize_domain(tier)
+        if alt:
+            feats = feat_contribs.get(alt, {}) or {}
 
     scored: List[Tuple[str, float]] = []
     if isinstance(feats, dict):
@@ -529,15 +546,18 @@ def extract_sample_summary(sample: Dict[str, Any]) -> Dict[str, Any]:
     confidence = float(sample.get("confidence", 0.0) or 0.0)
 
     shap_expl = sample.get("shap_explanation", {}) or {}
+    from scripts.network_domains import DOMAIN_LABELS, STORAGE_TO_DOMAIN, normalize_domain
+
     dominant_agent = (shap_expl.get("dominant_agent") or "").strip()
-    dominant_tier = dominant_agent if dominant_agent in ("RAN", "Edge", "Core") else "Unknown"
+    dominant_tier = normalize_domain(dominant_agent) or "Unknown"
     dominant_pct = float(shap_expl.get("dominant_contribution_pct", 0.0) or 0.0) * 100.0
 
     top_features = {
-        "RAN": _top_features_for_tier(sample, "RAN", top_n=3),
-        "Edge": _top_features_for_tier(sample, "Edge", top_n=3),
-        "Core": _top_features_for_tier(sample, "Core", top_n=3),
+        STORAGE_TO_DOMAIN[bucket]: _top_features_for_tier(sample, bucket, top_n=3)
+        for bucket in ("RAN", "Edge", "Core")
     }
+    for domain_name in DOMAIN_LABELS:
+        top_features.setdefault(domain_name, _top_features_for_tier(sample, domain_name, top_n=3))
 
     return {
         "label": label,
@@ -549,10 +569,15 @@ def extract_sample_summary(sample: Dict[str, Any]) -> Dict[str, Any]:
 
 
 _TEMPLATE_QUERY = (
-    "Find mitigation actions, detection steps, and response playbooks for a {label} attack in a telecom network. "
-    "Prioritize the {dominant_tier} tier (dominant contribution ~{dominant_pct:.0f}%). "
+    "Find mitigation actions, detection steps, and response playbooks for a {label} attack in an enterprise network. "
+    "Prioritize the {dominant_tier} domain (dominant contribution ~{dominant_pct:.0f}%). "
     "Use these top indicators as keywords: "
-    "RAN: {ran_feats}. Edge: {edge_feats}. Core: {core_feats}. "
+    "Access / ISP: {access_feats}. Perimeter / IDS: {perimeter_feats}. Endpoint / EDR: {endpoint_feats}. "
+    "Focus on controls appropriate for confidence {confidence:.0%}."
+)
+
+_TEMPLATE_QUERY_NOCOND = (
+    "Find mitigation actions, detection steps, and response playbooks for a {label} attack in an enterprise network. "
     "Focus on controls appropriate for confidence {confidence:.0%}."
 )
 
@@ -574,15 +599,22 @@ def build_template_rag_query(sample: Dict[str, Any]) -> str:
     def fmt(feats: List[str]) -> str:
         return ", ".join(feats) if feats else "no strong features"
 
+    tf = s["top_features"]
     return _TEMPLATE_QUERY.format(
         label=s["label"],
         dominant_tier=s["dominant_tier"],
         dominant_pct=s["dominant_pct"],
         confidence=s["confidence"],
-        ran_feats=fmt(s["top_features"]["RAN"]),
-        edge_feats=fmt(s["top_features"]["Edge"]),
-        core_feats=fmt(s["top_features"]["Core"]),
+        access_feats=fmt(tf.get("Access / ISP") or tf.get("RAN") or []),
+        perimeter_feats=fmt(tf.get("Perimeter / IDS") or tf.get("Edge") or []),
+        endpoint_feats=fmt(tf.get("Endpoint / EDR") or tf.get("Core") or []),
     )
+
+
+def build_template_rag_query_nocond(sample: Dict[str, Any]) -> str:
+    """Class + confidence only (no SHAP dominance or feature keywords)."""
+    s = extract_sample_summary(sample)
+    return _TEMPLATE_QUERY_NOCOND.format(label=s["label"], confidence=s["confidence"])
 
 
 def build_llm_rag_queries(sample: Dict[str, Any]) -> Tuple[str, str]:
@@ -659,6 +691,7 @@ def create_prompt(
     agentic_features_data: Optional[Dict[str, Any]] = None,
     *,
     include_knowledge_base: bool = True,
+    include_conditions: bool = True,
 ) -> str:
     # Dedupe: use the canonical prompt builder used by the API (`POST /agent/decide`).
     # Keep this wrapper so the notebook runner's call sites don't change.
@@ -669,6 +702,7 @@ def create_prompt(
         agentic_features_data,
         include_knowledge_base=include_knowledge_base,
         extra_agentic_notes=None,
+        include_conditions=include_conditions,
     )
 
 
@@ -942,7 +976,21 @@ QUERY_STRATEGY = "template"  # or: ["template", "rephrase"]
 # Per-query retrieval is fixed to 20 docs/query (see `_PER_QUERY_RETRIEVE_K`).
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    import argparse
+
+    p = argparse.ArgumentParser(description="RAG + LLM mitigation plans (default) or 9×6 ablation.")
+    p.add_argument(
+        "--all-types-ablation",
+        action="store_true",
+        help="Dispatch to scripts/reason_ablation.py (experiments/reason/all_types_<ts>/).",
+    )
+    args, extra = p.parse_known_args(argv)
+    if args.all_types_ablation:
+        from scripts.reason_ablation import main as ablation_main
+
+        raise SystemExit(ablation_main(extra))
+
     _ensure_runtime_loaded(verbose=True)
 
     n_attack = (

@@ -1,6 +1,6 @@
 # ChainAgentVFL backend
 
-FastAPI service for versioned files, CSV ML training (including VFL), batch predictions, FAISS + SentenceTransformers RAG, run/monitoring traces, and optional OpenAI-backed agentic actions. Artifacts live under **`storage/`** in this directory unless `STORAGE_ROOT` overrides it.
+FastAPI service for versioned files, CSV ML training (including VFL), batch predictions, FAISS + SentenceTransformers RAG, run/monitoring traces, and optional OpenAI-backed agentic actions. **API** artifacts live under **`storage/`** unless `STORAGE_ROOT` overrides it. **Console** paper stages (`scripts/pipeline.py`) write under repo **`experiments/<stage>/`**.
 
 ## Prerequisites
 
@@ -130,7 +130,7 @@ Uses **`scripts/data/sample_train.csv`** by default.
 
 ## Standalone CLI scripts
 
-Run from **`backend/`**. Notebook-derived helpers live under **`scripts/`**; launchers may `chdir` to the repo root for paths like **`RAG_docs/`**, **`datasets/`**.
+Run from **`backend/`**. Notebook-derived helpers live under **`scripts/`**. Console outputs go to **`experiments/<stage>/`** at the repo root (independent of cwd). Training CSVs stay in repo **`datasets/`**.
 
 | Script | Role |
 |--------|------|
@@ -153,7 +153,8 @@ Optional **`notebooks/*.ipynb`** — install Jupyter separately if needed.
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | SQLAlchemy URL (default MySQL: `mysql+pymysql://root:test@127.0.0.1:3306/agentic-vfl`) |
-| `STORAGE_ROOT` | Artifact root; empty → `backend/storage` |
+| `STORAGE_ROOT` | API artifact root; empty → `backend/storage` |
+| `EXPERIMENTS_ROOT` | Console artifact root; empty → repo `experiments/` |
 | `DEBUG` | Verbose logging when enabled (via settings) |
 | `OPENAI_API_KEY` | If unset, agent and RAG-LLM paths use mock responses |
 | `OPENAI_MODEL` | Chat model id when using OpenAI |

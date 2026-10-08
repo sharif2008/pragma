@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Paper end-to-end launchers: Detect → Reason → Evaluate, plus live Commit/Apply.
 
-Maps Fig. 1 layers to the runners in ``scripts/``. Run from ``backend/``::
+Maps Fig. 1 layers to the runners in ``scripts/``. Console artifacts go to
+``experiments/<stage>/`` at the repo root. Run from ``backend/``::
 
     python scripts/pipeline.py --list
     python scripts/pipeline.py detect-train
@@ -72,20 +73,28 @@ def _ensure_backend_on_path() -> None:
         sys.path.insert(0, root)
 
 
-def _run_script(relative_under_backend: str) -> None:
-    """Run a scripts/*.py file with cwd = repo root (datasets/, RAG_docs/)."""
+def _set_pipeline_scope(stage: str) -> None:
+    os.environ["CHAINAGENT_SCOPE"] = "pipeline"
+    os.environ["CHAINAGENT_TASK"] = stage
+
+
+def _run_script(relative_under_backend: str, extra: list[str] | None = None) -> None:
+    """Run a scripts/*.py file. Artifact roots are absolute (``experiments/<task>/``)."""
     _ensure_backend_on_path()
     os.chdir(_REPO)
-    runpy.run_path(str(_BACKEND / relative_under_backend), run_name="__main__")
+    script = str(_BACKEND / relative_under_backend)
+    sys.argv = [script, *(extra or [])]
+    runpy.run_path(script, run_name="__main__")
 
 
 def run_stage(stage: str, extra: list[str] | None = None) -> None:
     spec = STAGES[stage]
     target = spec["target"]
+    _set_pipeline_scope(stage)
     if stage == "e2e":
         cmd = [sys.executable, str(_BACKEND / target), *(extra or [])]
         raise SystemExit(subprocess.call(cmd, cwd=str(_BACKEND)))
-    _run_script(target)
+    _run_script(target, extra)
 
 
 def _print_list() -> None:
@@ -105,6 +114,7 @@ def _print_list() -> None:
     print("  scripts/trust_anchor_benchmark.py  offline CSV->RAG->LLM->anchor timings (no API)")
     print("  scripts/test_trust_chain.py        Hardhat smoke (storePlan / getPlan / markApplied)")
     print("  run/attack_monitor.py              same as stage e2e")
+    print("\nConsole artifacts: experiments/<stage>/  (API artifacts: backend/storage/)")
 
 
 def main(argv: list[str] | None = None) -> None:

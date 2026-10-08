@@ -611,7 +611,7 @@ def run(seed: int, n_rows: int, tamper: bool, hold_below: float) -> int:
 
     _banner("2/7", "RAG index (chunk 512 / overlap 64, bag-of-words, top-k=5)")
     index = RagIndex(POLICY_CORPUS)
-    print(f"  chunks indexed: {len(index.chunks)}  (production: FAISS + MiniLM over RAG_docs/)")
+    print(f"  chunks indexed: {len(index.chunks)}  (production: FAISS + MiniLM under experiments/rag-index/)")
 
     labels_demo = ["DDOS", "WEBATTACK", "PORTSCAN", "SSHPATATOR", "BENIGN", "BOT"]
     labels_demo = labels_demo[: max(1, n_rows)]

@@ -107,3 +107,19 @@ backend/run/output/
 
 # HuggingFace cache / local screenshots (not repo docs)
 backend/storage/hf_home/
+
+# Console paper stages (detect-train, detect-predict, rag-index, reason, evaluate, e2e)
+experiments/**
+!experiments/.gitkeep
+!experiments/detect-train/
+!experiments/detect-train/.gitkeep
+!experiments/detect-predict/
+!experiments/detect-predict/.gitkeep
+!experiments/rag-index/
+!experiments/rag-index/.gitkeep
+!experiments/reason/
+!experiments/reason/.gitkeep
+!experiments/evaluate/
+!experiments/evaluate/.gitkeep
+!experiments/e2e/
+!experiments/e2e/.gitkeep

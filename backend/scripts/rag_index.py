@@ -96,6 +96,8 @@ def _merge_pdf_pages(pdf_path: Path) -> Tuple[str, List[int]]:
         raise ImportError("pypdf required. pip install pypdf") from e
 
     reader = PdfReader(str(pdf_path))
+    if reader.is_encrypted:
+        reader.decrypt("")
     full_parts: List[str] = []
     char_to_page: List[int] = []
     for i, page in enumerate(reader.pages):

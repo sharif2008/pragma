@@ -65,7 +65,7 @@ from scripts.llm_prompt import (
     row_to_shap_explanation,
 )
 from scripts.ml_sklearn import load_model_bundle
-from scripts.shap import (
+from scripts.shap_payload import (
     RESULTS_JSON_TOP_SHAP_FEATURES,
     compute_sklearn_tree_shap_per_row,
     limit_shap_per_feature_by_abs,

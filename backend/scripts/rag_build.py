@@ -23,7 +23,7 @@ if sys.version_info >= (3, 14):
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 
-from scripts.env import load_project_dotenv
+from scripts.env import experiment_dir, load_project_dotenv, resolve_rag_knowledge_dir
 from scripts.rag_index import (
     CHILD_CHUNK_OVERLAP,
     CHILD_CHUNK_SIZE,
@@ -51,18 +51,14 @@ def _normalize_kb_record(
     return out
 
 
-def load_pdf_file(file_path: Path) -> list[dict[str, Any]]:
-    loader = PyPDFLoader(str(file_path))
-    docs = loader.load()
+def _rows_from_pdf_pages(file_path: Path, pages: list[tuple[int, str]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for i, doc in enumerate(docs):
-        meta_page = doc.metadata.get("page")
-        page_1based = int(meta_page) + 1 if meta_page is not None else i + 1
+    for page_1based, text in pages:
         rows.append(
             _normalize_kb_record(
                 {
                     "title": f"{file_path.name} (page {page_1based})",
-                    "text": doc.page_content or "",
+                    "text": text or "",
                 },
                 file_path.name,
                 "pdf",
@@ -70,6 +66,34 @@ def load_pdf_file(file_path: Path) -> list[dict[str, Any]]:
             )
         )
     return rows
+
+
+def _load_pdf_with_pypdf(file_path: Path) -> list[dict[str, Any]]:
+    from pypdf import PdfReader
+
+    reader = PdfReader(str(file_path))
+    if reader.is_encrypted:
+        reader.decrypt("")
+    pages: list[tuple[int, str]] = []
+    for i, page in enumerate(reader.pages):
+        pages.append((i + 1, page.extract_text() or ""))
+    return _rows_from_pdf_pages(file_path, pages)
+
+
+def load_pdf_file(file_path: Path) -> list[dict[str, Any]]:
+    try:
+        loader = PyPDFLoader(str(file_path))
+        docs = loader.load()
+        pages: list[tuple[int, str]] = []
+        for i, doc in enumerate(docs):
+            meta_page = doc.metadata.get("page")
+            page_1based = int(meta_page) + 1 if meta_page is not None else i + 1
+            pages.append((page_1based, doc.page_content or ""))
+        if pages:
+            return _rows_from_pdf_pages(file_path, pages)
+    except Exception:
+        pass
+    return _load_pdf_with_pypdf(file_path)
 
 
 def load_knowledge_base(knowledge_dir: Path, verbose: bool = True) -> list[dict[str, Any]]:
@@ -125,14 +149,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--knowledge-dir",
         type=Path,
-        default=Path("RAG_docs/knowledge"),
-        help="Directory with PDF/JSON knowledge files (relative to repo root unless absolute)",
+        default=None,
+        help="Directory with PDF/JSON knowledge files (default: resolve_rag_knowledge_dir)",
     )
     p.add_argument(
         "--vector-store-dir",
         type=Path,
-        default=Path("RAG_docs/vector_store"),
-        help="Output directory for FAISS + manifest",
+        default=None,
+        help="Output directory for FAISS + manifest (default: experiments/rag-index/vector_store)",
     )
     p.add_argument("--embed-model", default="all-MiniLM-L6-v2")
     p.add_argument("--embed-batch", type=int, default=16)
@@ -145,8 +169,8 @@ def main(argv: list[str] | None = None) -> int:
     except ImportError as e:
         raise SystemExit("PDF loading requires pypdf. pip install pypdf") from e
 
-    knowledge_dir = args.knowledge_dir.resolve()
-    vector_store_dir = args.vector_store_dir.resolve()
+    knowledge_dir = (args.knowledge_dir or resolve_rag_knowledge_dir()).resolve()
+    vector_store_dir = (args.vector_store_dir or (experiment_dir("rag-index") / "vector_store")).resolve()
     vector_store_dir.mkdir(parents=True, exist_ok=True)
 
     knowledge_base = load_knowledge_base(knowledge_dir)

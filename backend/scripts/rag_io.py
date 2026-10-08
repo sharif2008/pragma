@@ -27,7 +27,13 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
-from scripts.env import AGENTIC_FEATURES_JSON, ATTACK_OPTIONS_JSON
+from scripts.env import (
+    AGENTIC_FEATURES_JSON,
+    ATTACK_OPTIONS_JSON,
+    PREDICT_DETAIL_GLOB,
+    latest_run_dir,
+    wrap_flat_run_files,
+)
 
 # ---------------------------------------------------------------------------
 # Predictions + storage JSON configs (attack_options, agentic_features)
@@ -55,9 +61,28 @@ def tier_allowed_actions(tier_data: Dict[str, Any]) -> List[str]:
     return list(raw) if isinstance(raw, list) else []
 
 
+def _prediction_json_files(directory: Path) -> list[Path]:
+    detailed = sorted(directory.glob(PREDICT_DETAIL_GLOB))
+    if detailed:
+        return detailed
+    return [
+        p
+        for p in directory.glob("*.json")
+        if not p.name.startswith("decision_summary") and p.name != "manifest.json"
+    ]
+
+
 def load_predictions(predictions_dir: Path, verbose: bool = True) -> List[Dict[str, Any]]:
-    """Load all *.json prediction files; each sample gets _source_file."""
-    prediction_files = list(predictions_dir.glob("*.json"))
+    """Load prediction JSON from a run folder (or the latest detect-predict run)."""
+    predictions_dir = Path(predictions_dir)
+    if predictions_dir.name == "detect-predict":
+        wrap_flat_run_files(predictions_dir)
+    prediction_files = _prediction_json_files(predictions_dir)
+    if not prediction_files:
+        latest = latest_run_dir("detect-predict", marker=PREDICT_DETAIL_GLOB)
+        if latest is not None:
+            predictions_dir = latest
+            prediction_files = _prediction_json_files(predictions_dir)
     if not prediction_files:
         raise FileNotFoundError(f"No JSON files found in {predictions_dir}")
     if verbose:
