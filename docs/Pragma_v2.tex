@@ -893,7 +893,7 @@ The current executor records execution receipts rather than invoking a live netw
 
 %=================================================================
 \section{Experimental Results and Analysis} \label{sec:results}
-We evaluated the proposed system in two settings: detection quality and enforcement performance, including execution behavior and blockchain latency. Detection quality was measured on the held-out CICIDS-2017 test set ($N{=}78{,}080$ flows across nine classes). As shown in Table~\ref{tab:vfl}, the three-party Vertical Federated Learning (VFL) model achieves an accuracy of $0.9628$, macro-recall of $0.9861$, and macro-F1 of $0.8633$, compared with $0.9614$, $0.9829$, and $0.8617$, respectively, for the centralized MLP trained on all $88$ features. The macro-F1 difference is only $0.0016$, indicating that feature locality is achieved without materially degrading detection performance. The objective of vertical partitioning is therefore privacy-preserving feature locality rather than an accuracy gain over centralized learning.
+We evaluated the proposed system in three settings: detection quality; enforcement performance, including execution behavior and blockchain latency; and a stage-wise ablation of end-to-end Detect--Reason--Commit--Apply latency. Detection quality was measured on the held-out CICIDS-2017 test set ($N{=}78{,}080$ flows across nine classes). As shown in Table~\ref{tab:vfl}, the three-party Vertical Federated Learning (VFL) model achieves an accuracy of $0.9628$, macro-recall of $0.9861$, and macro-F1 of $0.8633$, compared with $0.9614$, $0.9829$, and $0.8617$, respectively, for the centralized MLP trained on all $88$ features. The macro-F1 difference is only $0.0016$, indicating that feature locality is achieved without materially degrading detection performance. The objective of vertical partitioning is therefore privacy-preserving feature locality rather than an accuracy gain over centralized learning.
 
 \begin{table}[t]
 \centering
@@ -967,6 +967,54 @@ Store + verify   & 78.91 & 48.59 & 69.73 & 812.58\\
 \bottomrule
 \end{tabular}
 \end{table}
+
+Table~\ref{tab:latency} answers whether a local registry is cheap. It does not answer which stage sets detection-to-action delay. We therefore time the unmodified happy path on a frozen $100$-flow CICIDS-2017-style fixture (BENIGN $n{=}12$ and $n{=}11$ of each remaining class), one ranked-RAG LLM call per flow, plans stored as generated. Detect is three-party VFL plus KernelSHAP (chunk wall time amortized per flow). Retrieve is FAISS~$N{=}80$ plus BM25~$N{=}80$ fused by reciprocal rank fusion; Rank is MMR ($\lambda{=}0.5$). Commit is \texttt{storePlan}, Verify is \texttt{getPlan}/\texttt{isInPlan}, and Apply is honest \texttt{markApplied} on the same Hardhat node. End-to-end (E2E) latency is the sum of the seven stages. Of $100$ plans, $99$ were stored and $332$ action units were applied; one FTPPATATOR \texttt{storePlan} reverted with \texttt{action\_not\_whitelisted}.
+
+Because the run uses a single system, the ablation is compositional: each row of Table~\ref{tab:e2e-ablation} removes one recorded stage from the Total E2E of $1780.1$\,s ($17.98$\,s/flow) without re-executing a different planner. Table~\ref{tab:e2e-layers} aggregates the same clocks into Detect, Reason, and Chain.
+
+\begin{table}[t]
+\centering
+\caption{Leave-one-stage-out ablation of E2E wall time on $N{=}100$ happy-path flows ($99$ complete traces). Remaining time is Total E2E minus that stage's sum. Reduction is stage sum $/$ Total E2E.}
+\label{tab:e2e-ablation}
+\renewcommand{\arraystretch}{1.12}
+\setlength{\tabcolsep}{4pt}
+{\footnotesize
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{Ablated stage} & \textbf{Remaining (s)} & \textbf{Mean (s/flow)} & \textbf{Reduction}\\
+\midrule
+None (full pipeline) & 1780.1 & 17.98 & --- \\
+LLM & 359.3 & 3.59 & $79.8\%$ \\
+Rank (MMR) & 1496.3 & 14.96 & $15.9\%$ \\
+Retrieve (FAISS+BM25+RRF) & 1748.1 & 17.48 & $1.8\%$ \\
+Apply (\texttt{markApplied}) & 1750.5 & 17.50 & $1.7\%$ \\
+Detect (VFL+SHAP) & 1757.9 & 17.58 & $1.2\%$ \\
+Commit (\texttt{storePlan}) & 1773.4 & 17.73 & $0.4\%$ \\
+Verify (\texttt{getPlan}) & 1777.3 & 17.77 & $0.2\%$ \\
+Chain (Commit+Verify+Apply) & 1741.0 & 17.41 & $2.2\%$ \\
+Reason (Retrieve+Rank+LLM) & 43.4 & 0.43 & $97.6\%$ \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Layer aggregation of Detect--Reason--Commit--Apply latency. Share is against Total E2E $1780.1$\,s. Mean is per flow.}
+\label{tab:e2e-layers}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+\textbf{Layer} & \textbf{Stages} & \textbf{Sum (s)} & \textbf{Share} & \textbf{Mean (ms)}\\
+\midrule
+Detect & VFL + KernelSHAP & 22.2 & $1.2\%$ & 222 \\
+Reason & Retrieve + Rank + LLM & 1736.7 & $97.6\%$ & 17367 \\
+Chain & Commit + Verify + Apply & 39.2 & $2.2\%$ & 392 \\
+E2E & seven stages & 1780.1 & $100\%$ & 17981 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Language-model plan generation is the first-order term ($79.8\%$ of E2E, $14.2$\,s/flow). Removing it is the only ablation that changes the operating regime, leaving $3.59$\,s/flow. MMR ranking is the only other first-order term ($15.9\%$, $2.84$\,s/flow). Hybrid retrieve ($1.8\%$), Detect ($1.2\%$), and the three on-chain stages together ($2.2\%$, $0.39$\,s/flow) are second-order. Per-class mean E2E spans $14.6$\,s (BENIGN) to $21.3$\,s (SSHPATATOR); that $1.46\times$ range tracks LLM time ($10.8$--$17.6$\,s) rather than Detect (flat $222$\,ms) or Commit ($59$--$75$\,ms). The local registry remains tens to hundreds of milliseconds, consistent with Table~\ref{tab:latency}; it is not the quantity that governs end-to-end response delay.
 
 \subsection{RQ1 --- Detection}
 \label{sec:rq1}
@@ -1047,17 +1095,19 @@ An off-whitelist rejection is returned to Reason once, using the original legal 
 \textit{Can blockchain-based commitments provide verifiable enforcement with acceptable latency overhead?}
 Blockchain cost is measured on two paths, both on a single Hardhat node (chain ID $31337$), with detection, retrieval, and language-model time omitted. On the $500$ online flows, \texttt{anchor} requires $45.08$\,ms on average and \texttt{getCommitment} requires $33.83$\,ms, for a combined chain time of $78.91$\,ms per flow (Table~\ref{tab:latency}). On the frozen-plan attack run, \texttt{storePlan} averages $77.96$\,ms over $420$ writes and \texttt{getPlan} averages $32.88$\,ms over $340$ reads. The SHA-256 digest of the stored rationale matches the on-chain \texttt{reasoningHash} for all $170$ committed plans. A complementary eight-case check rejects a changed action, a changed target, a replay, an unauthorized signer, a prohibited action, a poisoned retrieval instruction, an expired authorization timestamp, and a commitment that differs from the SHA-256 of the plan text. The expiry check is performed by the caller before \texttt{markApplied}, since the deployed registry stores no expiry field. Commitments on this node are verifiable: every stored plan re-hashes, and every submitted illegal unit is refused, at a few tens of milliseconds per chain call.
 
+That chain clock is not the operational bottleneck. On the $100$-flow happy path, Commit$+$Verify$+$Apply is $2.2\%$ of E2E ($0.39$\,s/flow), while language-model generation is $79.8\%$ and MMR ranking is $15.9\%$ (Tables~\ref{tab:e2e-ablation}--\ref{tab:e2e-layers}). Removing the ledger from the critical path would leave $17.41$\,s/flow; removing the LLM would leave $3.59$\,s/flow. Acceptable enforcement overhead therefore holds in the stronger sense that the gate is cheap \emph{relative to} detection-to-action delay, not only in isolation.
+
 \subsection{RQ6 --- End-to-End}
 \label{sec:rq6}
 
 \textit{Can PRAGMA integrate detection, explanation, reasoning, commitment, and enforcement into a reliable end-to-end security pipeline?}
-The $500$-flow online experiment exercises Detect, Reason, Commit, and Apply on one path. Each flow is classified by the three-party VFL model, attributed by KernelSHAP, turned into a mitigation plan of $3.08$ action units on average, committed as a SHA-256 digest, and checked before a receipt is written. Of the $1538$ proposed units, all $750$ modified units are rejected---$352$ by the class whitelist and $398$ by plan binding---and the $788$ unmodified units receive execution receipts (Table~\ref{tab:enforce}). The frozen-plan study then confirms that the same families of substitution are refused by \texttt{storePlan} and \texttt{markApplied} on plans that Reason has already produced. Plans whose predicted class cannot be recovered ($100$ of $270$) are not written to the ledger. Where a predicted class is available, the online run and the attack run together carry a flow from distributed detection through attributed planning, on-chain commitment, and gated enforcement.
+The $500$-flow online experiment exercises Detect, Reason, Commit, and Apply on one path. Each flow is classified by the three-party VFL model, attributed by KernelSHAP, turned into a mitigation plan of $3.08$ action units on average, committed as a SHA-256 digest, and checked before a receipt is written. Of the $1538$ proposed units, all $750$ modified units are rejected---$352$ by the class whitelist and $398$ by plan binding---and the $788$ unmodified units receive execution receipts (Table~\ref{tab:enforce}). The frozen-plan study then confirms that the same families of substitution are refused by \texttt{storePlan} and \texttt{markApplied} on plans that Reason has already produced. Plans whose predicted class cannot be recovered ($100$ of $270$) are not written to the ledger. Where a predicted class is available, the online run and the attack run together carry a flow from distributed detection through attributed planning, on-chain commitment, and gated enforcement. The complementary $100$-flow happy-path clock shows that this integrated path is live ($99/100$ stores, unresolved ${=}0$) and that its delay is planner-dominated rather than ledger-dominated (Table~\ref{tab:e2e-layers}).
 
 %------------------------------------------------------------------
 \section{Discussion} \label{sec:discussion}
 Our proposed system processes each network flow through four stages: Detect, Reason, Commit, and Apply. Detect uses vertical federated learning, allowing each party to retain its local feature columns without sharing raw flow data. Reason grounds mitigation planning in RAG-retrieved guidance from public sources such as NIST, CIS, and MITRE ATT\&CK. Commit anchors a SHA-256 digest of the generated action plan, while Apply enforces two checks before execution: each action must be permitted by the class-specific whitelist and must match the committed plan. If an action is modified before Apply, either to one that is invalid for the predicted class or to a valid but previously uncommitted action, that unit is rejected, while unchanged valid units may still proceed.
 
-The current testbed has several limitations. All VFL parties are implemented as column partitions on a single machine, so WAN latency, communication failures, and network partitions are not evaluated. The blockchain component runs on a local Hardhat node rather than a production ledger, and the Apply stage records execution receipts without invoking a live firewall, SOAR platform, or SDN controller.Nevertheless, the testbed preserves the deployment structure required for a distributed implementation: locally retained features, policy-grounded mitigation planning, and blockchain-backed validation before execution. A production deployment could therefore retain the Detect and Reason components, replace the local ledger with a production blockchain, and connect the Apply stage to a real enforcement interface after both validation gates succeed.
+The current testbed has several limitations. All VFL parties are implemented as column partitions on a single machine, so WAN latency, communication failures, and network partitions are not evaluated. The blockchain component runs on a local Hardhat node rather than a production ledger, and the Apply stage records execution receipts without invoking a live firewall, SOAR platform, or SDN controller. The end-to-end latency ablation is compositional on one ranked-RAG system (\(N{=}100\)), not a re-run of a no-retrieval planner, and Detect time is chunk-amortized. Nevertheless, the testbed preserves the deployment structure required for a distributed implementation: locally retained features, policy-grounded mitigation planning, and blockchain-backed validation before execution. A production deployment could therefore retain the Detect and Reason components, replace the local ledger with a production blockchain, and connect the Apply stage to a real enforcement interface after both validation gates succeed. On that path the SLA remains a planner and ranker problem: even a slower permissioned ledger would have to add many seconds per flow before it rivaled the $14.2$\,s language-model term.
 %------------------------------------------------------------------
 \section{Conclusion} 
 \label{sec:conclusion}

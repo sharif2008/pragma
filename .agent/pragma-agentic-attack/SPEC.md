@@ -182,11 +182,12 @@ honest.jsonl              # N storePlan + markApplied receipts
 attacks.jsonl             # one row per (case, threat), with route=reason_retry|human|none
 loops.jsonl               # L1 reason retry + L2 human revisePlan
 report.md                 # Stage B + Stage C + Stage L + Auth
-outcomes_a1_a25.png       # stacked skip / block / accept
-honest_store.png          # selected vs stored by planner
-auth_a13_a20.png          # A13–A20 pass/fail
-latency.png               # storePlan vs getPlan
-table_a1_a25.png          # A1–A25 table figure
+figures/                  # report PNGs
+  outcomes_a1_a25.png     # stacked skip / block / accept
+  honest_store.png        # selected vs stored by planner
+  auth_a13_a20.png        # A13–A20 pass/fail
+  latency.png             # storePlan vs getPlan
+  table_a1_a25.png        # A1–A25 table figure
 manifest.json
 latency.json              # storePlan / getPlan / markApplied / revisePlan ms
 ```

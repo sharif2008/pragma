@@ -1332,6 +1332,184 @@ def write_offgold_text_chart(out: Path, means: dict[str, Any], deltas: dict[str,
     return write_ac_text_chart(out, means, deltas)
 
 
+def write_offgold_3d_charts(out: Path) -> list[Path]:
+    """3D headline + per-class bars from comparison.csv (A vs C columns)."""
+    csv_path = out / "comparison.csv"
+    if not csv_path.is_file():
+        return []
+    import csv as _csv
+    from collections import defaultdict
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.patches import Patch
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    short = {
+        "BENIGN": "BENIGN",
+        "BOT": "BOT",
+        "DDOS": "DDoS",
+        "DOS": "DoS",
+        "FTPPATATOR": "FTP",
+        "OTHERS": "OTHERS",
+        "PORTSCAN": "PORT",
+        "SSHPATATOR": "SSH",
+        "WEBATTACK": "WEB",
+    }
+    keys = (
+        ("A_bertscore", "C_bertscore", "BERTScore F1"),
+        ("A_rouge1", "C_rouge1", "ROUGE-1"),
+        ("A_rougeL", "C_rougeL", "ROUGE-L"),
+    )
+    no_rag, rag = "#94a3b8", "#2563eb"
+    overall: dict[str, list[float]] = defaultdict(list)
+    by_cls: dict[str, dict[str, list[float]]] = {c: defaultdict(list) for c in NINE}
+    with csv_path.open(encoding="utf-8", newline="") as f:
+        for row in _csv.DictReader(f):
+            lab = str(row.get("true_label") or "").upper()
+            for ak, ck, _name in keys:
+                try:
+                    a, c = float(row[ak]), float(row[ck])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                overall[ak].append(a)
+                overall[ck].append(c)
+                if lab in by_cls:
+                    by_cls[lab][ak].append(a)
+                    by_cls[lab][ck].append(c)
+
+    def _mean(xs: list[float]) -> float:
+        return float(sum(xs) / len(xs)) if xs else 0.0
+
+    def _pane(ax: Any) -> None:
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+        for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+            axis.pane.set_edgecolor("#d1d5db")
+        ax.grid(True, color="#e5e7eb", linewidth=0.5)
+        ax.tick_params(labelsize=8)
+        ax.set_zlabel("Score", fontsize=9, labelpad=6)
+
+    a_vals = [_mean(overall[k[0]]) for k in keys]
+    c_vals = [_mean(overall[k[1]]) for k in keys]
+    names = [k[2] for k in keys]
+    fig = plt.figure(figsize=(8.8, 6.6), facecolor="white")
+    fig.text(0.50, 0.97, "No RAG vs RAG + SHAP", ha="center", va="top", fontsize=12)
+    ax = fig.add_axes([0.04, 0.28, 0.90, 0.62], projection="3d")
+    xs = np.arange(len(names), dtype=float)
+    dx, dy = 0.50, 0.34
+    for yi, (vals, color) in enumerate(((a_vals, no_rag), (c_vals, rag))):
+        ax.bar3d(
+            xs - dx / 2,
+            np.full(len(xs), float(yi)) - dy / 2,
+            np.zeros(len(xs)),
+            dx,
+            dy,
+            vals,
+            color=color,
+            shade=True,
+            edgecolor="white",
+            linewidth=0.6,
+            alpha=0.96,
+        )
+    ax.set_xticks(xs)
+    ax.set_xticklabels(names, fontsize=9)
+    ax.set_yticks([0.0, 1.0])
+    ax.set_yticklabels(["No RAG", "RAG + SHAP"], fontsize=8)
+    ax.set_zlim(0, 1.0)
+    _pane(ax)
+    ax.view_init(elev=21, azim=-56)
+    try:
+        ax.set_box_aspect((1.85, 0.72, 1.05))
+    except Exception:
+        pass
+    ax.legend(
+        handles=[Patch(facecolor=no_rag, label="No RAG"), Patch(facecolor=rag, label="RAG + SHAP")],
+        frameon=False,
+        loc="upper right",
+        fontsize=8,
+    )
+    tax = fig.add_axes([0.12, 0.04, 0.76, 0.20])
+    tax.axis("off")
+    cell = [[f"{a_vals[i]:.3f}", f"{c_vals[i]:.3f}", f"{c_vals[i] - a_vals[i]:+.3f}"] for i in range(3)]
+    tbl = tax.table(
+        cellText=cell,
+        rowLabels=names,
+        colLabels=["No RAG (A)", "RAG + SHAP (B)", "B − A"],
+        loc="center",
+        cellLoc="center",
+    )
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(9)
+    tbl.scale(1.0, 1.45)
+    for (r, col), cell_obj in tbl.get_celld().items():
+        cell_obj.set_edgecolor("#d1d5db")
+        if r == 0:
+            cell_obj.set_facecolor("#f1f5f9")
+            cell_obj.set_text_props(weight="bold")
+        elif col == 2:
+            cell_obj.set_text_props(color="#1e3a8a", weight="bold")
+    headline = out / "bertscore_rouge_3d.png"
+    fig.savefig(headline, dpi=170, facecolor="white")
+    plt.close(fig)
+    print("chart ->", headline)
+
+    fig = plt.figure(figsize=(15.8, 5.8), facecolor="white")
+    zmaxes = (1.0, 0.50, 0.28)
+    labels = [short[c] for c in NINE]
+    xs = np.arange(len(NINE), dtype=float)
+    dx, dy = 0.58, 0.32
+    for i, ((ak, ck, title), zmax) in enumerate(zip(keys, zmaxes)):
+        ax = fig.add_subplot(1, 3, i + 1, projection="3d")
+        av = [_mean(by_cls[lab][ak]) for lab in NINE]
+        cv = [_mean(by_cls[lab][ck]) for lab in NINE]
+        for yi, (vals, color) in enumerate(((av, no_rag), (cv, rag))):
+            ax.bar3d(
+                xs - dx / 2,
+                np.full(len(xs), float(yi)) - dy / 2,
+                np.zeros(len(xs)),
+                dx,
+                dy,
+                vals,
+                color=color,
+                shade=True,
+                edgecolor="white",
+                linewidth=0.3,
+                alpha=0.96,
+            )
+        ax.set_xticks(xs)
+        ax.set_xticklabels(labels, rotation=22, ha="right", fontsize=6.5)
+        ax.set_yticks([0.0, 1.0])
+        ax.set_yticklabels(["No RAG", "RAG+SHAP"], fontsize=7)
+        ax.set_zlim(0, zmax)
+        ax.set_title(title, fontsize=11, pad=2)
+        _pane(ax)
+        ax.view_init(elev=23, azim=-58)
+        try:
+            ax.set_box_aspect((1.9, 0.7, 1.05))
+        except Exception:
+            pass
+    fig.legend(
+        handles=[Patch(facecolor=no_rag, label="No RAG"), Patch(facecolor=rag, label="RAG + SHAP")],
+        loc="upper center",
+        ncol=2,
+        frameon=False,
+        fontsize=9,
+        bbox_to_anchor=(0.5, 0.99),
+    )
+    fig.suptitle("Text overlap by attack type  ·  n = 200 off-gold", fontsize=12, y=1.04)
+    fig.subplots_adjust(left=0.03, right=0.98, bottom=0.08, top=0.86, wspace=0.12)
+    by_class = out / "bertscore_rouge_by_class_3d.png"
+    fig.savefig(by_class, dpi=170, facecolor="white", bbox_inches="tight")
+    plt.close(fig)
+    print("chart ->", by_class)
+    return [headline, by_class]
+
+
 def write_pipeline_png(out: Path) -> Path:
     import matplotlib
 
@@ -1538,6 +1716,7 @@ def write_offgold_report(out: Path, paired: list[dict[str, Any]]) -> Path:
     text_scores = score_offgold_text(out, paired)
     write_offgold_plans(out, paired, text_scores=text_scores)
     write_offgold_text_chart(out, text_scores.get("means") or {}, text_scores.get("deltas") or {})
+    write_offgold_3d_charts(out)
     write_pipeline_png(out)
     present = _offgold_systems_present(out, paired)
 
@@ -1605,7 +1784,7 @@ def write_offgold_report(out: Path, paired: list[dict[str, Any]]) -> Path:
         f"| ROUGE-1 | {_fmt((tm.get('LLM_only') or {}).get('rouge_1'))} | {_fmt((tm.get('RAG_RANKING') or {}).get('rouge_1'))} | {_fmt(td.get('rouge_1'))} |",
         f"| ROUGE-L | {_fmt((tm.get('LLM_only') or {}).get('rouge_l'))} | {_fmt((tm.get('RAG_RANKING') or {}).get('rouge_l'))} | {_fmt(td.get('rouge_l'))} |",
         "",
-        "Chart: `bertscore_rouge.png`.",
+        "Charts: `bertscore_rouge.png` (2D), `bertscore_rouge_3d.png` (3D + table), `bertscore_rouge_by_class_3d.png` (per attack type).",
         "",
     ]
     lines += _action_table_lines(paired, by_sys, compare, catalog)

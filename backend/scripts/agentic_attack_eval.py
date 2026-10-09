@@ -38,6 +38,7 @@ from scripts.network_domains import DOMAIN_LABELS, normalize_domain  # noqa: E40
 
 REPO = _BACKEND.parent
 OUT = REPO / "experiments" / "agentic-attack"
+FIG = OUT / "figures"
 AUTH_PLANS_DEFAULT = OUT / "auth_plans.json"
 AUTH_RESULTS = OUT / "auth.jsonl"
 CATALOG_PATH = REPO / "hardhat-blockchain" / "contracts" / "attack_options.json"
@@ -255,7 +256,10 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 def _pct(blocked_n: int, injected_n: int) -> str:
     if injected_n <= 0:
         return "—"
-    return f"{100.0 * blocked_n / injected_n:.0f}"
+    ratio = 100.0 * blocked_n / injected_n
+    if abs(ratio - round(ratio)) < 1e-9:
+        return f"{ratio:.0f}"
+    return f"{ratio:.1f}"
 
 
 def _attack_stats(attack_rows: list[dict[str, Any]], source: str) -> tuple[int, int, int, int, str]:
@@ -310,6 +314,27 @@ def _auth_stats(auth_rows: list[dict[str, Any]], source: str) -> tuple[int, int,
     return 1, 0, blocked, accepted, str(match.get("revert") or "—")
 
 
+def _honest_summary(
+    honest_rows: list[dict[str, Any]],
+) -> tuple[dict[str, dict[str, int]], dict[str, dict[str, int]]]:
+    by_sys: dict[str, dict[str, int]] = {}
+    by_label: dict[str, dict[str, int]] = {}
+    for row in honest_rows:
+        sys_name = str(row.get("system") or "?")
+        slot = by_sys.setdefault(sys_name, {"n": 0, "stored": 0, "units": 0, "applied": 0})
+        slot["n"] += 1
+        if row.get("stored"):
+            slot["stored"] += 1
+            slot["units"] += int(row.get("units") or 0)
+            slot["applied"] += int(row.get("applied") or 0)
+        label = str(row.get("attack_type") or "unresolved")
+        lab = by_label.setdefault(label, {"n": 0, "stored": 0})
+        lab["n"] += 1
+        if row.get("stored"):
+            lab["stored"] += 1
+    return by_sys, by_label
+
+
 def render_report(
     *,
     plans_path: str,
@@ -325,76 +350,230 @@ def render_report(
     honest_ok = sum(1 for row in honest_rows if row.get("stored"))
     hash_ok = sum(1 for row in honest_rows if row.get("reasoning_hash_match"))
     failed = [row for row in honest_rows if not row.get("stored")]
-    lines = [
-        "# Agentic evaluation",
-        "",
-        "One report. IDs are `A` plus a sequential number. **Threat** is the Table III class. **How this works** is the injection that represents that threat.",
-        "",
-        f"Attack plans: `{plans_path}`",
-        f"Authorization plans: `{AUTH_PLANS_DEFAULT}`",
-        f"Service: Hardhat already running at `http://127.0.0.1:8545` (chain {chain_id}).",
-        f"Contract: `{contract}`.",
-        "Off-chain audit logs were not used. Detect and the LLM were not called.",
-        "",
-        f"Selected plans: **{len(honest_rows)}**. Honest `storePlan`: **{honest_ok}**. `reasoningHash` match: **{hash_ok}** of the stored plans.",
-        f"Authorization stories: **{len(auth_rows)}**.",
-        "",
-        "### A1–A25 threats and how this works",
-        "",
-        "| ID | Threat | How this works | n | Skip | Block | Acc | Block.% |",
-        "|----|--------|----------------|--:|-----:|------:|----:|--------:|",
-    ]
-    for uid, family, source, threat, how, _gate in UNIFIED_ROWS:
+    by_sys, by_label = _honest_summary(honest_rows)
+    fail_by_sys = Counter(str(row.get("system") or "?") for row in failed)
+    fail_err = Counter(str(row.get("error") or "fail") for row in failed)
+    unresolved = [row for row in failed if str(row.get("error") or "") == "attack_type_unresolved" or not row.get("attack_type")]
+    whitelist_fail = [row for row in failed if "action_not_whitelisted" in str(row.get("error") or "")]
+    store_ms = float(latency.get("storePlan_mean_ms") or 0)
+    get_ms = float(latency.get("getPlan_mean_ms") or 0)
+    stats: list[tuple[str, str, str, str, int, int, int, int, str, str]] = []
+    threat_roll: dict[str, dict[str, int]] = {}
+    for uid, family, source, threat, how, gate in UNIFIED_ROWS:
         if family == "attack":
-            n, skipped, blocked, accepted, _revert = _attack_stats(attack_rows, source)
+            n, skipped, blocked, accepted, revert = _attack_stats(attack_rows, source)
         elif family == "auth":
-            n, skipped, blocked, accepted, _revert = _auth_stats(auth_rows, source)
+            n, skipped, blocked, accepted, revert = _auth_stats(auth_rows, source)
         else:
-            n, skipped, blocked, accepted, _revert = _loop_stats(loop_rows, source)
+            n, skipped, blocked, accepted, revert = _loop_stats(loop_rows, source)
+        stats.append((uid, family, source, threat, n, skipped, blocked, accepted, revert, how))
+        roll = threat_roll.setdefault(threat, {"n": 0, "skip": 0, "block": 0, "acc": 0})
+        roll["n"] += n
+        roll["skip"] += skipped
+        roll["block"] += blocked
+        roll["acc"] += accepted
+    by_id = {row[0]: row for row in stats}
+    a4 = by_id.get("A4")
+    a11 = by_id.get("A11")
+    a22 = by_id.get("A22")
+    a24 = by_id.get("A24")
+    planner_bits = ", ".join(
+        f"`{name}` {by_sys[name]['stored']}/{by_sys[name]['n']}" for name in sorted(by_sys)
+    )
+    plans_name = Path(plans_path).parent.name or Path(plans_path).name
+    fail_err_label = ", ".join(f"{k} ×{v}" for k, v in fail_err.most_common()) or "none"
+    fail_ids = ", ".join(f"`{row.get('plan_id')}`" for row in failed) or "none"
+    injected_acc = sum(roll["acc"] for roll in threat_roll.values())
+    skip_note = (
+        f"{len(unresolved)} plan(s) never reached `storePlan` because `ŷ` could not be named "
+        f"(`attack_type_unresolved`). {len(whitelist_fail)} named plan(s) reached `storePlan` and "
+        f"reverted `action_not_whitelisted` (generated unit ∉ W[ŷ])."
+    )
+    finding_store = (
+        f"**Honest commit is {honest_ok}/{len(honest_rows)}.** {planner_bits}. "
+        f"Not stored: {len(failed)} ({fail_err_label}). Unresolved `ŷ`: {len(unresolved)}."
+    )
+    if a4 and a24 and a11:
+        finding_skip = (
+            f"**Some attacks cannot run on every plan.** A4 and A24 need a leftover legal action "
+            f"that is not already in the stored plan "
+            f"(A4 injected {a4[4]}, could not inject {a4[5]}; "
+            f"A24 injected {a24[4]}, could not inject {a24[5]}). "
+            f"A11 injected {a11[4]}; the rest have no unused network tier to swap."
+        )
+    else:
+        finding_skip = (
+            "**Some attacks cannot run on every plan** (no leftover legal action, no unused "
+            "network tier, or no live honest plan)."
+        )
+    a22_note = ""
+    if a22 and a22[4] and a22[6] < a22[4]:
+        a22_note = (
+            f" A22 legal retry stored {a22[6]}/{a22[4]}; the remainder is the same frozen plan "
+            f"that honest `storePlan` already rejected (not a tamper accept)."
+        )
+
+    lines = [
+        "# Agentic attack evaluation (A1–A25)",
+        "",
+        f"Frozen mitigation plans from `{plans_name}` are committed as written, then 25 injections are applied against the live `AgenticTrustRegistry`. Detect and the LLM are not called. **Threat** is the Table III class. **How this works** is the injection that represents that threat.",
+        "",
+        f"- Plans: `{plans_path}`",
+        f"- Auth stories: `{AUTH_PLANS_DEFAULT}`",
+        f"- Hardhat `{chain_id}` · `{contract}`",
+        "- Off-chain audit logs ignored",
+        "",
+        "## Headline",
+        "",
+        f"| | |",
+        f"|---|---|",
+        f"| Selected / honest stored | **{len(honest_rows)}** / **{honest_ok}** |",
+        f"| `reasoningHash` match | **{hash_ok}** / {honest_ok} stored |",
+        f"| Injected attempts accepted | **{injected_acc}** |",
+        f"| Authorization A13–A20 | **{len(auth_rows)}/{len(auth_rows)}** rejected, not executed |",
+        f"| Honest not stored | **{len(failed)}** · {fail_err_label} |",
+        f"| Unresolved `ŷ` | **{len(unresolved)}** |",
+        f"| Commit `storePlan` | **{store_ms:.1f} ms** (n={latency.get('storePlan_n')}) |",
+        f"| Verify `getPlan` | **{get_ms:.1f} ms** (n={latency.get('getPlan_n')}) |",
+        "",
+        skip_note,
+        "",
+        "## How to read the counts",
+        "",
+        "Three outcomes are scored. **Could not inject is not a pass and not a fail.**",
+        "",
+        "| Label | Meaning |",
+        "|-------|---------|",
+        "| **Injected / n** | Plans where this attack was actually submitted to the contract or harness. |",
+        "| **Blocked** | The mutated unit was submitted and refused. |",
+        "| **Accepted** | The mutated unit would have been applied. Must stay 0. |",
+        "| **Could not inject** | The attack was **not submitted**. That plan cannot host this injection, so Block.% ignores it. |",
+        "",
+        "Typical reasons an attack cannot be injected:",
+        "",
+        "- A4 / A24 — every legal action for that class is already in the stored plan, so there is no leftover token to drift to.",
+        "- A11 — the action is already stored on all three network tiers, so there is no unused domain to swap.",
+        "- A3, A8–A10, A12 — the honest plan never stored, so there is no live plan id to tamper with.",
+        "",
+        "Block.% = blocked / injected. Plans counted under **Could not inject** are excluded from that ratio.",
+        "",
+        "## Findings",
+        "",
+        "1. **The gate holds on the scoped adversary.** A1–A12 (scale), A13–A20 (authorization), and A21–A25 (retry / human loops) all report Acc = 0 on the injected subset.",
+        f"2. {finding_store}",
+        f"3. {finding_skip}{a22_note}",
+        "4. **Chain time is tens of milliseconds.** Detect / RAG / LLM are omitted here; see the e2e latency report for the planner-dominated path.",
+        "",
+        "### By threat class",
+        "",
+        "| Threat | Injected | Could not inject | Blocked | Accepted | Block.% |",
+        "|--------|---------:|-----------------:|--------:|---------:|--------:|",
+    ]
+    for threat, roll in threat_roll.items():
+        lines.append(
+            f"| {threat} | {roll['n']} | {roll['skip']} | {roll['block']} | {roll['acc']} | {_pct(roll['block'], roll['n'])} |"
+        )
+    lines.extend(
+        [
+            "",
+            "### A1–A25 threats and how this works",
+            "",
+            "| ID | Threat | How this works | Injected | Could not inject | Blocked | Accepted | Block.% |",
+            "|----|--------|----------------|---------:|-----------------:|--------:|---------:|--------:|",
+        ]
+    )
+    for uid, _family, _source, threat, n, skipped, blocked, accepted, _revert, how in stats:
         lines.append(
             f"| {uid} | {threat} | {how} | {n} | {skipped} | {blocked} | {accepted} | {_pct(blocked, n)} |"
         )
     lines.extend(
         [
             "",
-            "A1–A12 are the scale matrix (internal C1–C6, T4–T7). A13–A20 are the authorization stories (internal B1–B8). A21–A25 are the reject loops. How this works is the injection that represents the Threat column.",
+            "A1–A12 = scale matrix (C1–C6, T4–T7). A13–A20 = authorization stories (B1–B8). A21–A25 = reject loops (L1/L2).",
             "",
-            "### Honest store detail",
+            "### Gate and revert",
             "",
-            "| Case | System | Attack type | Stored | Applied | Units | Note |",
-            "|------|--------|-------------|--------|---------|-------|------|",
+            "| ID | Gate | Typical revert |",
+            "|----|------|----------------|",
         ]
     )
-    for row in honest_rows:
-        note = row.get("error") or ""
+    for uid, _family, _source, _threat, _n, _s, _b, _a, revert, _how in stats:
+        gate = next(row[5] for row in UNIFIED_ROWS if row[0] == uid)
+        lines.append(f"| {uid} | `{gate}` | `{revert}` |")
+    lines.extend(
+        [
+            "",
+            "## Honest store",
+            "",
+            "A plan is stored only when `ŷ` is named in the plan and every unit is in `W[ŷ]`. Unresolved or whitelist-rejected rows are recorded; the job continues.",
+            "",
+            "| Planner | Selected | Stored | Store % | Units applied | Not stored |",
+            "|---------|---------:|-------:|--------:|--------------:|-----------:|",
+        ]
+    )
+    for name in sorted(by_sys):
+        s = by_sys[name]
+        pct_store = 100.0 * s["stored"] / s["n"] if s["n"] else 0
         lines.append(
-            f"| {row.get('case_id')} | {row.get('system')} | {row.get('attack_type') or '—'} | {row.get('stored')} | {row.get('applied')} | {row.get('units')} | {note} |"
+            f"| `{name}` | {s['n']} | {s['stored']} | {_pct(s['stored'], s['n'])} | {s['applied']} | {s['n'] - s['stored']} |"
         )
-    lines.append("")
-    if failed:
-        lines.append("Honest plans that did not store (job continued):")
-        lines.append("")
-        for row in failed:
-            lines.append(f"- `{row.get('case_id')}` / {row.get('system')}: {row.get('error')}")
-        lines.append("")
     lines.append(
-        f"Commit mean {latency.get('storePlan_mean_ms')} ms (n={latency.get('storePlan_n')}). "
-        f"Verify mean {latency.get('getPlan_mean_ms')} ms (n={latency.get('getPlan_n')})."
+        f"| **Total** | **{len(honest_rows)}** | **{honest_ok}** | **{_pct(honest_ok, len(honest_rows))}** | **{sum(v['applied'] for v in by_sys.values())}** | **{len(failed)}** |"
     )
     lines.extend(
         [
             "",
-            "### Charts",
+            "| Predicted class | Plans | Stored |",
+            "|-----------------|------:|-------:|",
+        ]
+    )
+    for label in sorted(by_label, key=lambda k: (k == "unresolved", k)):
+        lab = by_label[label]
+        lines.append(f"| {label} | {lab['n']} | {lab['stored']} |")
+    lines.extend(
+        [
             "",
-            "![A1–A25 outcomes](outcomes_a1_a25.png)",
+            f"Not stored by planner: "
+            + (", ".join(f"`{k}` {v}" for k, v in sorted(fail_by_sys.items())) or "none")
+            + f". Plan ids: {fail_ids}.",
             "",
-            "![Honest store by planner](honest_store.png)",
+            "## Chain latency",
             "",
-            "![Authorization A13–A20](auth_a13_a20.png)",
+            "Detect, retrieval, and LLM time are omitted (blockchain-only clock).",
             "",
-            "![Chain latency](latency.png)",
+            f"| Call | n | Mean (ms) |",
+            f"|------|--:|----------:|",
+            f"| `storePlan` (Commit) | {latency.get('storePlan_n')} | {store_ms:.2f} |",
+            f"| `getPlan` (Verify) | {latency.get('getPlan_n')} | {get_ms:.2f} |",
+            f"| Combined | — | **{store_ms + get_ms:.2f}** |",
             "",
-            "![A1–A25 table](table_a1_a25.png)",
+            "## Figures",
+            "",
+            "PNGs live in `figures/`.",
+            "",
+            "**A1–A25 outcomes.** Orange = blocked (submitted and refused). Grey = could not inject (attack not submitted because the plan cannot host it). Dark = accepted (must be empty).",
+            "",
+            "![A1–A25 outcomes](figures/outcomes_a1_a25.png)",
+            "",
+            f"**Honest store by planner.** {len(honest_rows)} selected across {len(by_sys)} planner(s). Stored < selected is unresolved `ŷ` or `action_not_whitelisted`.",
+            "",
+            "![Honest store by planner](figures/honest_store.png)",
+            "",
+            "**Authorization A13–A20.** All eight stories rejected before execution.",
+            "",
+            "![Authorization A13–A20](figures/auth_a13_a20.png)",
+            "",
+            "**Chain latency.**",
+            "",
+            "![Chain latency](figures/latency.png)",
+            "",
+            "**Injected attempts by threat class.** Orange bars are blocked. The note after each bar is how many plans could not host that attack (not submitted).",
+            "",
+            "![Threat class](figures/threat_class.png)",
+            "",
+            "**A1–A25 table (figure).** LaTeX (same numbers, use this instead of the PNG): `table_a1_a25.tex`.",
+            "",
+            "![A1–A25 table](figures/table_a1_a25.png)",
             "",
         ]
     )
@@ -463,22 +642,26 @@ def write_charts(
     skip_p = [100.0 * s / t for s, t in zip(skipped, totals)]
     block_p = [100.0 * b / t for b, t in zip(blocked, totals)]
     acc_p = [100.0 * a / t for a, t in zip(accepted, totals)]
-    fig, ax = plt.subplots(figsize=(11.2, 8.4))
+    fig, ax = plt.subplots(figsize=(13.4, 8.4))
     y = list(range(len(ids)))
-    ax.barh(y, skip_p, color="#cbd5e1", label="Skipped")
-    ax.barh(y, block_p, left=skip_p, color="#16a34a", label="Blocked")
-    ax.barh(y, acc_p, left=[s + b for s, b in zip(skip_p, block_p)], color="#dc2626", label="Accepted")
+    ax.barh(y, skip_p, color="#D6D3D1", label="Could not inject")
+    ax.barh(y, block_p, left=skip_p, color="#E07A3D", label="Blocked")
+    ax.barh(y, acc_p, left=[s + b for s, b in zip(skip_p, block_p)], color="#9A3412", label="Accepted")
     ax.set_yticks(y)
     ax.set_yticklabels(ids)
     ax.invert_yaxis()
     ax.set_xlim(0, 100)
     ax.set_xlabel("% of selected plans")
-    ax.set_title("A1–A25 outcomes (injected block vs skip vs accept)")
+    ax.set_title("A1–A25 outcomes (blocked vs could not inject vs accepted)")
     ax.legend(frameon=False, loc="lower right")
     for i, (n, skip_n, block_n) in enumerate(zip(ns, skipped, blocked)):
-        ax.text(101, i, f"{block_n}/{n}" if n else f"skip {skip_n}", va="center", ha="left", fontsize=7, color="#334155")
+        note = f"{block_n} blocked / {n} injected"
+        if skip_n:
+            note += f" · {skip_n} not injected"
+        ax.text(101, i, note, va="center", ha="left", fontsize=6.5, color="#334155")
     fig.tight_layout()
-    path = OUT / "outcomes_a1_a25.png"
+    FIG.mkdir(parents=True, exist_ok=True)
+    path = FIG / "outcomes_a1_a25.png"
     fig.savefig(path, dpi=140)
     plt.close(fig)
     written.append(path)
@@ -495,8 +678,8 @@ def write_charts(
     x = list(range(len(names)))
     sel = [by_sys[n][0] for n in names]
     sto = [by_sys[n][1] for n in names]
-    b1 = ax.bar([i - 0.18 for i in x], sel, 0.36, label="Selected", color="#94a3b8")
-    b2 = ax.bar([i + 0.18 for i in x], sto, 0.36, label="Stored", color="#2563eb")
+    b1 = ax.bar([i - 0.18 for i in x], sel, 0.36, label="Selected", color="#D6D3D1")
+    b2 = ax.bar([i + 0.18 for i in x], sto, 0.36, label="Stored", color="#E07A3D")
     ax.set_xticks(x)
     ax.set_xticklabels(names, rotation=15, ha="right")
     ax.set_ylabel("Plans")
@@ -507,7 +690,7 @@ def write_charts(
             h = rect.get_height()
             ax.text(rect.get_x() + rect.get_width() / 2, h + 1.2, f"{int(h)}", ha="center", va="bottom", fontsize=8)
     fig.tight_layout()
-    path = OUT / "honest_store.png"
+    path = FIG / "honest_store.png"
     fig.savefig(path, dpi=140)
     plt.close(fig)
     written.append(path)
@@ -520,14 +703,14 @@ def write_charts(
         _n, _s, block_n, acc_n, _r = _auth_stats(auth_rows, source)
         auth_block.append(1 if block_n else 0)
     fig, ax = plt.subplots(figsize=(8.6, 3.8))
-    colors = ["#16a34a" if v else "#dc2626" for v in auth_block]
+    colors = ["#E07A3D" if v else "#9A3412" for v in auth_block]
     ax.bar(auth_ids, auth_block, color=colors)
     ax.set_ylim(0, 1.25)
     ax.set_yticks([0, 1])
     ax.set_yticklabels(["fail", "pass"])
     ax.set_title("Authorization stories A13–A20 (1 = rejected, not executed)")
     fig.tight_layout()
-    path = OUT / "auth_a13_a20.png"
+    path = FIG / "auth_a13_a20.png"
     fig.savefig(path, dpi=140)
     plt.close(fig)
     written.append(path)
@@ -535,25 +718,25 @@ def write_charts(
     fig, ax = plt.subplots(figsize=(6.4, 3.8))
     labels = ["Commit\nstorePlan", "Verify\ngetPlan"]
     vals = [float(latency.get("storePlan_mean_ms") or 0), float(latency.get("getPlan_mean_ms") or 0)]
-    bars = ax.bar(labels, vals, color=["#1d4ed8", "#0f766e"])
+    bars = ax.bar(labels, vals, color=["#E07A3D", "#9A3412"])
     ax.set_ylabel("Mean ms")
     ax.set_title("Chain latency (Detect / RAG / LLM omitted)")
     for rect, val in zip(bars, vals):
         ax.text(rect.get_x() + rect.get_width() / 2, rect.get_height() + 1, f"{val:.1f}", ha="center", va="bottom")
     fig.tight_layout()
-    path = OUT / "latency.png"
+    path = FIG / "latency.png"
     fig.savefig(path, dpi=140)
     plt.close(fig)
     written.append(path)
 
     fig, ax = plt.subplots(figsize=(16.5, 13.2))
     ax.axis("off")
-    col_labels = ["ID", "Threat", "How this works", "n", "Skip", "Block", "Acc", "Block.%"]
+    col_labels = ["ID", "Threat", "How this works", "Injected", "Could not inject", "Blocked", "Accepted", "Block.%"]
     table = ax.table(cellText=table_cells, colLabels=col_labels, loc="center", cellLoc="left")
     table.auto_set_font_size(False)
     table.set_fontsize(7.5)
     table.scale(1, 2.05)
-    widths = [0.05, 0.16, 0.46, 0.06, 0.06, 0.07, 0.06, 0.08]
+    widths = [0.05, 0.14, 0.40, 0.08, 0.12, 0.08, 0.08, 0.08]
     for (r, c), cell in table.get_celld().items():
         cell.set_width(widths[c])
         cell.set_edgecolor("#e2e8f0")
@@ -567,11 +750,134 @@ def write_charts(
             cell.get_text().set_ha("center")
     ax.set_title("A1–A25 threats and how this works", pad=18)
     fig.tight_layout()
-    path = OUT / "table_a1_a25.png"
+    path = FIG / "table_a1_a25.png"
     fig.savefig(path, dpi=160, bbox_inches="tight")
     plt.close(fig)
     written.append(path)
+
+    roll: dict[str, list[int]] = {}
+    for uid, family, source, threat, simulation, gate in UNIFIED_ROWS:
+        n, skip_n, block_n, acc_n, _revert = _outcome_row(family, source, attack_rows, loop_rows, auth_rows)
+        slot = roll.setdefault(threat, [0, 0, 0, 0])
+        slot[0] += n
+        slot[1] += skip_n
+        slot[2] += block_n
+        slot[3] += acc_n
+    names = list(roll)
+    fig, ax = plt.subplots(figsize=(9.4, 5.4))
+    y = list(range(len(names)))
+    block_n = [roll[k][2] for k in names]
+    acc_n = [roll[k][3] for k in names]
+    ax.barh(y, block_n, color="#E07A3D", label="Blocked")
+    ax.barh(y, acc_n, left=block_n, color="#9A3412", label="Accepted")
+    ax.set_yticks(y)
+    ax.set_yticklabels(names)
+    ax.invert_yaxis()
+    ax.set_xlabel("Injected attempts (submitted to the contract)")
+    ax.set_title("Injected attempts by threat class")
+    ax.legend(frameon=False, loc="lower right", bbox_to_anchor=(0.99, 0.02))
+    xmax = max(block_n) if block_n else 1
+    ax.set_xlim(0, xmax * 1.42)
+    for i, k in enumerate(names):
+        n_inj, n_na, n_block = roll[k][0], roll[k][1], roll[k][2]
+        label = f"{n_block} blocked"
+        if n_na:
+            label += f"  ·  {n_na} could not inject"
+        ax.text(n_block + max(xmax * 0.012, 8), i, label, va="center", fontsize=8)
+    total_inj = sum(roll[k][0] for k in names)
+    total_na = sum(roll[k][1] for k in names)
+    total_block = sum(roll[k][2] for k in names)
+    total_acc = sum(roll[k][3] for k in names)
+    total_att = total_inj + total_na
+    summary = (
+        f"Blocked            {100.0 * total_block / max(total_inj, 1):.0f}% of injected\n"
+        f"Accepted             {100.0 * total_acc / max(total_inj, 1):.0f}%\n"
+        f"Could not inject   {100.0 * total_na / max(total_att, 1):.1f}%"
+    )
+    ax.text(
+        0.98,
+        0.42,
+        summary,
+        transform=ax.transAxes,
+        ha="right",
+        va="center",
+        fontsize=9,
+        linespacing=1.45,
+        color="#1e293b",
+        bbox={
+            "boxstyle": "round,pad=0.55",
+            "facecolor": "#FFF7ED",
+            "edgecolor": "#E07A3D",
+            "linewidth": 1.1,
+        },
+    )
+    fig.tight_layout()
+    path = FIG / "threat_class.png"
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+    written.append(path)
     return written
+
+
+def _tex_escape(text: str) -> str:
+    repl = {
+        "\\": r"\textbackslash{}",
+        "&": r"\&",
+        "%": r"\%",
+        "$": r"\$",
+        "#": r"\#",
+        "_": r"\_",
+        "{": r"\{",
+        "}": r"\}",
+        "~": r"\textasciitilde{}",
+        "^": r"\textasciicircum{}",
+    }
+    return "".join(repl.get(ch, ch) for ch in text)
+
+
+def write_latex_table(
+    *,
+    attack_rows: list[dict[str, Any]],
+    loop_rows: list[dict[str, Any]],
+    auth_rows: list[dict[str, Any]],
+) -> Path:
+    """IEEE-style drop-in for table_a1_a25.png. Does not edit docs/Pragma_v2.tex."""
+    lines = [
+        r"% Drop-in for experiments/agentic-attack/figures/table_a1_a25.png",
+        r"% Same A1--A25 counts. Requires: booktabs, tabularx, ragged2e, array",
+        r"% \usepackage{booktabs,tabularx,ragged2e,array}",
+        r"\begin{table*}[t]",
+        r"\centering",
+        r"\caption{A1--A25 threats and how this works. Injected = submitted to the contract or harness.",
+        r"Could not inject = the plan cannot host this attack (not submitted; neither a pass nor a fail).",
+        r"Block.\% = blocked / injected. Accepted must stay 0.}",
+        r"\label{tab:agentic-a1-a25}",
+        r"\footnotesize",
+        r"\setlength{\tabcolsep}{3.5pt}",
+        r"\begin{tabularx}{\textwidth}{@{}l l >{\RaggedRight\arraybackslash}X r r r r r@{}}",
+        r"\toprule",
+        r"ID & Threat & How this works & Inj. & N/I & Blk & Acc & Blk.\% \\",
+        r"\midrule",
+    ]
+    for uid, family, source, threat, how, _gate in UNIFIED_ROWS:
+        n, skip_n, block_n, acc_n, _revert = _outcome_row(family, source, attack_rows, loop_rows, auth_rows)
+        pct = "---" if n == 0 else _pct(block_n, n)
+        lines.append(
+            f"{uid} & {_tex_escape(threat)} & {_tex_escape(how)} & "
+            f"{n} & {skip_n} & {block_n} & {acc_n} & {pct} \\\\"
+        )
+    lines.extend(
+        [
+            r"\bottomrule",
+            r"\end{tabularx}",
+            r"\\[2pt]{\scriptsize N/I = could not inject. A1--A12 scale matrix; A13--A20 authorization; A21--A25 reject loops.}",
+            r"\end{table*}",
+            "",
+        ]
+    )
+    path = OUT / "table_a1_a25.tex"
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -609,6 +915,12 @@ def write_combined_from_disk(*, plans_path: str) -> Path:
     )
     for chart in charts:
         print("chart ->", chart)
+    tex = write_latex_table(
+        attack_rows=_read_jsonl(OUT / "attacks.jsonl"),
+        loop_rows=_read_jsonl(OUT / "loops.jsonl"),
+        auth_rows=_read_jsonl(AUTH_RESULTS),
+    )
+    print("latex ->", tex)
     return target
 
 

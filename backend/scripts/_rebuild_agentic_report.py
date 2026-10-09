@@ -1,4 +1,8 @@
-"""Rebuild experiments/agentic-attack/report.md from jsonl. No web3."""
+"""Rebuild experiments/agentic-attack/report.md and figures/ from jsonl.
+
+Prefers `agentic_attack_eval.write_combined_from_disk` (same markdown as a live run).
+Falls back to `experiments/agentic-attack/plot_report.py` for figures only.
+"""
 
 from __future__ import annotations
 
@@ -162,4 +166,14 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    try:
+        from scripts.agentic_attack_eval import write_combined_from_disk
+
+        path = write_combined_from_disk(plans_path="")
+        print("wrote", path)
+    except Exception as exc:
+        print("eval import failed; writing legacy markdown:", exc)
+        main()

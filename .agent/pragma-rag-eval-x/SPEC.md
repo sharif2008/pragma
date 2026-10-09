@@ -92,6 +92,8 @@ mitigation_plans.json
 comparison.csv
 pipeline.png
 bertscore_rouge.png
+bertscore_rouge_3d.png
+bertscore_rouge_by_class_3d.png
 report.md
 manifest.json
 ```

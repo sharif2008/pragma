@@ -31,7 +31,7 @@ Reference = gold-100 `relevant_rag_chunks[].text` concat **per attack type**.
 | A | rationale only |
 | B | 5 parents + rationale |
 
-Headline `bertscore_rouge.png`:
+Headline `bertscore_rouge.png` (2D) and `bertscore_rouge_3d.png` (3D + table). Per-class: `bertscore_rouge_by_class_3d.png`.
 
 | Metric | No RAG (A) | RAG + SHAP (B) | B − A |
 |--------|------------|----------------|-------|
@@ -51,6 +51,8 @@ experiments/rag/hybrid_eval200/
   comparison.csv
   pipeline.png
   bertscore_rouge.png
+  bertscore_rouge_3d.png
+  bertscore_rouge_by_class_3d.png
   report.md
   manifest.json
 ```

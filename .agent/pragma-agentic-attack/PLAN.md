@@ -49,11 +49,12 @@ experiments/agentic-attack/
   attacks.jsonl
   loops.jsonl
   report.md          # A1–A25
-  outcomes_a1_a25.png
-  honest_store.png
-  auth_a13_a20.png
-  latency.png
-  table_a1_a25.png
+  figures/           # report PNGs
+    outcomes_a1_a25.png
+    honest_store.png
+    auth_a13_a20.png
+    latency.png
+    table_a1_a25.png
   manifest.json
   latency.json
 ```
