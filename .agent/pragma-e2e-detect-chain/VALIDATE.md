@@ -23,8 +23,8 @@ Checklist is 1:1 with [`SPEC.md`](SPEC.md). Do not score this run with eval100 o
 
 - [x] Script `backend/scripts/e2e_detect_chain.py` exists
 - [x] Default command: sample (if missing) → detect → reason → chain → report
-- [ ] `runs.jsonl` has 1000 `RAG_RANKING` lines — **this run is eval-10 (N=10)**
-- [x] `honest.jsonl` has 10 lines; `attack_type_unresolved` = 0
+- [ ] `runs.jsonl` has 1000 `RAG_RANKING` lines — **this run is eval-100 (N=100)**
+- [x] `honest.jsonl` has 100 lines; `attack_type_unresolved` = 0
 - [x] No `attacks.jsonl`, no inject flags
 - [x] `latency.json` has Total + 9 labels × each step (sum/mean/min/max)
 - [x] `report.md` and `REPORT.md` contain the SPEC latency matrix plus mean/min/max per step (not a single Total-only mean in place of the matrix)
@@ -32,4 +32,4 @@ Checklist is 1:1 with [`SPEC.md`](SPEC.md). Do not score this run with eval100 o
 
 ## Verdict
 
-**eval-10 smoke complete (N=10, 10 LLM calls, unresolved=0).** Report row **Total** (not Overall). Row E2E = seven-step sum; Total = column sum of nine labels. Detect min=max because Detect is amortized per chunk. Full 1000-flow run not started.
+**eval-100 complete (N=100, 100 LLM calls, unresolved=0).** Stored 99/100. One FTPPATATOR store revert (`87486`, `action_not_whitelisted`); job continued. Detect min=max (one amortized chunk). Full 1000-flow run not started.
