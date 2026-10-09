@@ -90,13 +90,13 @@ Hardhat is already up (`http://127.0.0.1:8545`, chain 31337). This job does not 
 
 ## What to score
 
-Group by **true_label**, then Overall. Latency cells are **total ms** (sum over that row’s n flows).
+Group by **true_label**, then Total. Latency cells are **total ms** (sum over that row’s n flows).
 
-**Row-wise:** E2E = Detect + Retrieve + Rank + LLM + Commit + Verify + Apply. **Column-wise:** Overall n and each Overall step = sum of the nine attack-type rows. Honest-store Overall n / Stored / Applied / Fail / unresolved are those same column sums.
+**Row-wise:** E2E = Detect + Retrieve + Rank + LLM + Commit + Verify + Apply. **Column-wise:** Total n and each Total step = sum of the nine attack-type rows. Honest-store Total n / Stored / Applied / Fail / unresolved are those same column sums.
 
 ### Latency (required table)
 
-One matrix: **row = attack type**, **column = pipeline step**. Nine labels first, **Overall last**. This table is the headline of `report.md` and `.agent/pragma-e2e-detect-chain/REPORT.md`.
+One matrix: **row = attack type**, **column = pipeline step**. Nine labels first, **Total last**. This table is the headline of `report.md` and `.agent/pragma-e2e-detect-chain/REPORT.md`.
 
 | Attack | n | Detect | Retrieve | Rank | LLM | Commit | Verify | Apply | E2E |
 |--------|--:|-------:|---------:|-----:|----:|-------:|-------:|------:|----:|
@@ -109,7 +109,7 @@ One matrix: **row = attack type**, **column = pipeline step**. Nine labels first
 | PORTSCAN | | | | | | | | | |
 | SSHPATATOR | | | | | | | | | |
 | WEBATTACK | | | | | | | | | |
-| Overall | 1000 | | | | | | | | |
+| Total | 1000 | | | | | | | | |
 
 | Column | Clock |
 |--------|--------|
@@ -122,16 +122,16 @@ One matrix: **row = attack type**, **column = pipeline step**. Nine labels first
 | Apply | honest `markApplied` total per attack type |
 | E2E | row sum of the seven steps |
 
-`latency.json` stores the same matrix (each label + Overall; each step’s `sum_ms`, `mean_ms`, `min_ms`, `max_ms`, and n).
+`latency.json` stores the same matrix (each label + Total; each step’s `sum_ms`, `mean_ms`, `min_ms`, `max_ms`, and n).
 
 ### Honest store
 
-Same row set (9 labels, then Overall):
+Same row set (9 labels, then Total):
 
 | Attack | n | Stored | Applied | Fail | unresolved |
 |--------|--:|-------:|--------:|-----:|-----------:|
 | … | | | | | |
-| Overall | 1000 | | | | **0** |
+| Total | 1000 | | | | **0** |
 
 `attack_type_unresolved` must be **0**.
 
@@ -142,10 +142,10 @@ No BERTScore, ROUGE, evidence-support, inject Block.%, or per-flow true/false ac
 `experiments/e2e-detect-chain/report.md` (filled after the run) and `.agent/pragma-e2e-detect-chain/REPORT.md` (same tables). Order:
 
 1. Fixture N, class histogram, LLM calls = 1000
-2. **Latency matrix** (required): every step × every attack type, Overall last (cells = total ms)
-3. **E2E per-flow** mean / min / max (9 labels, then Overall)
-4. **Overall by step** mean / min / max / sum
-5. Honest store matrix (9 labels, then Overall)
+2. **Latency matrix** (required): every step × every attack type, Total last (cells = total ms)
+3. **E2E per-flow** mean / min / max (9 labels, then Total)
+4. **Total by step** mean / min / max / sum
+5. Honest store matrix (9 labels, then Total)
 6. Chain fails (if any), by `split_index` and revert
 
 Do not replace the latency matrix with a single overall mean. Every step and every attack type must have a cell. Mean / min / max sit in extra tables, not instead of the totals.
@@ -176,7 +176,7 @@ detect/predictions_detailed.json
 runs.jsonl
 mitigation_plans.json
 honest.jsonl
-latency.json               # overall + 9 labels × each step
+latency.json               # Total + 9 labels × each step
 report.md                  # latency matrix required
 manifest.json
 README.md

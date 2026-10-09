@@ -27,7 +27,7 @@ Do not read gold JSON, eval100 jsonl, agentic-attack receipts, or any other fixt
 2. **Detect** — chunked `detect_predict.py` into `experiments/e2e-detect-chain/detect/`.
 3. **Reason** — `RAG_RANKING` only. `hybrid_children` (FAISS 80 + BM25 80 → RRF → MMR λ=0.5 → 20 children → 5 parents). One LLM call per flow. Resume `runs.jsonl`. Write `predicted_label` on every mitigation-plans case.
 4. **Chain** — store the generated plan unchanged. `planId={split_index}-RAG_RANKING-honest`. `storePlan` → verify → `markApplied`. Record ms. unresolved = 0. Continue on other reverts. No mutation, no inject.
-5. **Report** — write the SPEC latency matrix (every step × 9 attack types, **Overall last**) and the honest-store matrix into `experiments/e2e-detect-chain/report.md` and `.agent/pragma-e2e-detect-chain/REPORT.md`. Cells are total ms. E2E is the row sum of Detect…Apply. Overall is the column sum of the nine attack types. `--report-only` rebuilds both from this folder’s jsonl.
+5. **Report** — write the SPEC latency matrix (every step × 9 attack types, **Total last**) and the honest-store matrix into `experiments/e2e-detect-chain/report.md` and `.agent/pragma-e2e-detect-chain/REPORT.md`. Cells are total ms. E2E is the row sum of Detect…Apply. Total is the column sum of the nine attack types. `--report-only` rebuilds both from this folder’s jsonl.
 
 ```
 cd backend
@@ -55,7 +55,7 @@ experiments/e2e-detect-chain/
   runs.jsonl             # 1000
   mitigation_plans.json
   honest.jsonl
-  latency.json           # overall + 9 labels, each step sum/mean/min/max + n
+  latency.json           # Total + 9 labels, each step sum/mean/min/max + n
   report.md              # latency matrix + E2E mean/min/max
   manifest.json
   README.md

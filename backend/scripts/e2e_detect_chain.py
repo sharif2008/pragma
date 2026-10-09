@@ -75,6 +75,7 @@ load_project_dotenv()
 SYSTEM = "RAG_RANKING"
 CLOCKS = ("detect", "retrieve", "rank", "llm", "commit", "verify", "apply")
 STEPS = CLOCKS + ("e2e",)
+TOTAL = "Total"
 AGENT_REPORT = _REPO / ".agent" / "pragma-e2e-detect-chain" / "REPORT.md"
 
 
@@ -456,6 +457,42 @@ def _cell(block: dict[str, Any], key: str, field: str = "sum_ms") -> str:
     return f"{float(val):.1f}"
 
 
+def _column_sum(parts: list[dict[str, Any]], field: str) -> dict[str, Any]:
+    """Total row = sum of the nine attack-type cells for this field."""
+    n = sum(int(p.get("n") or 0) for p in parts)
+    out: dict[str, Any] = {"n": n}
+    for key in STEPS:
+        kn = 0
+        if field == "mean_ms":
+            sum_total = 0.0
+            saw = False
+            for part in parts:
+                step = part.get(key) or {}
+                if step.get("sum_ms") is None:
+                    continue
+                saw = True
+                sum_total += float(step["sum_ms"])
+                kn += int(step.get("n") or 0)
+            out[key] = {
+                "sum_ms": round(sum_total, 1) if saw else None,
+                "n": kn,
+                "mean_ms": round(sum_total / kn, 2) if kn else None,
+            }
+            continue
+        total = 0.0
+        saw = False
+        for part in parts:
+            step = part.get(key) or {}
+            val = step.get(field)
+            if val is None:
+                continue
+            saw = True
+            total += float(val)
+            kn += int(step.get("n") or 0)
+        out[key] = {field: round(total, 1) if saw else None, "n": kn}
+    return out
+
+
 def _latency_block(rows: list[dict[str, Any]]) -> dict[str, Any]:
     buckets: dict[str, list[float]] = {k: [] for k in CLOCKS}
     e2e_vals: list[float] = []
@@ -475,10 +512,11 @@ def _latency_block(rows: list[dict[str, Any]]) -> dict[str, Any]:
             val = lat.get(src)
             if val is None:
                 continue
-            buckets[key].append(float(val))
-            parts.append(float(val))
+            v = round(float(val), 1)
+            buckets[key].append(v)
+            parts.append(v)
         if len(parts) == len(CLOCKS):
-            e2e_vals.append(sum(parts))
+            e2e_vals.append(round(sum(parts), 1))
     out: dict[str, Any] = {"n": len(rows)}
     for key in CLOCKS:
         out[key] = _stat(buckets[key])
@@ -507,7 +545,8 @@ def write_report(flows: Path) -> Path:
         lab = str(row.get("true_label") or "").strip().upper()
         by_label[lab].append(row)
     matrix: dict[str, Any] = {lab: _latency_block(by_label.get(lab) or []) for lab in NINE}
-    matrix["Overall"] = _latency_block(rows)
+    label_parts = [matrix[lab] for lab in NINE]
+    matrix[TOTAL] = _latency_block(rows)
     _dump(live / "latency.json", matrix)
 
     def store_line(label: str, group: list[dict[str, Any]]) -> str:
@@ -523,10 +562,14 @@ def write_report(flows: Path) -> Path:
             "| Attack | n | Detect | Retrieve | Rank | LLM | Commit | Verify | Apply | E2E |",
             "|--------|--:|-------:|---------:|-----:|----:|-------:|-------:|------:|----:|",
         ]
-        for label in (*NINE, "Overall"):
+        for label in NINE:
             block = matrix[label]
             cells = " | ".join(_cell(block, s, field) for s in STEPS)
             lines.append(f"| {label} | {block['n']} | {cells} |")
+        total_field = "sum_ms" if field in ("min_ms", "max_ms") else field
+        total_block = _column_sum(label_parts, total_field)
+        cells = " | ".join(_cell(total_block, s, total_field) for s in STEPS)
+        lines.append(f"| {TOTAL} | {total_block['n']} | {cells} |")
         return lines
 
     lat_lines = _matrix_lines("sum_ms")
@@ -538,7 +581,7 @@ def write_report(flows: Path) -> Path:
         "| Attack | n | mean | min | max |",
         "|--------|--:|-----:|----:|----:|",
     ]
-    for label in (*NINE, "Overall"):
+    for label in (*NINE, TOTAL):
         block = matrix[label]
         e2e_lines.append(
             f"| {label} | {block['n']} | {_cell(block, 'e2e', 'mean_ms')} | {_cell(block, 'e2e', 'min_ms')} | {_cell(block, 'e2e', 'max_ms')} |"
@@ -554,15 +597,15 @@ def write_report(flows: Path) -> Path:
         "apply": "Apply",
         "e2e": "E2E",
     }
-    overall = matrix["Overall"]
+    total_block = matrix[TOTAL]
     step_lines = [
         "| Step | n | mean | min | max | sum |",
         "|------|--:|-----:|----:|----:|----:|",
     ]
     for key in STEPS:
-        step = overall.get(key) or {}
+        step = total_block.get(key) or {}
         step_lines.append(
-            f"| {step_title[key]} | {step.get('n') or 0} | {_cell(overall, key, 'mean_ms')} | {_cell(overall, key, 'min_ms')} | {_cell(overall, key, 'max_ms')} | {_cell(overall, key)} |"
+            f"| {step_title[key]} | {step.get('n') or 0} | {_cell(total_block, key, 'mean_ms')} | {_cell(total_block, key, 'min_ms')} | {_cell(total_block, key, 'max_ms')} | {_cell(total_block, key)} |"
         )
 
     fails = [r for r in rows if not r.get("stored")]
@@ -582,7 +625,7 @@ def write_report(flows: Path) -> Path:
             "",
             "## Latency (total ms)",
             "",
-            "Cell = **total ms** over that row’s n flows. **E2E** is the row sum of Detect…Apply. **Overall** is the column sum of the nine attack types (n and every step).",
+            "Cell = **total ms** over that row’s n flows. **E2E** is the row sum of Detect…Apply. **Total** is the column sum of the nine attack types (n and every step).",
             "",
             *lat_lines,
             "",
@@ -599,29 +642,29 @@ def write_report(flows: Path) -> Path:
             "",
             "## Latency (mean ms)",
             "",
-            "Cell = **mean ms** per flow in that row. **Overall** is mean over all n flows.",
+            "Cell = **mean ms** per flow in that row. **Total** is mean over all n flows.",
             "",
             *mean_lines,
             "",
             "## Latency (min ms)",
             "",
-            "Cell = **min ms** among that row’s flows.",
+            "Cell = **min ms** among that row’s flows. **Total** is the **sum** of Detect / Retrieve / Rank / … over all attack types (same as the total-ms table), not the global min.",
             "",
             *min_lines,
             "",
             "## Latency (max ms)",
             "",
-            "Cell = **max ms** among that row’s flows.",
+            "Cell = **max ms** among that row’s flows. **Total** is the **sum** of Detect / Retrieve / Rank / … over all attack types (same as the total-ms table), not the global max.",
             "",
             *max_lines,
             "",
             "## E2E per flow (ms)",
             "",
-            "Per-flow E2E = Detect + Retrieve + Rank + LLM + Commit + Verify + Apply. **Overall** is all n flows (not a mean of means).",
+            "Per-flow E2E = Detect + Retrieve + Rank + LLM + Commit + Verify + Apply. **Total** is all n flows (mean / min / max over every flow).",
             "",
             *e2e_lines,
             "",
-            "### Overall by step (per-flow ms)",
+            "### Total by step (per-flow ms)",
             "",
             *step_lines,
             "",
@@ -630,9 +673,9 @@ def write_report(flows: Path) -> Path:
             "| Attack | n | Stored | Applied | Fail | unresolved |",
             "|--------|--:|-------:|--------:|-----:|-----------:|",
             *[store_line(lab, by_label.get(lab) or []) for lab in NINE],
-            store_line("Overall", rows),
+            store_line(TOTAL, rows),
             "",
-            "Overall n / Stored / Applied / Fail / unresolved are the sums of the attack-type rows.",
+            "Total n / Stored / Applied / Fail / unresolved are the sums of the attack-type rows. Applied is `markApplied` action units, not plans.",
             "",
             "## Chain fails",
             "",

@@ -7,11 +7,11 @@ Class histogram (true_label): `{"BENIGN": 2, "BOT": 1, "DDOS": 1, "DOS": 1, "FTP
 
 ## Latency (total ms)
 
-Cell = **total ms** over that row’s n flows. **E2E** is the row sum of Detect…Apply. **Overall** is the column sum of the nine attack types (n and every step).
+Cell = **total ms** over that row’s n flows. **E2E** is the row sum of Detect…Apply. **Total** is the column sum of the nine attack types (n and every step).
 
 | Attack | n | Detect | Retrieve | Rank | LLM | Commit | Verify | Apply | E2E |
 |--------|--:|-------:|---------:|-----:|----:|-------:|-------:|------:|----:|
-| BENIGN | 2 | 4528.2 | 3071.4 | 12600.9 | 24070.9 | 596.1 | 77.6 | 716.6 | 45661.8 |
+| BENIGN | 2 | 4528.2 | 3071.4 | 12600.9 | 24070.9 | 596.2 | 77.6 | 716.6 | 45661.8 |
 | BOT | 1 | 2264.1 | 2618.7 | 4748.8 | 20640.7 | 348.6 | 43.1 | 547.9 | 31211.9 |
 | DDOS | 1 | 2264.1 | 461.3 | 2933.0 | 12688.6 | 133.5 | 33.1 | 384.5 | 18898.1 |
 | DOS | 1 | 2264.1 | 378.2 | 2821.5 | 15831.4 | 139.2 | 40.5 | 945.2 | 22420.1 |
@@ -19,8 +19,8 @@ Cell = **total ms** over that row’s n flows. **E2E** is the row sum of Detect�
 | OTHERS | 1 | 2264.1 | 784.0 | 4131.0 | 13307.3 | 94.4 | 31.3 | 254.7 | 20866.8 |
 | PORTSCAN | 1 | 2264.1 | 487.0 | 4909.4 | 14806.6 | 104.8 | 48.3 | 586.2 | 23206.4 |
 | SSHPATATOR | 1 | 2264.1 | 347.0 | 5523.3 | 16511.7 | 112.0 | 28.9 | 419.3 | 25206.3 |
-| WEBATTACK | 1 | 2264.1 | 331.9 | 3122.8 | 25318.8 | 93.2 | 38.3 | 281.1 | 31450.1 |
-| Overall | 10 | 22641.0 | 8826.5 | 45248.5 | 167038.7 | 1725.6 | 384.4 | 4503.2 | 250367.9 |
+| WEBATTACK | 1 | 2264.1 | 331.9 | 3122.8 | 25318.8 | 93.2 | 38.3 | 281.1 | 31450.2 |
+| Total | 10 | 22641.0 | 8826.5 | 45248.5 | 167038.7 | 1725.5 | 384.5 | 4503.2 | 250367.9 |
 
 | Step | Clock |
 |------|--------|
@@ -35,24 +35,24 @@ Cell = **total ms** over that row’s n flows. **E2E** is the row sum of Detect�
 
 ## Latency (mean ms)
 
-Cell = **mean ms** per flow in that row. **Overall** is mean over all n flows.
+Cell = **mean ms** per flow in that row. **Total** is mean over all n flows.
 
 | Attack | n | Detect | Retrieve | Rank | LLM | Commit | Verify | Apply | E2E |
 |--------|--:|-------:|---------:|-----:|----:|-------:|-------:|------:|----:|
-| BENIGN | 2 | 2264.10 | 1535.70 | 6300.45 | 12035.45 | 298.07 | 38.81 | 358.30 | 22830.88 |
-| BOT | 1 | 2264.10 | 2618.70 | 4748.80 | 20640.70 | 348.62 | 43.09 | 547.90 | 31211.91 |
-| DDOS | 1 | 2264.10 | 461.30 | 2933.00 | 12688.60 | 133.51 | 33.13 | 384.50 | 18898.15 |
-| DOS | 1 | 2264.10 | 378.20 | 2821.50 | 15831.40 | 139.25 | 40.49 | 945.20 | 22420.14 |
-| FTPPATATOR | 1 | 2264.10 | 347.00 | 4457.80 | 23862.70 | 103.62 | 43.36 | 367.70 | 31446.28 |
-| OTHERS | 1 | 2264.10 | 784.00 | 4131.00 | 13307.30 | 94.43 | 31.29 | 254.70 | 20866.82 |
-| PORTSCAN | 1 | 2264.10 | 487.00 | 4909.40 | 14806.60 | 104.83 | 48.31 | 586.20 | 23206.44 |
-| SSHPATATOR | 1 | 2264.10 | 347.00 | 5523.30 | 16511.70 | 111.99 | 28.87 | 419.30 | 25206.26 |
-| WEBATTACK | 1 | 2264.10 | 331.90 | 3122.80 | 25318.80 | 93.17 | 38.27 | 281.10 | 31450.14 |
-| Overall | 10 | 2264.10 | 882.65 | 4524.85 | 16703.87 | 172.56 | 38.44 | 450.32 | 25036.79 |
+| BENIGN | 2 | 2264.10 | 1535.70 | 6300.45 | 12035.45 | 298.10 | 38.80 | 358.30 | 22830.90 |
+| BOT | 1 | 2264.10 | 2618.70 | 4748.80 | 20640.70 | 348.60 | 43.10 | 547.90 | 31211.90 |
+| DDOS | 1 | 2264.10 | 461.30 | 2933.00 | 12688.60 | 133.50 | 33.10 | 384.50 | 18898.10 |
+| DOS | 1 | 2264.10 | 378.20 | 2821.50 | 15831.40 | 139.20 | 40.50 | 945.20 | 22420.10 |
+| FTPPATATOR | 1 | 2264.10 | 347.00 | 4457.80 | 23862.70 | 103.60 | 43.40 | 367.70 | 31446.30 |
+| OTHERS | 1 | 2264.10 | 784.00 | 4131.00 | 13307.30 | 94.40 | 31.30 | 254.70 | 20866.80 |
+| PORTSCAN | 1 | 2264.10 | 487.00 | 4909.40 | 14806.60 | 104.80 | 48.30 | 586.20 | 23206.40 |
+| SSHPATATOR | 1 | 2264.10 | 347.00 | 5523.30 | 16511.70 | 112.00 | 28.90 | 419.30 | 25206.30 |
+| WEBATTACK | 1 | 2264.10 | 331.90 | 3122.80 | 25318.80 | 93.20 | 38.30 | 281.10 | 31450.20 |
+| Total | 10 | 2264.10 | 882.65 | 4524.85 | 16703.87 | 172.55 | 38.45 | 450.32 | 25036.79 |
 
 ## Latency (min ms)
 
-Cell = **min ms** among that row’s flows.
+Cell = **min ms** among that row’s flows. **Total** is the **sum** of Detect / Retrieve / Rank / … over all attack types (same as the total-ms table), not the global min.
 
 | Attack | n | Detect | Retrieve | Rank | LLM | Commit | Verify | Apply | E2E |
 |--------|--:|-------:|---------:|-----:|----:|-------:|-------:|------:|----:|
@@ -64,12 +64,12 @@ Cell = **min ms** among that row’s flows.
 | OTHERS | 1 | 2264.1 | 784.0 | 4131.0 | 13307.3 | 94.4 | 31.3 | 254.7 | 20866.8 |
 | PORTSCAN | 1 | 2264.1 | 487.0 | 4909.4 | 14806.6 | 104.8 | 48.3 | 586.2 | 23206.4 |
 | SSHPATATOR | 1 | 2264.1 | 347.0 | 5523.3 | 16511.7 | 112.0 | 28.9 | 419.3 | 25206.3 |
-| WEBATTACK | 1 | 2264.1 | 331.9 | 3122.8 | 25318.8 | 93.2 | 38.3 | 281.1 | 31450.1 |
-| Overall | 10 | 2264.1 | 331.9 | 2821.5 | 9579.4 | 93.2 | 28.9 | 244.5 | 18867.8 |
+| WEBATTACK | 1 | 2264.1 | 331.9 | 3122.8 | 25318.8 | 93.2 | 38.3 | 281.1 | 31450.2 |
+| Total | 10 | 22641.0 | 8826.5 | 45248.5 | 167038.7 | 1725.5 | 384.5 | 4503.2 | 250367.9 |
 
 ## Latency (max ms)
 
-Cell = **max ms** among that row’s flows.
+Cell = **max ms** among that row’s flows. **Total** is the **sum** of Detect / Retrieve / Rank / … over all attack types (same as the total-ms table), not the global max.
 
 | Attack | n | Detect | Retrieve | Rank | LLM | Commit | Verify | Apply | E2E |
 |--------|--:|-------:|---------:|-----:|----:|-------:|-------:|------:|----:|
@@ -81,27 +81,27 @@ Cell = **max ms** among that row’s flows.
 | OTHERS | 1 | 2264.1 | 784.0 | 4131.0 | 13307.3 | 94.4 | 31.3 | 254.7 | 20866.8 |
 | PORTSCAN | 1 | 2264.1 | 487.0 | 4909.4 | 14806.6 | 104.8 | 48.3 | 586.2 | 23206.4 |
 | SSHPATATOR | 1 | 2264.1 | 347.0 | 5523.3 | 16511.7 | 112.0 | 28.9 | 419.3 | 25206.3 |
-| WEBATTACK | 1 | 2264.1 | 331.9 | 3122.8 | 25318.8 | 93.2 | 38.3 | 281.1 | 31450.1 |
-| Overall | 10 | 2264.1 | 2620.0 | 6415.9 | 25318.8 | 488.3 | 48.3 | 945.2 | 31450.1 |
+| WEBATTACK | 1 | 2264.1 | 331.9 | 3122.8 | 25318.8 | 93.2 | 38.3 | 281.1 | 31450.2 |
+| Total | 10 | 22641.0 | 8826.5 | 45248.5 | 167038.7 | 1725.5 | 384.5 | 4503.2 | 250367.9 |
 
 ## E2E per flow (ms)
 
-Per-flow E2E = Detect + Retrieve + Rank + LLM + Commit + Verify + Apply. **Overall** is all n flows (not a mean of means).
+Per-flow E2E = Detect + Retrieve + Rank + LLM + Commit + Verify + Apply. **Total** is all n flows (mean / min / max over every flow).
 
 | Attack | n | mean | min | max |
 |--------|--:|-----:|----:|----:|
-| BENIGN | 2 | 22830.88 | 18867.8 | 26794.0 |
-| BOT | 1 | 31211.91 | 31211.9 | 31211.9 |
-| DDOS | 1 | 18898.15 | 18898.1 | 18898.1 |
-| DOS | 1 | 22420.14 | 22420.1 | 22420.1 |
-| FTPPATATOR | 1 | 31446.28 | 31446.3 | 31446.3 |
-| OTHERS | 1 | 20866.82 | 20866.8 | 20866.8 |
-| PORTSCAN | 1 | 23206.44 | 23206.4 | 23206.4 |
-| SSHPATATOR | 1 | 25206.26 | 25206.3 | 25206.3 |
-| WEBATTACK | 1 | 31450.14 | 31450.1 | 31450.1 |
-| Overall | 10 | 25036.79 | 18867.8 | 31450.1 |
+| BENIGN | 2 | 22830.90 | 18867.8 | 26794.0 |
+| BOT | 1 | 31211.90 | 31211.9 | 31211.9 |
+| DDOS | 1 | 18898.10 | 18898.1 | 18898.1 |
+| DOS | 1 | 22420.10 | 22420.1 | 22420.1 |
+| FTPPATATOR | 1 | 31446.30 | 31446.3 | 31446.3 |
+| OTHERS | 1 | 20866.80 | 20866.8 | 20866.8 |
+| PORTSCAN | 1 | 23206.40 | 23206.4 | 23206.4 |
+| SSHPATATOR | 1 | 25206.30 | 25206.3 | 25206.3 |
+| WEBATTACK | 1 | 31450.20 | 31450.2 | 31450.2 |
+| Total | 10 | 25036.79 | 18867.8 | 31450.2 |
 
-### Overall by step (per-flow ms)
+### Total by step (per-flow ms)
 
 | Step | n | mean | min | max | sum |
 |------|--:|-----:|----:|----:|----:|
@@ -109,10 +109,10 @@ Per-flow E2E = Detect + Retrieve + Rank + LLM + Commit + Verify + Apply. **Overa
 | Retrieve | 10 | 882.65 | 331.9 | 2620.0 | 8826.5 |
 | Rank | 10 | 4524.85 | 2821.5 | 6415.9 | 45248.5 |
 | LLM | 10 | 16703.87 | 9579.4 | 25318.8 | 167038.7 |
-| Commit | 10 | 172.56 | 93.2 | 488.3 | 1725.6 |
-| Verify | 10 | 38.44 | 28.9 | 48.3 | 384.4 |
+| Commit | 10 | 172.55 | 93.2 | 488.3 | 1725.5 |
+| Verify | 10 | 38.45 | 28.9 | 48.3 | 384.5 |
 | Apply | 10 | 450.32 | 244.5 | 945.2 | 4503.2 |
-| E2E | 10 | 25036.79 | 18867.8 | 31450.1 | 250367.9 |
+| E2E | 10 | 25036.79 | 18867.8 | 31450.2 | 250367.9 |
 
 ## Honest store
 
@@ -127,9 +127,9 @@ Per-flow E2E = Detect + Retrieve + Rank + LLM + Commit + Verify + Apply. **Overa
 | PORTSCAN | 1 | 1 | 5 | 0 | 0 |
 | SSHPATATOR | 1 | 1 | 3 | 0 | 0 |
 | WEBATTACK | 1 | 1 | 2 | 0 | 0 |
-| Overall | 10 | 10 | 31 | 0 | 0 |
+| Total | 10 | 10 | 31 | 0 | 0 |
 
-Overall n / Stored / Applied / Fail / unresolved are the sums of the attack-type rows.
+Total n / Stored / Applied / Fail / unresolved are the sums of the attack-type rows. Applied is `markApplied` action units, not plans.
 
 ## Chain fails
 
