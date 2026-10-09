@@ -18,6 +18,7 @@ import sys
 import time
 from collections import Counter
 from datetime import date
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -49,9 +50,9 @@ from scripts.vfl import load_attack_actions_by_type
 
 load_project_dotenv()
 
-GOLD = _REPO / "data" / "ground_truth" / "ground_truth-100.json"
-FIXTURE_FLOWS = _REPO / "experiments" / "fixtures" / "gold-100" / "flows.csv"
-FIXTURE_MANIFEST = _REPO / "experiments" / "fixtures" / "gold-100" / "manifest.json"
+GOLD = _REPO / "experiments" / "gold-100" / "ground_truth-100.json"
+FIXTURE_FLOWS = _REPO / "experiments" / "data" / "gold-100" / "flows.csv"
+FIXTURE_MANIFEST = _REPO / "experiments" / "data" / "gold-100" / "manifest.json"
 GOLD_LIVE = _REPO / "experiments" / "gold-100"
 DOCS_REPORT = _REPO / "docs" / "rag_experiment_report.md"
 NINE = (
@@ -111,9 +112,9 @@ def verify_inputs() -> dict[str, Any]:
     gold_idx = {int(c["split_index"]) for c in cases}
     fixture_idx = set(int(x) for x in fixture.get("selected_split_index") or [])
     if gold_idx != fixture_idx:
-        raise SystemExit("gold split_index set != fixtures/gold-100 manifest")
+        raise SystemExit("gold split_index set != data/gold-100 manifest")
     for reason_name in ("rag_reason_500", "rag_reason_1000"):
-        reason_man = _REPO / "experiments" / "fixtures" / reason_name / "manifest.json"
+        reason_man = _REPO / "experiments" / "data" / reason_name / "manifest.json"
         if not reason_man.is_file():
             continue
         other = set(json.loads(reason_man.read_text(encoding="utf-8")).get("selected_split_index") or [])
@@ -548,20 +549,37 @@ def _clip_score_text(s: str) -> str:
     return t[:_SCORE_CHARS]
 
 
-def _rouge_scores(ref: str, hyp: str) -> tuple[float, float]:
+@lru_cache(maxsize=1)
+def _rouge_scorer():
     from rouge_score import rouge_scorer
 
-    scorer = rouge_scorer.RougeScorer(["rouge1", "rougeL"], use_stemmer=True)
-    s = scorer.score(ref or " ", hyp or " ")
+    return rouge_scorer.RougeScorer(["rouge1", "rougeL"], use_stemmer=True)
+
+
+def _rouge_scores(ref: str, hyp: str) -> tuple[float, float]:
+    s = _rouge_scorer().score(ref or " ", hyp or " ")
     return float(s["rouge1"].fmeasure), float(s["rougeL"].fmeasure)
 
 
-def _bertscore_f1(refs: list[str], hyps: list[str], batch_size: int = 8) -> list[float]:
-    """CPU + small batches — a single 270-pair GPU call crashed Windows (0xC0000005)."""
+_BERT_SCORER = None
+
+
+def _bert_scorer():
+    """Load roberta-large once. Calling bert_score() per batch reloads the model (~1 min each)."""
+    global _BERT_SCORER
+    if _BERT_SCORER is None:
+        from bert_score import BERTScorer
+
+        print("BERTScore: loading roberta-large once (CPU)")
+        _BERT_SCORER = BERTScorer(lang="en", device="cpu", batch_size=16)
+    return _BERT_SCORER
+
+
+def _bertscore_f1(refs: list[str], hyps: list[str], batch_size: int = 32) -> list[float]:
+    """One model load; chunk only to avoid Windows 0xC0000005 on huge tensors."""
     import gc
 
-    from bert_score import score as bert_score
-
+    scorer = _bert_scorer()
     safe_refs = [r if (r or "").strip() else " " for r in refs]
     safe_hyps = [h if (h or "").strip() else " " for h in hyps]
     out: list[float] = []
@@ -569,14 +587,7 @@ def _bertscore_f1(refs: list[str], hyps: list[str], batch_size: int = 8) -> list
         chunk_r = safe_refs[i : i + batch_size]
         chunk_h = safe_hyps[i : i + batch_size]
         print(f"  BERTScore {i + 1}–{i + len(chunk_r)} / {len(safe_refs)}")
-        _p, _r, f1 = bert_score(
-            chunk_h,
-            chunk_r,
-            lang="en",
-            verbose=False,
-            device="cpu",
-            batch_size=min(4, len(chunk_r)),
-        )
+        _p, _r, f1 = scorer.score(chunk_h, chunk_r)
         out.extend(float(x) for x in f1.tolist())
         del _p, _r, f1
         gc.collect()
@@ -952,10 +963,10 @@ def _render_report(
         "# RAG vs LLM-only (reserved gold cores)",
         "",
         f"**Run:** `experiments/rag/rag_eval100/`",
-        f"**Gold:** `data/ground_truth/ground_truth-100.json` SHA-256 `{manifest.get('gold_sha256')}`",
+        f"**Gold:** `experiments/gold-100/ground_truth-100.json` SHA-256 `{manifest.get('gold_sha256')}`",
         f"**Eval model:** `{manifest.get('model')}` (temperature {manifest.get('temperature')})",
         f"**Index:** `{manifest.get('index')}`  retrieve = FAISS+BM25 → RRF → MMR (C) → 5 parents",
-        f"**Flows:** `experiments/fixtures/gold-100/flows.csv` SHA-256 `{manifest.get('flows_sha256')}`",
+        f"**Flows:** `experiments/data/gold-100/flows.csv` SHA-256 `{manifest.get('flows_sha256')}`",
         "",
         "## 1. What was compared",
         "",
@@ -1007,7 +1018,7 @@ def _render_report(
         "",
         "## 6. Not this report",
         "",
-        "The 1000-row `pragma-rag-reason` set (later blockchain / e2e) is a different fixture.",
+        "The 1000-row `pragma-e2e-detect-chain` set (later blockchain / e2e) is a different fixture.",
         "No McNemar / Wilcoxon. No Commit / Apply.",
         "",
     ]
@@ -1087,6 +1098,39 @@ def load_offgold_pairs(n: int = 10) -> list[dict[str, Any]]:
         raise SystemExit(f"off-gold set overlaps gold: {sorted(overlap)}")
     if len(rows) != n:
         raise SystemExit(f"off-gold n={len(rows)} expected {n}")
+    return rows
+
+
+def load_offgold_pairs_from_jsonl(out: Path) -> list[dict[str, Any]]:
+    """Rebuild the 200-flow list from traces when detect JSON is not on disk."""
+    recs = _read_jsonl(_jsonl_path(out, "LLM_only")) or _read_jsonl(_jsonl_path(out, "RAG_RANKING"))
+    if not recs:
+        raise SystemExit(f"no off-gold jsonl in {out}")
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for rec in recs:
+        cid = str(rec.get("case_id") or "")
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        true = str(rec.get("true_label") or "").upper()
+        rows.append(
+            {
+                "case": {
+                    "case_id": cid,
+                    "split_index": int(rec.get("split_index") or 0),
+                    "condition": {"true_label": true, "primary_network_tier": ""},
+                    "actions": {},
+                    "relevant_rag_chunks": [],
+                },
+                "sample": {
+                    "split_index": int(rec.get("split_index") or 0),
+                    "true_label": true,
+                    "predicted_label": rec.get("predicted_label"),
+                    "confidence": rec.get("confidence"),
+                },
+            }
+        )
     return rows
 
 
@@ -1181,14 +1225,6 @@ def score_offgold_text(out: Path, paired: list[dict[str, Any]]) -> dict[str, Any
         )
         for row, f1 in zip(rows, f1s):
             row["bertscore_f1"] = f1
-        rag_rows = [r for r in rows if r["rag"] and r["prompt_txt"]]
-        if rag_rows:
-            rf1s = _bertscore_f1(
-                [_clip_score_text(r["gold_ref"]) for r in rag_rows],
-                [_clip_score_text(r["prompt_txt"]) for r in rag_rows],
-            )
-            for row, f1 in zip(rag_rows, rf1s):
-                row["retrieve_bertscore_f1"] = f1
 
     by_key: dict[tuple[str, str], dict[str, Any]] = {}
     for row in rows:
@@ -1646,8 +1682,17 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.offgold_n or args.offgold_report_only:
         n = int(args.offgold_n) if args.offgold_n else 10
-        paired = load_offgold_pairs(n)
         out = offgold_out_dir(n)
+        if args.offgold_report_only:
+            jsonl_n = len(_read_jsonl(_jsonl_path(out, "LLM_only")) or _read_jsonl(_jsonl_path(out, "RAG_RANKING")))
+            if jsonl_n:
+                n = jsonl_n
+                out = offgold_out_dir(n)
+                paired = load_offgold_pairs_from_jsonl(out)
+            else:
+                paired = load_offgold_pairs(n)
+        else:
+            paired = load_offgold_pairs(n)
         print(f"off-gold n={len(paired)} -> {out}")
         print("class mix", dict(Counter(str(p["case"]["condition"]["true_label"]).upper() for p in paired)))
         if not args.offgold_report_only:

@@ -194,7 +194,7 @@ def sample_fixture() -> Path:
     catalog_lines = [
         "# rag_reason_500",
         "",
-        f"{len(picked)} held-out test flows, **disjoint** from gold cores (`fixtures/gold-100`).",
+        f"{len(picked)} held-out test flows, **disjoint** from gold cores (`data/gold-100`).",
         "",
         "A/B/C: **No RAG** vs **RAG** vs **Ranked RAG** — **three LLM calls per flow** (1500 total).",
         "",

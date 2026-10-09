@@ -7,7 +7,7 @@ The first freeze drew 100 **stratified** test rows and collapsed to 71 BENIGN / 
 ## Steps
 
 1. **Clean** — Delete leftover gold files (`drafts/`, `gold_security_cases.*`, `generation.json`, `split_manifest.json`, `SHA256.txt`). Keep `predictions_*` / `decision_summary_*`.
-2. **Sample** — `gold_sample_100.py` → `experiments/fixtures/gold-100/` (shared input only).
+2. **Sample** — `gold_sample_100.py` → `experiments/data/gold-100/` (shared input only).
 3. **Detect** — `gold_predict_100.py` writes SHAP into `experiments/gold-100/` (keep these).
 4. **Freeze** — One overwrite: `ground_truth-100.json`. Each case has detection, condition, `rationale`, `rationale_summary`, **`chunks_summary` (semantic digest of retrieved parents; BERTScore ref)**, actions, and up to 20 full PDF parent texts. Copy that file to `data/ground_truth/`. Keep `predictions_*`. Do not call the eval LLM API.
 

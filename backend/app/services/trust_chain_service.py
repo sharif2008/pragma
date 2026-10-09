@@ -299,12 +299,16 @@ def _registry_contract(settings: Settings, contract_address: str | None = None):
     return w3, w3.eth.contract(address=addr, abi=_REGISTRY_ABI)
 
 
-_REVERT_RE = re.compile(r"execution reverted:?\s*([A-Za-z_][A-Za-z0-9_=]*)")
+_REASON_STRING_RE = re.compile(r"reverted with reason string '([^']+)'")
+_REVERT_RE = re.compile(r"execution reverted:?\s*(?!Error\b)([A-Za-z_][A-Za-z0-9_=]*)")
 
 
 def revert_reason(err: Any) -> str:
     """Short contract revert reason (e.g. ``action_not_whitelisted``), else the trimmed error text."""
     msg = str(err)
+    named = _REASON_STRING_RE.search(msg)
+    if named:
+        return named.group(1)
     m = _REVERT_RE.search(msg)
     return m.group(1) if m else msg[:500]
 

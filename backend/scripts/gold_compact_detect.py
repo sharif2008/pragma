@@ -12,7 +12,7 @@ _BACKEND = Path(__file__).resolve().parents[1]
 _REPO = _BACKEND.parent
 
 LIVE = _REPO / "experiments" / "gold-100"
-FLOWS = _REPO / "experiments" / "fixtures" / "gold-100" / "flows.csv"
+FLOWS = _REPO / "experiments" / "data" / "gold-100" / "flows.csv"
 PARENTS = _REPO / "experiments" / "rag-index" / "vector_store" / "rag_parents.json"
 DRAFTS = LIVE / "drafts"
 CATALOG = DRAFTS / "_parent_catalog_slim.json"

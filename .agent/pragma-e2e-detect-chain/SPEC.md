@@ -1,0 +1,189 @@
+# Spec: 1000-flow happy-path e2e latency
+
+Action: `pragma-e2e-detect-chain`
+
+Script: `backend/scripts/reason_1000.py`
+
+Self-contained success path on **1000** flows. One system. One LLM call per flow. **No plan mutation. No inject. No BERTScore.**
+
+**detect → ranked RAG → reason → `storePlan` → verify → `markApplied`**
+
+This run does **not** open any other experiment folder, report, gold JSON, or mitigation-plans file. It does not score eval100 or agentic-attack. It does not edit other `.agent` tasks.
+
+## What we measure
+
+| Dimension | Clock | Question |
+|-----------|--------|----------|
+| **E2E latency** | Detect, retrieve, rank, LLM, commit, verify, apply | How long does an unmodified success-path flow take, per attack type? |
+| **Honest chain** | `storePlan` / `getPlan` / `markApplied` | Did the generated plan land as written? |
+
+## System (one only)
+
+| ID | Name | LLM calls |
+|----|------|-----------|
+| `RAG_RANKING` | Ranked RAG + SHAP | **1000** |
+
+Do **not** run `LLM_only` or `RAG_No_Ranking`. Store the LLM plan **as generated**. Do not swap actions, tiers, or prose before commit.
+
+### Retrieve (library, not another task)
+
+Call `scripts.rag_hybrid.hybrid_children` + parent expand (`rag_bridge.retrieve_context` / `reason.expand_parent_sections`). Do **not** read `experiments/rag/**` jsonl or eval100 reports. Do **not** add a new search path.
+
+Index on disk: `experiments/rag-index/vector_store/` (live FAISS, not an eval artifact). Query: `build_template_rag_query`.
+
+1. Dense FAISS — N=80
+2. BM25 — N=80, same child ids
+3. RRF — \(1/(60+\mathrm{rank})\)
+4. MMR — \(\lambda=0.5\), keep **20** children
+5. **5** parents into the prompt
+
+Prompt: `create_agentic_orchestration_prompt` with `include_knowledge_base=True`, `include_conditions=True`. Model `OPENAI_MODEL` (default `gpt-6-luna`), temperature **0**. \(W[\hat{y}]\) from `attack_options.json` using the **detect** label.
+
+## Input (this task only)
+
+The only experiment input is this fixture:
+
+```
+experiments/data/e2e-detect-chain/
+  flows.csv
+  manifest.json
+  README.md
+```
+
+- N = **1000** from the VFL test split (seed **42**, 20% stratified) of the training CSV
+- Water-fill across nine labels (`OTHERS` is small — take all remaining)
+- Confirm histogram in **this** `manifest.json`
+- Do not read other `experiments/data/` sets, `experiments/gold-100/ground_truth-100.json`, or any other task’s csv/json/report when sampling or running
+
+Nine labels: BENIGN, BOT, DDOS, DOS, FTPPATATOR, OTHERS, PORTSCAN, SSHPATATOR, WEBATTACK.
+
+Results never go in `experiments/data/`.
+
+## Pipeline
+
+Default = full happy path with resume. Do not inject, mutate, or re-reason.
+
+| Stage | Job | Resume |
+|-------|-----|--------|
+| **Sample** | Write this fixture | skip if `flows.csv` exists and N=1000 |
+| **Detect** | VFL + SHAP on this fixture | `detect/predictions_detailed.json` (chunked `detect_predict.py` into **this** live folder) |
+| **RAG + reason** | Ranked retrieve + one Mitigation Plan | `runs.jsonl` key = `split_index` |
+| **Chain** | Unmodified `storePlan` → `getPlan`/`isInPlan` → `markApplied` | `honest.jsonl` key = `split_index` |
+| **Report** | Latency + honest store, per attack type | `report.md` from this folder’s jsonl |
+
+### Chain (happy path only)
+
+For each of the 1000 plans, **no modification**:
+
+1. `attackType` = detect `predicted_label`. Never substitute `true_label`. Write `predicted_label` on the case and the system block.
+2. `planId` = `{split_index}-RAG_RANKING-honest`
+3. `storePlan` the generated units as written → `getPlan` / `isInPlan` → `markApplied` each `{u,τ}`
+4. On revert, record and **continue**. Do not rewrite the plan and retry.
+
+Use `trust_chain_service` (or equivalent JSON-RPC). Do **not** import `agentic_attack_eval.py`. Do **not** call C1–C6, T4–T7, L1/L2, or Auth.
+
+Hardhat is already up (`http://127.0.0.1:8545`, chain 31337). This job does not start or stop it.
+
+`attack_type_unresolved` on honest store must be **0**.
+
+## What to score
+
+Group by **true_label** and overall. Latency cells are `mean ms (n)`.
+
+### Latency (required table)
+
+One matrix: **row = attack type**, **column = pipeline step**. Overall is the first data row. This table is the headline of `report.md` and `.agent/pragma-e2e-detect-chain/REPORT.md`.
+
+| Attack | n | Detect | Retrieve | Rank | LLM | Commit | Verify | Apply | E2E |
+|--------|--:|-------:|---------:|-----:|----:|-------:|-------:|------:|----:|
+| Overall | 1000 | | | | | | | | |
+| BENIGN | | | | | | | | | |
+| BOT | | | | | | | | | |
+| DDOS | | | | | | | | | |
+| DOS | | | | | | | | | |
+| FTPPATATOR | | | | | | | | | |
+| OTHERS | | | | | | | | | |
+| PORTSCAN | | | | | | | | | |
+| SSHPATATOR | | | | | | | | | |
+| WEBATTACK | | | | | | | | | |
+
+| Column | Clock |
+|--------|--------|
+| Detect | wall per chunk, amortized per flow |
+| Retrieve | FAISS + BM25 + RRF |
+| Rank | MMR |
+| LLM | Mitigation Plan |
+| Commit | `storePlan` |
+| Verify | `getPlan` / `isInPlan` |
+| Apply | honest `markApplied` mean per plan |
+| E2E | sum of the seven steps |
+
+`latency.json` stores the same matrix (overall + each of the nine labels, each step’s mean and n).
+
+### Honest store
+
+Same row set (Overall + 9 labels):
+
+| Attack | n | Stored | Applied | Fail | unresolved |
+|--------|--:|-------:|--------:|-----:|-----------:|
+| Overall | 1000 | | | | **0** |
+| … | | | | | |
+
+`attack_type_unresolved` must be **0**.
+
+No BERTScore, ROUGE, evidence-support, inject Block.%, or per-flow true/false action tables.
+
+## Report format
+
+`experiments/e2e-detect-chain/report.md` (filled after the run) and `.agent/pragma-e2e-detect-chain/REPORT.md` (same tables). Order:
+
+1. Fixture N, class histogram, LLM calls = 1000
+2. **Latency matrix** (required): every step × every attack type, plus Overall
+3. Honest store matrix (Overall + 9 labels)
+4. Chain fails (if any), by `split_index` and revert
+
+Do not replace the latency matrix with a single overall mean. Every step and every attack type must have a cell.
+
+## Run
+
+```
+cd backend
+python scripts/reason_1000.py
+python scripts/reason_1000.py --sample-only
+python scripts/reason_1000.py --predict-only
+python scripts/reason_1000.py --reason-only
+python scripts/reason_1000.py --chain-only
+python scripts/reason_1000.py --report-only
+```
+
+Default = sample (if missing) → detect (if missing) → reason (resume) → chain (resume) → report.
+
+`--systems` is not accepted.
+
+## Outputs (one folder)
+
+`experiments/e2e-detect-chain/`
+
+```
+detect/predictions_detailed.json
+runs.jsonl
+mitigation_plans.json
+honest.jsonl
+latency.json               # overall + 9 labels × each step
+report.md                  # latency matrix required
+manifest.json
+README.md
+```
+
+Also fill `.agent/pragma-e2e-detect-chain/REPORT.md` with the same latency matrix.
+
+## Out of scope
+
+- Plan mutation, inject (C1–C6, T4–T7), loops, Auth B1–B8
+- BERTScore / ROUGE / PDF needles / evidence-support
+- `LLM_only` / `RAG_No_Ranking`
+- Reading or writing other experiment folders (`reason/`, `gold-100/`, `rag/**`, `agentic-attack/`, `e2e/`)
+- Other-task reports as inputs
+- Editing other `.agent` tasks or `docs/Pragma_v2.tex`
+- Starting Hardhat; live SOAR / MCP
+- A new search implementation

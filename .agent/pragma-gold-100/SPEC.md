@@ -2,7 +2,7 @@
 
 Action: `pragma-gold-100`
 
-**N = 90** held-out flows: **10 per trained class** (9 labels). These rows are **reserved** for gold + `pragma-rag-eval100`. Do not reuse them in `pragma-rag-reason` (1000-row set) or for prompt tuning.
+**N = 90** held-out flows: **10 per trained class** (9 labels). These rows are **reserved** for gold + `pragma-rag-eval100`. Do not reuse them in `pragma-e2e-detect-chain` (1000-row set) or for prompt tuning.
 
 This task **stops at reserved flows + gold freeze**. It does not run LLM-only / RAG scoring.
 
@@ -17,7 +17,7 @@ No Heartbleed / Infiltration as their own class. All rows from the **VFL test sp
 **Input** (owner `gold-100`; other tasks may read, must not write):
 
 ```
-experiments/fixtures/gold-100/
+experiments/data/gold-100/
   flows.csv          # 90 rows, 10 × 9 classes, seed 42
   manifest.json
   README.md
@@ -34,13 +34,13 @@ experiments/gold-100/
 
 Do not nest `gold_100/`. Do not write or archive `detect-predict/`. Do not emit extra gold JSON.
 
-## Main output for `pragma-rag-eval100`
+## Main output for `pragma-rag-eval-x`
 
 Eval reads **one file**:
 
-`data/ground_truth/ground_truth-100.json`
+`experiments/gold-100/ground_truth-100.json`
 
-Same bytes as `experiments/gold-100/ground_truth-100.json`. No CSV, no `generation.json`, no `SHA256.txt`, no drafts.
+No copy under `data/ground_truth/`. No CSV, no `generation.json`, no `SHA256.txt`, no drafts.
 
 ## Knowledge / actions (closed) — PDF-grounded gold
 
@@ -71,7 +71,7 @@ Top-level also has `n`, `generation` (`openai_api_used: false`), `split` (seed, 
 
 ## Quality checks
 
-- One file `ground_truth-100.json` in live and `data/ground_truth/` (identical)
+- One file `experiments/gold-100/ground_truth-100.json`
 - 90 unique `case_id` / `split_index`; histogram **10 each** of the nine classes
 - Actions ∈ catalog; tiers ∈ three domains; cited parent body supports the class
 - Detect/SHAP files remain under `experiments/gold-100/`
@@ -79,6 +79,6 @@ Top-level also has `n`, `generation` (`openai_api_used: false`), `split` (seed, 
 ## Out of scope
 
 - `pragma-rag-eval100` scoring
-- Sampling the 1000-row `pragma-rag-reason` fixture
-- Extra files in `data/ground_truth/`
+- Sampling the 1000-row `pragma-e2e-detect-chain` fixture
+- A second copy under `data/ground_truth/`
 - Stratified “majority BENIGN” 100-row draw

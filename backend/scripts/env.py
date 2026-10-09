@@ -27,6 +27,7 @@ EXPERIMENT_TASKS = (
     "reason",
     "evaluate",
     "e2e",
+    "e2e-detect-chain",
     "gold-100",
     "rag",
 )
@@ -48,7 +49,7 @@ PAPER_OUTPUT_DIR = REPO_ROOT / "outputs"
 RUN_DIR_PREFIX = "run_"
 ARCHIVE_DIRNAME = "archive"
 _RUN_STAMP_RE = re.compile(r"(?<!\d)(\d{8}_\d{6})(?!\d)")
-# Stay at the task root across runs (indexes / placeholders). Flow CSVs live in experiments/fixtures/.
+# Stay at the task root across runs (indexes / placeholders). Flow CSVs live in experiments/data/.
 _TASK_ROOT_KEEP = frozenset(
     {
         ".gitkeep",
@@ -63,15 +64,11 @@ _TASK_ROOT_KEEP = frozenset(
     }
 )
 
-# Shared inputs under experiments/fixtures/<owner-task>/ (other tasks may read, not write).
-FIXTURE_REASON_ABLATION_9 = "reason_ablation_9"
+# Shared inputs under experiments/data/<owner-task>/ (other tasks may read, not write).
 FIXTURE_GOLD_100 = "gold-100"
 FIXTURE_RAG_GROUND_100 = FIXTURE_GOLD_100  # alias; prefer FIXTURE_GOLD_100
 FIXTURE_RAG_REASON_500 = "rag_reason_500"
-FIXTURE_RAG_REASON_1000 = "rag_reason_1000"  # pointer; use FIXTURE_RAG_REASON_500
-FIXTURE_RAG_RETRIEVAL_TEST_50 = "rag_retrieval_test_50"
-FIXTURE_BLOCKCHAIN_ALL_1000 = "blockchain_all_1000"
-FIXTURE_E2E_DETECT_TO_BLOCKCHAIN_1000 = "e2e_detect_to_blockchain_1000"
+FIXTURE_E2E_DETECT_CHAIN = "e2e-detect-chain"
 TRAIN_CHECKPOINT = "vfl_model_best.pth"
 PREDICT_DETAIL_GLOB = "predictions_detailed_*.json"
 
@@ -83,23 +80,27 @@ def experiments_root() -> Path:
     return (REPO_ROOT / "experiments").resolve()
 
 
-def fixtures_dir(*, mkdir: bool = True) -> Path:
-    """``experiments/fixtures/<owner-task>/`` — shared input CSVs. Results stay in ``experiments/<task>/``."""
-    path = experiments_root() / "fixtures"
+def data_dir(*, mkdir: bool = True) -> Path:
+    """``experiments/data/<owner-task>/`` — shared input CSVs. Results stay in ``experiments/<task>/``."""
+    path = experiments_root() / "data"
     if mkdir:
         path.mkdir(parents=True, exist_ok=True)
     return path
 
 
+def fixtures_dir(*, mkdir: bool = True) -> Path:
+    return data_dir(mkdir=mkdir)
+
+
 def fixture_set_dir(name: str, *, mkdir: bool = False) -> Path:
-    path = fixtures_dir(mkdir=mkdir) / name
+    path = data_dir(mkdir=mkdir) / name
     if mkdir:
         path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def resolve_fixture_csv(name: str) -> Path:
-    """First CSV in ``experiments/fixtures/<name>/``: ``flows.csv``, ``<name>.csv``, then any ``*.csv``."""
+    """First CSV in ``experiments/data/<name>/``: ``flows.csv``, ``<name>.csv``, then any ``*.csv``."""
     folder = fixture_set_dir(name, mkdir=False)
     for cand in (
         folder / "flows.csv",
@@ -113,7 +114,7 @@ def resolve_fixture_csv(name: str) -> Path:
         if csvs:
             return csvs[0]
     raise FileNotFoundError(
-        f"Fixture CSV not found under {folder}. Expected flows.csv or {name}.csv"
+        f"Input CSV not found under {folder}. Expected flows.csv or {name}.csv"
     )
 
 
@@ -344,11 +345,7 @@ def resolve_latest_predict_dir(*, require: bool = False) -> Path:
 
 
 def resolve_sample_csv() -> Path:
-    """Prediction CSV: 9-class fixture, then ``backend/run/data/sample.csv``."""
-    try:
-        return resolve_fixture_csv(FIXTURE_REASON_ABLATION_9)
-    except FileNotFoundError:
-        pass
+    """Prediction CSV: ``backend/run/data/sample.csv`` and common fallbacks."""
     candidates = (
         BACKEND_ROOT / "run" / "data" / "sample_all_attack_types.csv",
         SAMPLE_CSV,

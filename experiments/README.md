@@ -10,7 +10,8 @@ Console paper stages. Each case keeps **one live result**; older complete trees 
 | Reason ablation | `reason/reason_ablation_9/` | `reason_ablation.py` |
 | Gold freeze | `gold-100/` (detect + freeze) | `gold_predict_100.py` / `pragma-gold-100` |
 | RAG eval (gold cores) | `rag/rag_eval100/` (flat: plans + jsonl) | `pragma-rag-eval100` |
-| Reason scale (500, ranked) | `reason/rag_reason_500/` | `reason_500.py` / `pragma-rag-reason` |
-| Shared inputs | `fixtures/<owner-task>/` | read-only for other tasks |
+| Detect → RAG → reason → chain (1000) | `e2e-detect-chain/` | `reason_1000.py` / `pragma-e2e-detect-chain` |
+| Agentic attack + authorization (A1–A25) | `agentic-attack/report.md` | `agentic_attack_eval.py` / `pragma-agentic-attack` |
+| Shared inputs | `data/<owner-task>/` | read-only for other tasks |
 
 API artifacts stay in `backend/storage/`.

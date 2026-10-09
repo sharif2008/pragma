@@ -56,5 +56,5 @@ If a delta is negative, ranking or RAG did not help on that metric — report th
 
 ## 6. Not this report
 
-The 1000-row `pragma-rag-reason` set (later blockchain / e2e) is a different fixture.
+The 1000-row `pragma-e2e-detect-chain` set (later blockchain / e2e) is a different fixture.
 No McNemar / Wilcoxon. No Commit / Apply.

@@ -17,10 +17,9 @@ if str(_BACKEND) not in sys.path:
 from scripts.vfl import load_attack_actions_by_type
 
 LIVE = _REPO / "experiments" / "gold-100"
-GROUND = _REPO / "data" / "ground_truth"
 OUT_NAME = "ground_truth-100.json"
 PARENTS = _REPO / "experiments" / "rag-index" / "vector_store" / "rag_parents.json"
-FIXTURE = _REPO / "experiments" / "fixtures" / "gold-100" / "manifest.json"
+FIXTURE = _REPO / "experiments" / "data" / "gold-100" / "manifest.json"
 PDFS = {
     "NIST-SP-800-53-Rev5-Security-Privacy-Controls.pdf",
     "NIST-SP-800-207-Zero-Trust-Architecture.pdf",
@@ -60,11 +59,11 @@ CLASS_NEEDLES = {
 
 
 def main() -> int:
-    live = json.loads((LIVE / OUT_NAME).read_text(encoding="utf-8"))
-    ground = json.loads((GROUND / OUT_NAME).read_text(encoding="utf-8"))
-    if live != ground:
-        print("FAIL live/ground ground_truth-100.json differ")
+    live_path = LIVE / OUT_NAME
+    if not live_path.is_file():
+        print(f"FAIL missing {live_path}")
         return 1
+    live = json.loads(live_path.read_text(encoding="utf-8"))
     cases = live.get("cases") or []
     fixture = json.loads(FIXTURE.read_text(encoding="utf-8"))
     parents = json.loads(PARENTS.read_text(encoding="utf-8"))["parents"]
@@ -165,20 +164,22 @@ def main() -> int:
     if gen.get("openai_api_used") is not False:
         errs.append("openai_api_used not false")
 
-    extra_ground = [
+    extra = [
         p.name
-        for p in GROUND.iterdir()
-        if p.is_file() and p.name not in {OUT_NAME, "README.md", ".gitkeep"}
+        for p in LIVE.iterdir()
+        if p.is_file()
+        and p.name not in {OUT_NAME, "README.md", ".gitkeep"}
+        and not p.name.startswith(("predictions_", "decision_summary_"))
     ]
-    if extra_ground:
-        errs.append(f"extra files in data/ground_truth: {extra_ground}")
+    if extra:
+        errs.append(f"extra files in experiments/gold-100: {extra}")
 
     if errs:
         print("FAIL", len(errs))
         for e in errs[:30]:
             print(" -", e)
         return 1
-    print("OK 90 cases in ground_truth-100.json; live==ground; parents+actions valid")
+    print("OK 90 cases in experiments/gold-100/ground_truth-100.json; parents+actions valid")
     return 0
 
 

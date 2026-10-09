@@ -4,7 +4,7 @@ Checked after single-file freeze with top-20 full PDF parents + rationale summar
 
 ## Shared input
 
-- [x] `experiments/fixtures/gold-100/flows.csv` — 90 rows, 10 per class
+- [x] `experiments/data/gold-100/flows.csv` — 90 rows, 10 per class
 
 ## Results
 

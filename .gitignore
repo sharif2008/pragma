@@ -120,11 +120,9 @@ experiments/**
 !experiments/rag-index/.gitkeep
 !experiments/reason/
 !experiments/reason/.gitkeep
-!experiments/evaluate/
-!experiments/evaluate/.gitkeep
-!experiments/e2e/
-!experiments/e2e/.gitkeep
-!experiments/fixtures/
-!experiments/fixtures/**
+!experiments/data/
+!experiments/data/**
 !experiments/gold-100/
 !experiments/gold-100/.gitkeep
+!experiments/gold-100/ground_truth-100.json
+!experiments/gold-100/README.md

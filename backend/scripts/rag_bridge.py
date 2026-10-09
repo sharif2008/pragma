@@ -18,7 +18,7 @@ from typing import Any
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _REPO = _BACKEND.parent
-GOLD_PATH = _REPO / "data" / "ground_truth" / "ground_truth-100.json"
+GOLD_PATH = _REPO / "experiments" / "gold-100" / "ground_truth-100.json"
 
 PROMPT_SECTIONS = 5
 IR_SECTIONS = 10

@@ -24,7 +24,7 @@ from scripts.env import named_live_dir
 from scripts.vfl import load_attack_actions_by_type, not_allowed_actions_for_type
 
 LIVE = named_live_dir("gold-100", mkdir=True)
-FLOWS = _REPO / "experiments" / "fixtures" / "gold-100" / "flows.csv"
+FLOWS = _REPO / "experiments" / "data" / "gold-100" / "flows.csv"
 OUT_NAME = "ground_truth-100.json"
 OPTIONS = _BACKEND / "storage" / "attack_options.json"
 KEEP_LIVE = {".gitkeep", "README.md", OUT_NAME}
@@ -36,9 +36,9 @@ JUNK_GROUND = {
     "split_manifest.json",
     "SHA256.txt",
 }
-FIXTURE_MANIFEST = _REPO / "experiments" / "fixtures" / "gold-100" / "manifest.json"
+FIXTURE_MANIFEST = _REPO / "experiments" / "data" / "gold-100" / "manifest.json"
 PARENTS = _REPO / "experiments" / "rag-index" / "vector_store" / "rag_parents.json"
-GROUND = _REPO / "data" / "ground_truth"
+GROUND = LIVE
 TIERS = {"Access / ISP", "Perimeter / IDS", "Endpoint / EDR"}
 DATE = date.today().isoformat()
 # Needles must appear in parent *body text*. Primary is the W[class] action that control supports.
@@ -208,9 +208,8 @@ def _clean_task_outputs() -> None:
             p.unlink()
         elif p.is_dir():
             shutil.rmtree(p)
-    GROUND.mkdir(parents=True, exist_ok=True)
     for name in JUNK_GROUND:
-        leftover = GROUND / name
+        leftover = LIVE / name
         if leftover.is_file():
             leftover.unlink()
 
@@ -713,15 +712,13 @@ def main() -> int:
     digest = _sha256_bytes(text.encode("utf-8"))
 
     live_out = LIVE / OUT_NAME
-    ground_out = GROUND / OUT_NAME
     live_out.write_text(text, encoding="utf-8")
-    shutil.copy2(live_out, ground_out)
     (LIVE / "README.md").write_text(
         "\n".join(
             [
                 "# Gold-100 results",
                 "",
-                f"Main output: `{OUT_NAME}` (also copied to `data/ground_truth/`).",
+                f"Main output: `experiments/gold-100/{OUT_NAME}`. Eval reads this file.",
                 "Detect/SHAP files (`predictions_*`) stay here. Do not add extra gold JSON.",
                 f"N={len(cases)} hist={hist} empty_rag={sum(1 for c in cases if not c['relevant_rag_chunks'])}",
                 "",
@@ -729,12 +726,7 @@ def main() -> int:
         ),
         encoding="utf-8",
     )
-    (GROUND / "README.md").write_text(
-        f"# Ground truth\n\nEval reads only `{OUT_NAME}`.\n",
-        encoding="utf-8",
-    )
     print("live", live_out)
-    print("ground", ground_out)
     print("n", len(cases), "hist", hist, "sha256", digest)
     return 0
 

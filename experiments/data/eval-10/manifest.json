@@ -1,0 +1,29 @@
+{
+  "n": 10,
+  "owner": "pragma-rag-eval-x",
+  "source_pool": "experiments/data/rag_reason_500/flows.csv",
+  "outside_gold": true,
+  "selected_split_index": [
+    1919,
+    14921,
+    141761,
+    33973,
+    87204,
+    69592,
+    106499,
+    74661,
+    99563,
+    2809
+  ],
+  "class_counts": {
+    "BENIGN": 2,
+    "BOT": 1,
+    "DDOS": 1,
+    "DOS": 1,
+    "FTPPATATOR": 1,
+    "OTHERS": 1,
+    "PORTSCAN": 1,
+    "SSHPATATOR": 1,
+    "WEBATTACK": 1
+  }
+}

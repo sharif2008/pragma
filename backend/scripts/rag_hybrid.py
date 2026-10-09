@@ -46,7 +46,7 @@ def _iter_store_docs(vector_store: Any) -> list[Any]:
 
 def build_bm25(vector_store: Any) -> dict[str, Any]:
     cached = getattr(vector_store, "_pragma_bm25", None)
-    if cached is not None:
+    if isinstance(cached, dict) and "tfs" in cached:
         return cached
     recs: list[dict[str, Any]] = []
     docs_tokens: list[list[str]] = []
@@ -61,7 +61,13 @@ def build_bm25(vector_store: Any) -> dict[str, Any]:
     n = len(recs)
     avgdl = (sum(len(t) for t in docs_tokens) / n) if n else 1.0
     idf = {t: math.log(1.0 + (n - c + 0.5) / (c + 0.5)) for t, c in df.items()}
-    index = {"recs": recs, "tokens": docs_tokens, "idf": idf, "avgdl": avgdl, "n": n}
+    tfs: list[dict[str, int]] = []
+    for toks in docs_tokens:
+        tf: dict[str, int] = {}
+        for t in toks:
+            tf[t] = tf.get(t, 0) + 1
+        tfs.append(tf)
+    index = {"recs": recs, "tokens": docs_tokens, "tfs": tfs, "idf": idf, "avgdl": avgdl, "n": n}
     setattr(vector_store, "_pragma_bm25", index)
     return index
 
@@ -73,20 +79,18 @@ def bm25_search(vector_store: Any, query: str, *, top_k: int = BM25_N) -> list[d
         return []
     k1, b = 1.5, 0.75
     avgdl = float(idx["avgdl"] or 1.0)
+    tfs: list[dict[str, int]] = idx["tfs"]
     scores: list[tuple[float, int]] = []
-    for i, toks in enumerate(idx["tokens"]):
-        if not toks:
+    for i, tf in enumerate(tfs):
+        if not tf:
             continue
-        tf: dict[str, int] = {}
-        for t in toks:
-            tf[t] = tf.get(t, 0) + 1
-        dl = len(toks)
+        dl = sum(tf.values())
         s = 0.0
         for t in qtoks:
-            if t not in tf:
+            freq = tf.get(t)
+            if not freq:
                 continue
             idf = float(idx["idf"].get(t, 0.0))
-            freq = tf[t]
             s += idf * (freq * (k1 + 1.0)) / (freq + k1 * (1.0 - b + b * dl / avgdl))
         if s > 0.0:
             scores.append((s, i))
@@ -156,7 +160,8 @@ def hybrid_children(
         "pipeline": "faiss_bm25_rrf_mmr" if rank else "faiss_bm25_rrf",
     }
     if rank:
-        picked = mmr_select(vector_store, query, fused, k=int(final_children), lambda_mult=MMR_LAMBDA)
+        mmr_pool = fused[: max(int(final_children) * 2, 40)]
+        picked = mmr_select(vector_store, query, mmr_pool, k=int(final_children), lambda_mult=MMR_LAMBDA)
     else:
         picked = fused[: int(final_children)]
     for c in picked:

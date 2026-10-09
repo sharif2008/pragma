@@ -16,7 +16,7 @@ Follow .agent/pragma-gold-100/SPEC.md and PLAN.md.
 
 1. Reconstruct VFL test split from the same CSV as last detect-train (random_state=42, 20% stratified). Save indices.
 2. From test_idx only (seed 42), take **exactly 10 rows per class** (N=90). Nine labels: BENIGN, BOT, DDOS, DOS, FTPPATATOR, OTHERS, PORTSCAN, SSHPATATOR, WEBATTACK. Include BENIGN. No Heartbleed/Infiltration.
-3. Write experiments/fixtures/gold-100/flows.csv (not reason_ablation_9). Treat split_index as reserved.
+3. Write experiments/data/gold-100/flows.csv (not reason_ablation_9). Treat split_index as reserved.
 4. Run detect_predict on exactly those 90 rows (KernelSHAP). Do not use the 9-row ablation fixture as gold source.
 5. Freeze gold that is PDF-grounded (parent body quotes + W[class] action the control supports). Muse Spark if available; else gold_freeze.py. Do not call gpt-6-luna / OPENAI_API_KEY (reserved for pragma-rag-eval100).
 ```
@@ -40,7 +40,7 @@ Read-only inputs (do not invent fields):
 - backend/storage/attack_options.json  → attacks[TRUE_LABEL], evidence_cues, primary_domains
 - backend/storage/agentic_features.json → domain names, action_capabilities
 - experiments/rag-index/vector_store/rag_parents.json → parent_id, source_file, section_heading, text
-- experiments/fixtures/gold-100/flows.csv
+- experiments/data/gold-100/flows.csv
 
 Closed knowledge filenames (source_file must be exact; no 11th PDF, no SOC 2, no FiGHT, no web):
 NIST-SP-800-53-Rev5-Security-Privacy-Controls.pdf

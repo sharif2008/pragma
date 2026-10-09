@@ -1,5 +1,5 @@
 # Gold-100 results
 
-Main output: `ground_truth-100.json` (also copied to `data/ground_truth/`).
-Detect/SHAP files (`predictions_*`) stay here. Do not add extra gold JSON.
-N=90 hist={'BENIGN': 10, 'BOT': 10, 'DDOS': 10, 'DOS': 10, 'FTPPATATOR': 10, 'OTHERS': 10, 'PORTSCAN': 10, 'SSHPATATOR': 10, 'WEBATTACK': 10} empty_rag=0
+Main output: `experiments/gold-100/ground_truth-100.json`. Eval (`pragma-rag-eval-x`) reads this file.
+
+Input flows (CSV) are in `experiments/data/gold-100/`. Detect/SHAP files (`predictions_*`) stay here. Do not add extra gold JSON. Do not copy this file to `data/ground_truth/`.
