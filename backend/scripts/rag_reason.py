@@ -1,11 +1,11 @@
-"""500-row A/B/C reason set, disjoint from gold cores.
+"""A/B/C reason scorecard. N is the row count of ``--input``.
 
-No RAG vs RAG vs Ranked RAG (1500 LLM calls). Resume per (split_index, system).
-Default: reason then the per-attack phase / action-% report.
+Not the planner library (``reason.py``) and not the e2e chain run (``e2e_detect_chain.py``).
 
-    python scripts/reason_500.py
-    python scripts/reason_500.py --reason-only
-    python scripts/reason_500.py --report-only
+    python scripts/rag_reason.py --input ../experiments/data/eval-10
+    python scripts/rag_reason.py --input ../experiments/data/eval-200 --reason-only
+    python scripts/rag_reason.py --input ../experiments/data/rag_reason_500
+    python scripts/rag_reason.py --input ../experiments/data/eval-10 --report-only
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ from scripts.env import (
 from scripts.gold_sample_100 import NINE, SEED, _sha256_file, load_training_frame
 from scripts.llm_prompt import create_agentic_orchestration_prompt
 from scripts.network_domains import DOMAIN_LABELS
-from scripts.rag_eval100 import _llm_call, _norm_action, _retrieve
+from scripts.rag_retrieval_scoring import _llm_call, _norm_action, _retrieve
 from scripts.rag_io import load_attack_and_agentic, load_parent_store, load_vector_store
 from scripts.reason import VECTOR_STORE_DIR
 from scripts import reason as reason_mod
@@ -49,8 +49,10 @@ from scripts.vfl import load_attack_actions_by_type, not_allowed_actions_for_typ
 
 load_project_dotenv()
 
-N_TARGET = 500
 DETECT_CHUNK = 100
+_FLOWS: Path | None = None
+_LIVE_NAME = LIVE_RAG_REASON_500
+_N = 0
 VALID_TIERS = {str(x) for x in DOMAIN_LABELS}
 SYSTEMS = (
     {"id": "LLM_only", "rag": False, "rank": False, "label": "No RAG"},
@@ -88,14 +90,55 @@ def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _n_target() -> int:
+    return int(_N)
+
+
 def _fixture_dir(*, mkdir: bool = False) -> Path:
+    if _FLOWS is not None:
+        return _FLOWS.parent
     return fixture_set_dir(FIXTURE_RAG_REASON_500, mkdir=mkdir)
 
 
 def _live_dir(*, reset: bool = False) -> Path:
+    name = _LIVE_NAME or LIVE_RAG_REASON_500
     if reset:
-        return new_named_live_dir("reason", LIVE_RAG_REASON_500)
-    return named_live_dir("reason", LIVE_RAG_REASON_500, mkdir=True)
+        return new_named_live_dir("reason", name)
+    return named_live_dir("reason", name, mkdir=True)
+
+
+def resolve_input_csv(raw: str) -> Path:
+    text = (raw or "").strip()
+    path = Path(text) if text else fixture_set_dir(FIXTURE_RAG_REASON_500, mkdir=False)
+    if not path.is_absolute():
+        path = (_BACKEND / path).resolve() if not path.exists() else path.resolve()
+        if not path.exists():
+            path = (_REPO / text).resolve() if text else path
+    if path.is_file() and path.suffix.lower() == ".csv":
+        return path
+    csv_path = path / "flows.csv"
+    if csv_path.is_file():
+        return csv_path
+    raise SystemExit(f"Input flows.csv not found: {path}. Pass --input PATH (N = row count of that file).")
+
+
+def configure(flows: Path) -> int:
+    global _FLOWS, _LIVE_NAME, _N
+    import pandas as pd
+
+    _FLOWS = flows
+    _LIVE_NAME = flows.parent.name if flows.name.lower() == "flows.csv" else flows.stem
+    _N = int(len(pd.read_csv(flows)))
+    return _N
+
+
+def _flows_csv() -> Path:
+    if _FLOWS is not None:
+        return _FLOWS
+    path = fixture_set_dir(FIXTURE_RAG_REASON_500, mkdir=False) / "flows.csv"
+    if not path.is_file():
+        raise SystemExit(f"Fixture missing: {path}. Pass --input.")
+    return path
 
 
 def _gold_indices() -> set[int]:
@@ -121,7 +164,10 @@ def _waterfill_quotas(available: dict[str, int], n_target: int) -> dict[str, int
     return quota
 
 
-def sample_fixture() -> Path:
+def sample_fixture(n_target: int, out_dir: Path) -> Path:
+    n_target = int(n_target)
+    if n_target <= 0:
+        raise SystemExit("--n must be > 0 to sample")
     gold_idx = _gold_indices()
     df, csvs = load_training_frame()
     stratify = df["label_numeric"]
@@ -141,9 +187,9 @@ def sample_fixture() -> Path:
         pos = [int(i) for i, lab in enumerate(pool["label_simplified"]) if str(lab) == cls]
         by_class[cls] = pos
     available = {c: len(by_class[c]) for c in NINE}
-    quota = _waterfill_quotas(available, N_TARGET)
-    if sum(quota.values()) < N_TARGET:
-        print(f"Shortfall: test-minus-gold can supply {sum(quota.values())} of {N_TARGET}")
+    quota = _waterfill_quotas(available, n_target)
+    if sum(quota.values()) < n_target:
+        print(f"Shortfall: test-minus-gold can supply {sum(quota.values())} of {n_target}")
 
     seeds: list[int] = []
     for cls in NINE:
@@ -162,7 +208,8 @@ def sample_fixture() -> Path:
     picked = picked.sort_values("split_index").reset_index(drop=True)
     picked.insert(0, "reason_row", range(1, len(picked) + 1))
 
-    out_dir = _fixture_dir(mkdir=True)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
     flows = out_dir / "flows.csv"
     picked.to_csv(flows, index=False)
     hist = Counter(str(x) for x in picked["label_simplified"])
@@ -171,7 +218,7 @@ def sample_fixture() -> Path:
         "dataset_paths": [str(p) for p in csvs],
         "dataset_sha256": {p.name: _sha256_file(p) for p in csvs},
         "seed": SEED,
-        "n_target": N_TARGET,
+        "n_target": n_target,
         "n_sampled": len(picked),
         "systems": list(SYSTEM_IDS),
         "llm_calls": len(picked) * len(SYSTEM_IDS),
@@ -191,15 +238,16 @@ def sample_fixture() -> Path:
     if overlap:
         raise SystemExit(f"sampled split_index overlaps gold: {sorted(overlap)[:8]}")
     _dump(out_dir / "manifest.json", manifest)
+    n_llm = len(picked) * len(SYSTEM_IDS)
     catalog_lines = [
-        "# rag_reason_500",
+        f"# {out_dir.name}",
         "",
         f"{len(picked)} held-out test flows, **disjoint** from gold cores (`data/gold-100`).",
         "",
-        "A/B/C: **No RAG** vs **RAG** vs **Ranked RAG** — **three LLM calls per flow** (1500 total).",
+        f"A/B/C: **No RAG** vs **RAG** vs **Ranked RAG** — **three LLM calls per flow** ({n_llm} total).",
         "",
         "Headline: per-attack phase table (underline the better system) and action shares inside W[y].",
-        "These 500 rows are **not** gold-100.",
+        f"These {len(picked)} rows are **not** gold-100.",
         "",
         "## Class counts (true label)",
         "",
@@ -249,24 +297,20 @@ def _force_utf8_stdio() -> None:
 
 
 def run_detect(*, chunk_size: int = DETECT_CHUNK) -> Path:
-    fixture = _fixture_dir(mkdir=False)
-    flows = fixture / "flows.csv"
-    if not flows.is_file():
-        raise SystemExit(f"Fixture missing: {flows}. Run --sample-only first.")
+    import pandas as pd
+
+    flows = _flows_csv()
+    df = pd.read_csv(flows)
+    n = len(df)
     live = _live_dir(reset=False)
     detect_root = live / "detect"
     detect_root.mkdir(parents=True, exist_ok=True)
     merged = _merged_pred_path(live)
     if merged.is_file():
         existing = json.loads(merged.read_text(encoding="utf-8"))
-        if isinstance(existing, list) and len(existing) >= N_TARGET:
+        if isinstance(existing, list) and len(existing) >= n:
             print(f"Detect already complete: {merged} ({len(existing)} rows)")
             return merged
-
-    import pandas as pd
-
-    df = pd.read_csv(flows)
-    n = len(df)
     chunk_root = detect_root / "chunks"
     chunk_root.mkdir(parents=True, exist_ok=True)
     parts: list[list[dict[str, Any]]] = []
@@ -297,7 +341,11 @@ def run_detect(*, chunk_size: int = DETECT_CHUNK) -> Path:
         for i, rec in enumerate(chunk_preds):
             rec["sample_id"] = start + i
             rec["split_index"] = int(df.iloc[start + i]["split_index"])
-            rec["reason_row"] = int(df.iloc[start + i]["reason_row"])
+            rec["reason_row"] = (
+                int(df.iloc[start + i]["reason_row"])
+                if "reason_row" in df.columns
+                else start + i + 1
+            )
         parts.append(chunk_preds)
 
     merged_rows = [row for part in parts for row in part]
@@ -308,12 +356,11 @@ def run_detect(*, chunk_size: int = DETECT_CHUNK) -> Path:
 
 
 def _pair_rows() -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    fixture = _fixture_dir(mkdir=False)
-    flows_path = fixture / "flows.csv"
-    man_path = fixture / "manifest.json"
-    if not flows_path.is_file() or not man_path.is_file():
-        raise SystemExit("Fixture missing. Run --sample-only first.")
-    manifest = json.loads(man_path.read_text(encoding="utf-8"))
+    flows_path = _flows_csv()
+    man_path = flows_path.parent / "manifest.json"
+    if not flows_path.is_file():
+        raise SystemExit(f"Fixture missing: {flows_path}. Pass --input.")
+    manifest = json.loads(man_path.read_text(encoding="utf-8")) if man_path.is_file() else {}
     with flows_path.open(encoding="utf-8", newline="") as f:
         flows = list(csv.DictReader(f))
     live = _live_dir(reset=False)
@@ -333,7 +380,7 @@ def _pair_rows() -> tuple[list[dict[str, Any]], dict[str, Any]]:
         row["sample_id"] = six
         row["reason_row"] = int(float(flow.get("reason_row") or 0) or 0)
         paired.append({"flow": flow, "sample": row})
-    gold = set(int(x) for x in (manifest.get("excluded_gold_split_index") or []))
+    gold = set(int(x) for x in (manifest.get("excluded_gold_split_index") or [])) or _gold_indices()
     overlap = {int(p["sample"]["split_index"]) for p in paired} & gold
     if overlap:
         raise SystemExit(f"paired rows overlap gold: {len(overlap)}")
@@ -713,7 +760,8 @@ def write_report(*, live: Path | None = None) -> Path:
     live = live or _live_dir(reset=False)
     recs = _read_jsonl(_jsonl_path(live))
     catalog = load_attack_actions_by_type()
-    fixture_man = json.loads((_fixture_dir() / "manifest.json").read_text(encoding="utf-8"))
+    man_path = _flows_csv().parent / "manifest.json"
+    fixture_man = json.loads(man_path.read_text(encoding="utf-8")) if man_path.is_file() else {}
     parents = load_parent_store(VECTOR_STORE_DIR)
 
     scored = [_score_row(rec, catalog, parents) for rec in recs]
@@ -819,9 +867,9 @@ def write_report(*, live: Path | None = None) -> Path:
         "systems": list(SYSTEM_IDS),
         "labels": dict(SYSTEM_LABEL),
         "n": n,
-        "n_target": N_TARGET,
+        "n_target": _n_target(),
         "n_by_system": n_by_sys,
-        "llm_calls_target": N_TARGET * len(SYSTEM_IDS),
+        "llm_calls_target": _n_target() * len(SYSTEM_IDS),
         "disjoint_from_gold": True,
         "model": os.getenv("OPENAI_MODEL", "gpt-6-luna"),
         "metrics": {
@@ -857,7 +905,7 @@ def write_report(*, live: Path | None = None) -> Path:
     coverage_payload = {
         "systems": list(SYSTEM_IDS),
         "n_runs": n,
-        "n_target": N_TARGET,
+        "n_target": _n_target(),
         "n_by_system": n_by_sys,
         "llm_calls": n,
         "model": os.getenv("OPENAI_MODEL", "gpt-6-luna"),
@@ -878,7 +926,7 @@ def write_report(*, live: Path | None = None) -> Path:
     head = " | ".join(["Phase"] + [SYSTEM_LABEL[s] for s in SYSTEM_IDS])
     rule = "|".join(["------"] + [":------:" for _ in SYSTEM_IDS])
     model = os.getenv("OPENAI_MODEL", "gpt-6-luna")
-    counts = ", ".join(f"{SYSTEM_LABEL[s]} {n_by_sys[s]}/{N_TARGET}" for s in SYSTEM_IDS)
+    counts = ", ".join(f"{SYSTEM_LABEL[s]} {n_by_sys[s]}/{_n_target()}" for s in SYSTEM_IDS)
 
     def _phase_section(title: str, blocks: dict[str, dict[str, Any]], detect_rows: list[dict[str, Any]]) -> list[str]:
         n_flow = max((int(b.get("n") or 0) for b in blocks.values()), default=0)
@@ -994,10 +1042,10 @@ def write_report(*, live: Path | None = None) -> Path:
             "systems": list(SYSTEM_IDS),
             "n_runs": n,
             "n_by_system": n_by_sys,
-            "n_target": N_TARGET,
+            "n_target": _n_target(),
             "llm_calls": n,
-            "llm_calls_target": N_TARGET * len(SYSTEM_IDS),
-            "fixture": str(_fixture_dir() / "flows.csv"),
+            "llm_calls_target": _n_target() * len(SYSTEM_IDS),
+            "fixture": str(_flows_csv()),
             "fixture_sha256": fixture_man.get("flows_sha256"),
             "runs_sha256": hashlib.sha256(_jsonl_path(live).read_bytes()).hexdigest() if _jsonl_path(live).is_file() else None,
             "mitigation_json": str(live / "mitigation.json"),
@@ -1009,15 +1057,33 @@ def write_report(*, live: Path | None = None) -> Path:
     return report
 
 
+def _bind_input(input_raw: str) -> Path:
+    flows = resolve_input_csv(input_raw)
+    n_rows = configure(flows)
+    print(f"input {flows} n={n_rows} live={_live_dir(reset=False)}")
+    return flows
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
-        description="500-row A/B/C reason + mitigation report. Default: reason (resume) then report."
+        description="A/B/C reason scorecard. N = row count of --input (folder or flows.csv)."
+    )
+    p.add_argument(
+        "--input",
+        default="",
+        help="Fixture folder or flows.csv (default: experiments/data/rag_reason_500). N = row count.",
+    )
+    p.add_argument(
+        "--n",
+        type=int,
+        default=0,
+        help="Only with --sample-only: how many rows to write into --input (does not select a preset set)",
     )
     p.add_argument("--sample-only", action="store_true")
     p.add_argument("--predict-only", action="store_true")
     p.add_argument("--reason-only", action="store_true", help="Reason then report (skip sample/detect)")
     p.add_argument("--report-only", action="store_true", help="Rebuild report from existing runs.jsonl")
-    p.add_argument("--reset-live", action="store_true", help="Archive prior rag_reason_500 live folder")
+    p.add_argument("--reset-live", action="store_true", help="Archive the live folder for this input set")
     p.add_argument("--limit", type=int, default=0, help="Reason only the first N paired rows (smoke)")
     p.add_argument("--chunk-size", type=int, default=DETECT_CHUNK)
     p.add_argument(
@@ -1037,11 +1103,29 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("Pick at most one of --sample-only / --predict-only / --reason-only / --report-only")
 
     if args.sample_only:
-        sample_fixture()
+        want = int(args.n)
+        if want <= 0:
+            raise SystemExit("--sample-only requires --n (row count to write)")
+        if not (args.input or "").strip():
+            raise SystemExit("--sample-only requires --input (folder for flows.csv)")
+        dest_dir = Path(args.input.strip())
+        if not dest_dir.is_absolute():
+            dest_dir = (_REPO / args.input.strip()).resolve() if not dest_dir.exists() else dest_dir.resolve()
+        dest = dest_dir / "flows.csv" if dest_dir.suffix.lower() != ".csv" else dest_dir
+        if dest.suffix.lower() == ".csv":
+            dest_dir = dest.parent
+            dest = dest_dir / "flows.csv"
+        if dest.is_file():
+            print(f"Fixture exists: {dest} (not resampled)")
+            return 0
+        sample_fixture(want, dest_dir)
         return 0
+
+    if args.n:
+        raise SystemExit("N comes from the input CSV. Use --input PATH. --n is only valid with --sample-only.")
+
+    _bind_input(args.input)
     if args.predict_only:
-        if not (_fixture_dir() / "flows.csv").is_file():
-            sample_fixture()
         run_detect(chunk_size=args.chunk_size)
         return 0
     if args.reason_only:
@@ -1052,10 +1136,6 @@ def main(argv: list[str] | None = None) -> int:
         write_report()
         return 0
 
-    if not (_fixture_dir() / "flows.csv").is_file():
-        sample_fixture()
-    else:
-        print(f"Fixture exists: {_fixture_dir() / 'flows.csv'}")
     run_detect(chunk_size=args.chunk_size)
     run_reason(limit=args.limit or None, reset_live=args.reset_live, systems=systems)
     write_report()

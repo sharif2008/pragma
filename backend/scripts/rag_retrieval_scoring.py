@@ -1,7 +1,8 @@
-"""Gold-core RAG eval (A/B/C) for pragma-rag-eval100.
+"""RAG retrieval scoring (BERTScore / ROUGE) for pragma-rag-eval-x / gold-core.
 
-Writes only ``experiments/rag/rag_eval100/``. Reads gold + gold-100 detect. Does not
-edit gold or write into gold-100 / reason / detect-predict.
+Gold-core writes ``experiments/rag/rag_eval100/``. Off-gold ``--offgold-n`` writes
+``experiments/rag/hybrid_eval{n}/``. Reads gold JSON as the text baseline only.
+Does not edit gold or write into gold-100 / reason / detect-predict.
 """
 
 from __future__ import annotations
@@ -113,7 +114,7 @@ def verify_inputs() -> dict[str, Any]:
     fixture_idx = set(int(x) for x in fixture.get("selected_split_index") or [])
     if gold_idx != fixture_idx:
         raise SystemExit("gold split_index set != data/gold-100 manifest")
-    for reason_name in ("rag_reason_500", "rag_reason_1000"):
+    for reason_name in ("rag_reason_500", "e2e-detect-chain"):
         reason_man = _REPO / "experiments" / "data" / reason_name / "manifest.json"
         if not reason_man.is_file():
             continue
@@ -1044,7 +1045,7 @@ def offgold_out_dir(n: int) -> Path:
 
 def load_offgold_pairs(n: int = 10) -> list[dict[str, Any]]:
     """n flows from rag_reason_500 — disjoint from gold-100, stratified by true_label."""
-    from scripts.reason_500 import _pair_rows
+    from scripts.rag_reason import _pair_rows
 
     paired, man = _pair_rows()
     gold = {int(x) for x in (man.get("excluded_gold_split_index") or [])}
@@ -1652,7 +1653,9 @@ def write_offgold_report(out: Path, paired: list[dict[str, Any]]) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="Gold-core A/B/C eval → experiments/rag/rag_eval100/")
+    p = argparse.ArgumentParser(
+        description="RAG retrieval scoring (BERTScore / ROUGE). Gold-core → experiments/rag/rag_eval100/."
+    )
     p.add_argument("--systems", default=",".join(SYSTEM_IDS), help="Comma-separated system ids")
     p.add_argument("--limit", type=int, default=0, help="Optional gold case cap (smoke). 0 = all 90.")
     p.add_argument("--score-only", action="store_true")

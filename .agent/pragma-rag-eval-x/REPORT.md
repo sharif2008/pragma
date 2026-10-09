@@ -1,4 +1,4 @@
-# rag_eval100 — A LLM vs B RAG+SHAP (SPEC)
+# RAG retrieval scoring — A LLM vs B RAG+SHAP (SPEC)
 
 Follows [`.agent/pragma-rag-eval100/SPEC.md`](SPEC.md). Not the old 90×3 three-system gold folder.
 
@@ -58,5 +58,5 @@ experiments/rag/hybrid_eval200/
 Rebuild without new LLM calls (uses existing jsonl; BERTScorer loads once):
 
 ```
-python scripts/rag_eval100.py --offgold-n 200 --offgold-report-only --systems LLM_only,RAG_RANKING
+python scripts/rag_retrieval_scoring.py --offgold-n 200 --offgold-report-only --systems LLM_only,RAG_RANKING
 ```

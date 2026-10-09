@@ -2,7 +2,7 @@
 
 Action: `pragma-rag-eval-x` (formerly `pragma-rag-eval100`)
 
-Script: `backend/scripts/rag_eval100.py`
+Script: `backend/scripts/rag_retrieval_scoring.py`
 
 **x** is the number of flows. Default **x = 200**. Two systems. Mitigation Plans only. No Commit / Apply.
 
@@ -46,7 +46,7 @@ BERTScore / ROUGE still need the frozen chunk concat:
 - **x × 2** Mitigation Plans; resume jsonl
 
 ```
-python scripts/rag_eval100.py --offgold-n 200 --systems LLM_only,RAG_RANKING
+python scripts/rag_retrieval_scoring.py --offgold-n 200 --systems LLM_only,RAG_RANKING
 ```
 
 ## Systems

@@ -59,8 +59,8 @@ Specs live in `.agent/`. Shared **input CSVs** live in `experiments/data/` (othe
 | Case | Input | Results | Script / spec |
 |------|-------|---------|----------------|
 | Gold freeze (90 = 10×9) | `experiments/data/gold-100/` | `experiments/gold-100/ground_truth-100.json` | `pragma-gold-100` |
-| RAG vs LLM-only (default x=200) | `experiments/data/eval-200/` | `experiments/rag/eval-200/` (or `hybrid_eval200/`) | `rag_eval100.py` / `pragma-rag-eval-x` |
-| Detect → RAG → reason → chain (1000) | `experiments/data/e2e-detect-chain/` | `experiments/e2e-detect-chain/` | `reason_1000.py` / `pragma-e2e-detect-chain` |
+| RAG vs LLM-only (default x=200) | `experiments/data/eval-200/` | `experiments/rag/eval-200/` (or `hybrid_eval200/`) | `rag_retrieval_scoring.py` / `pragma-rag-eval-x` |
+| Detect → RAG → reason → chain (1000) | `experiments/data/e2e-detect-chain/` | `experiments/e2e-detect-chain/` | `e2e_detect_chain.py` / `pragma-e2e-detect-chain` |
 | Agentic attack + authorization (A1–A25) | gold-eval plans (read-only) | `experiments/agentic-attack/` | `agentic_attack_eval.py` / `pragma-agentic-attack` |
 
 `eval-10` ⊂ `eval-100` ⊂ `eval-200` ⊂ `rag_reason_500`. All disjoint from gold-100. Do not use gold-100 **rows** as the eval-x set; gold is the **class chunk-concat** BERTScore / ROUGE baseline only.
@@ -178,8 +178,8 @@ If your UI supports it, set `VITE_API_BASE_URL` to the backend origin (e.g., `ht
 From `backend/` with the venv:
 
 ```bash
-python scripts/rag_eval100.py --offgold-n 200 --systems LLM_only,RAG_RANKING
-python scripts/rag_eval100.py --offgold-n 200 --offgold-report-only --systems LLM_only,RAG_RANKING
+python scripts/rag_retrieval_scoring.py --offgold-n 200 --systems LLM_only,RAG_RANKING
+python scripts/rag_retrieval_scoring.py --offgold-n 200 --offgold-report-only --systems LLM_only,RAG_RANKING
 python scripts/agentic_attack_eval.py
 ```
 
@@ -189,10 +189,10 @@ python scripts/agentic_attack_eval.py
 - **Deploy**: `hardhat-blockchain/scripts/deploy.js`
 - **Plan store / apply**: `backend/app/services/trust_chain_service.py`
 - **Hybrid retrieve**: `backend/scripts/rag_hybrid.py`
-- **RAG eval-x**: `backend/scripts/rag_eval100.py`
+- **RAG retrieval scoring**: `backend/scripts/rag_retrieval_scoring.py`
 - **Agentic attack A1–A25**: `backend/scripts/agentic_attack_eval.py`
 - **Gold freeze**: `backend/scripts/gold_freeze.py`
-- **E2E 1000**: `backend/scripts/reason_1000.py`
+- **E2E 1000**: `backend/scripts/e2e_detect_chain.py`
 - **Shared inputs**: `experiments/data/`
 - **Gold JSON**: `experiments/gold-100/ground_truth-100.json`
 

@@ -33,8 +33,8 @@ Do not resample `rag_reason_500` at run time. Do not read `experiments/reason/` 
 5. Score vs class gold chunk concat. Write SPEC outputs.
 
 ```
-python scripts/rag_eval100.py --offgold-n 200 --systems LLM_only,RAG_RANKING
-python scripts/rag_eval100.py --offgold-n 200 --offgold-report-only --systems LLM_only,RAG_RANKING
+python scripts/rag_retrieval_scoring.py --offgold-n 200 --systems LLM_only,RAG_RANKING
+python scripts/rag_retrieval_scoring.py --offgold-n 200 --offgold-report-only --systems LLM_only,RAG_RANKING
 ```
 
 ## Done when

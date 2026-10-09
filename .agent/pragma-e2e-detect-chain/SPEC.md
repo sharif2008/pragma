@@ -2,7 +2,7 @@
 
 Action: `pragma-e2e-detect-chain`
 
-Script: `backend/scripts/reason_1000.py`
+Script: `backend/scripts/e2e_detect_chain.py`
 
 Self-contained success path on **1000** flows. One system. One LLM call per flow. **No plan mutation. No inject. No BERTScore.**
 
@@ -41,7 +41,7 @@ Prompt: `create_agentic_orchestration_prompt` with `include_knowledge_base=True`
 
 ## Input (this task only)
 
-The only experiment input is this fixture:
+Default fixture:
 
 ```
 experiments/data/e2e-detect-chain/
@@ -50,10 +50,12 @@ experiments/data/e2e-detect-chain/
   README.md
 ```
 
-- N = **1000** from the VFL test split (seed **42**, 20% stratified) of the training CSV
+`--input PATH` may point at another frozen `experiments/data/<set>/` folder or `flows.csv` (e.g. `eval-10`). Do not resample. N is that CSV’s length.
+
+- Default N = **1000** from the VFL test split (seed **42**, 20% stratified) of the training CSV
 - Water-fill across nine labels (`OTHERS` is small — take all remaining)
-- Confirm histogram in **this** `manifest.json`
-- Do not read other `experiments/data/` sets, `experiments/gold-100/ground_truth-100.json`, or any other task’s csv/json/report when sampling or running
+- Confirm histogram in **that** fixture’s `manifest.json`
+- Do not read `experiments/gold-100/ground_truth-100.json` or any other task’s jsonl/report
 
 Nine labels: BENIGN, BOT, DDOS, DOS, FTPPATATOR, OTHERS, PORTSCAN, SSHPATATOR, WEBATTACK.
 
@@ -88,15 +90,16 @@ Hardhat is already up (`http://127.0.0.1:8545`, chain 31337). This job does not 
 
 ## What to score
 
-Group by **true_label** and overall. Latency cells are `mean ms (n)`.
+Group by **true_label**, then Overall. Latency cells are **total ms** (sum over that row’s n flows).
+
+**Row-wise:** E2E = Detect + Retrieve + Rank + LLM + Commit + Verify + Apply. **Column-wise:** Overall n and each Overall step = sum of the nine attack-type rows. Honest-store Overall n / Stored / Applied / Fail / unresolved are those same column sums.
 
 ### Latency (required table)
 
-One matrix: **row = attack type**, **column = pipeline step**. Overall is the first data row. This table is the headline of `report.md` and `.agent/pragma-e2e-detect-chain/REPORT.md`.
+One matrix: **row = attack type**, **column = pipeline step**. Nine labels first, **Overall last**. This table is the headline of `report.md` and `.agent/pragma-e2e-detect-chain/REPORT.md`.
 
 | Attack | n | Detect | Retrieve | Rank | LLM | Commit | Verify | Apply | E2E |
 |--------|--:|-------:|---------:|-----:|----:|-------:|-------:|------:|----:|
-| Overall | 1000 | | | | | | | | |
 | BENIGN | | | | | | | | | |
 | BOT | | | | | | | | | |
 | DDOS | | | | | | | | | |
@@ -106,6 +109,7 @@ One matrix: **row = attack type**, **column = pipeline step**. Overall is the fi
 | PORTSCAN | | | | | | | | | |
 | SSHPATATOR | | | | | | | | | |
 | WEBATTACK | | | | | | | | | |
+| Overall | 1000 | | | | | | | | |
 
 | Column | Clock |
 |--------|--------|
@@ -115,19 +119,19 @@ One matrix: **row = attack type**, **column = pipeline step**. Overall is the fi
 | LLM | Mitigation Plan |
 | Commit | `storePlan` |
 | Verify | `getPlan` / `isInPlan` |
-| Apply | honest `markApplied` mean per plan |
-| E2E | sum of the seven steps |
+| Apply | honest `markApplied` total per attack type |
+| E2E | row sum of the seven steps |
 
-`latency.json` stores the same matrix (overall + each of the nine labels, each step’s mean and n).
+`latency.json` stores the same matrix (each label + Overall; each step’s `sum_ms`, `mean_ms`, `min_ms`, `max_ms`, and n).
 
 ### Honest store
 
-Same row set (Overall + 9 labels):
+Same row set (9 labels, then Overall):
 
 | Attack | n | Stored | Applied | Fail | unresolved |
 |--------|--:|-------:|--------:|-----:|-----------:|
-| Overall | 1000 | | | | **0** |
 | … | | | | | |
+| Overall | 1000 | | | | **0** |
 
 `attack_type_unresolved` must be **0**.
 
@@ -138,22 +142,25 @@ No BERTScore, ROUGE, evidence-support, inject Block.%, or per-flow true/false ac
 `experiments/e2e-detect-chain/report.md` (filled after the run) and `.agent/pragma-e2e-detect-chain/REPORT.md` (same tables). Order:
 
 1. Fixture N, class histogram, LLM calls = 1000
-2. **Latency matrix** (required): every step × every attack type, plus Overall
-3. Honest store matrix (Overall + 9 labels)
-4. Chain fails (if any), by `split_index` and revert
+2. **Latency matrix** (required): every step × every attack type, Overall last (cells = total ms)
+3. **E2E per-flow** mean / min / max (9 labels, then Overall)
+4. **Overall by step** mean / min / max / sum
+5. Honest store matrix (9 labels, then Overall)
+6. Chain fails (if any), by `split_index` and revert
 
-Do not replace the latency matrix with a single overall mean. Every step and every attack type must have a cell.
+Do not replace the latency matrix with a single overall mean. Every step and every attack type must have a cell. Mean / min / max sit in extra tables, not instead of the totals.
 
 ## Run
 
 ```
 cd backend
-python scripts/reason_1000.py
-python scripts/reason_1000.py --sample-only
-python scripts/reason_1000.py --predict-only
-python scripts/reason_1000.py --reason-only
-python scripts/reason_1000.py --chain-only
-python scripts/reason_1000.py --report-only
+python scripts/e2e_detect_chain.py
+python scripts/e2e_detect_chain.py --input ../experiments/data/eval-10
+python scripts/e2e_detect_chain.py --sample-only
+python scripts/e2e_detect_chain.py --predict-only
+python scripts/e2e_detect_chain.py --reason-only
+python scripts/e2e_detect_chain.py --chain-only
+python scripts/e2e_detect_chain.py --report-only
 ```
 
 Default = sample (if missing) → detect (if missing) → reason (resume) → chain (resume) → report.
