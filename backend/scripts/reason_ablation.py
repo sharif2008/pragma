@@ -1,6 +1,6 @@
-"""9-class × 6-cell reasoning ablation (paper path + RAG/condition/ranking switches).
+"""9-class × 3-cell reasoning ablation (LLM-only vs RAG_No_Ranking vs RAG_RANKING).
 
-Writes ``experiments/reason/all_types_<ts>/``. Does not Commit/Apply.
+Writes ``experiments/reason/reason_ablation_9/`` (archives a prior live folder). Does not Commit/Apply.
 """
 
 from __future__ import annotations
@@ -11,7 +11,6 @@ import json
 import os
 import sys
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,24 +20,22 @@ if str(_BACKEND) not in sys.path:
 
 from openai import OpenAI
 
-from scripts.env import experiment_dir, load_project_dotenv, resolve_latest_predict_dir
+from scripts.env import (
+    LIVE_REASON_ABLATION_9,
+    load_project_dotenv,
+    new_named_live_dir,
+    resolve_latest_predict_dir,
+)
 from scripts.llm_prompt import create_agentic_orchestration_prompt
 from scripts.rag_io import load_attack_and_agentic, load_predictions, load_vector_store
+from scripts.rag_bridge import retrieve_context
 from scripts.reason import (
     VECTOR_STORE_DIR,
-    _DEFAULT_MMR_K,
-    _DEFAULT_RERANK_K,
     _LLM_RAG_SECTIONS_IN_PROMPT,
-    _PER_QUERY_RETRIEVE_K,
     _ensure_runtime_loaded,
     build_template_rag_query,
     build_template_rag_query_nocond,
-    expand_parent_sections,
     extract_sample_summary,
-    merge_and_dedupe_child_chunks,
-    mmr_select,
-    rerank_with_cross_encoder,
-    retrieve_child_chunks_for_query,
 )
 
 load_project_dotenv()
@@ -46,12 +43,9 @@ load_project_dotenv()
 EMPTY_KB_SENTENCE = "No relevant documents found from RAG search."
 
 CELLS: list[dict[str, Any]] = [
-    {"id": "rag_cond_rank", "rag": True, "cond": True, "rank": True},
-    {"id": "rag_cond_norank", "rag": True, "cond": True, "rank": False},
-    {"id": "rag_nocond_rank", "rag": True, "cond": False, "rank": True},
-    {"id": "rag_nocond_norank", "rag": True, "cond": False, "rank": False},
-    {"id": "norag_cond", "rag": False, "cond": True, "rank": False},
-    {"id": "norag_nocond", "rag": False, "cond": False, "rank": False},
+    {"id": "LLM_only", "rag": False, "cond": True, "rank": False},
+    {"id": "RAG_No_Ranking", "rag": True, "cond": True, "rank": False},
+    {"id": "RAG_RANKING", "rag": True, "cond": True, "rank": True},
 ]
 
 CLASS_ORDER = (
@@ -230,16 +224,15 @@ def _class_readme(class_name: str, pred: dict[str, Any], cells: list[dict[str, A
         f"- dominant **{pred.get('dominant_domain')}** ({float(pred.get('dominant_contribution_pct') or 0):.1f}%)",
         f"- shares: {pred.get('domain_shares')}",
         "",
-        "| cell | RAG | cond | rank | threat | priority | primary | llm_ms |",
-        "|------|-----|------|------|--------|----------|---------|--------|",
+        "| cell | RAG | rank | threat | priority | primary | llm_ms |",
+        "|------|-----|------|--------|----------|---------|--------|",
     ]
     for c in cells:
         plan = c.get("plan") or {}
         lines.append(
-            "| `{id}` | {rag} | {cond} | {rank} | {threat} | {pri} | {prim} | {llm} |".format(
+            "| `{id}` | {rag} | {rank} | {threat} | {pri} | {prim} | {llm} |".format(
                 id=c["id"],
                 rag="on" if c["rag"] else "off",
-                cond="on" if c["cond"] else "off",
                 rank="on" if c["rank"] else "n/a",
                 threat=plan.get("threat_level", ""),
                 pri=plan.get("execution_priority", ""),
@@ -316,27 +309,12 @@ def run_cell(
 
     rag_results: list[dict[str, Any]] = []
     if cell["rag"]:
-        t0 = time.perf_counter()
-        children = retrieve_child_chunks_for_query(
-            vector_store, query, top_k=int(_PER_QUERY_RETRIEVE_K)
+        rag_results, _ir, retrieve_ms, rank_ms = retrieve_context(
+            vector_store, sample, rank=bool(cell["rank"]), fallback_query=query
         )
-        merged = merge_and_dedupe_child_chunks([children])
-        latency["retrieve"] = _ms(t0)
-        if cell["rank"]:
-            t0 = time.perf_counter()
-            pool = mmr_select(vector_store, query, merged, k=int(_DEFAULT_MMR_K), lambda_mult=0.5)
-            ranked = rerank_with_cross_encoder(query, pool)
-            top_children = ranked[: int(_DEFAULT_RERANK_K)]
-            rag_results = expand_parent_sections(top_children, top_sections=5)
-            latency["rank"] = _ms(t0)
-        else:
-            latency["rank"] = None
-            top_children = merged[: int(_DEFAULT_RERANK_K)]
-            for c in top_children:
-                if c.get("rerank_score") is None:
-                    c["rerank_score"] = float(c.get("vector_score", 0.0) or 0.0)
-            rag_results = expand_parent_sections(top_children, top_sections=5)
-        rag_results = rag_results[: min(5, _LLM_RAG_SECTIONS_IN_PROMPT)]
+        latency["retrieve"] = retrieve_ms
+        latency["rank"] = rank_ms
+        rag_results = rag_results[: min(3, _LLM_RAG_SECTIONS_IN_PROMPT)]
     else:
         latency["retrieve"] = None
         latency["rank"] = None
@@ -376,7 +354,9 @@ def run_cell(
 
 
 def main(argv: list[str] | None = None) -> int:
-    p = argparse.ArgumentParser(description="9×6 reasoning ablation under experiments/reason/all_types_<ts>/")
+    p = argparse.ArgumentParser(
+        description="9×3 reasoning ablation under experiments/reason/reason_ablation_9/"
+    )
     p.add_argument("--classes", default="", help="Comma-separated true labels (smoke). Default: all 9.")
     p.add_argument("--strip-prompt", action="store_true", help="Optional extra free-form cell (off by default).")
     args = p.parse_args(argv)
@@ -401,8 +381,7 @@ def main(argv: list[str] | None = None) -> int:
     vector_store = load_vector_store(VECTOR_STORE_DIR)
     attack_actions, agentic_features = load_attack_and_agentic(verbose=False)
 
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_dir = experiment_dir("reason") / f"all_types_{stamp}"
+    out_dir = new_named_live_dir("reason", LIVE_REASON_ABLATION_9)
     by_attack = out_dir / "by_attack"
     by_attack.mkdir(parents=True, exist_ok=True)
 

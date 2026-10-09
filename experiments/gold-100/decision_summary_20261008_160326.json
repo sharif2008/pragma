@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-10-08T16:03:27.024714",
+  "total_samples": 90,
+  "predictions": {
+    "BENIGN": 32,
+    "BOT": 0,
+    "DDOS": 11,
+    "DOS": 17,
+    "FTPPATATOR": 10,
+    "OTHERS": 0,
+    "PORTSCAN": 10,
+    "SSHPATATOR": 10,
+    "WEBATTACK": 0
+  },
+  "dominant_agents": {
+    "Access / ISP": 71,
+    "Perimeter / IDS": 16,
+    "Endpoint / EDR": 3
+  },
+  "accuracy": 0.6444444444444445,
+  "correct_predictions": 58
+}

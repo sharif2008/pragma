@@ -20,7 +20,7 @@ Display names in new metadata: **Access / ISP**, **Perimeter / IDS**, **Endpoint
 
 ## Model folder (write + reuse)
 
-Latest live run `experiments/detect-train/run_*/` (via `resolve_model_dir()`). A new train writes a new `run_<ts>/` and moves the previous live run into `archive/`:
+**Keep only the latest live run** `experiments/detect-train/run_*/` (via `resolve_model_dir()`). A new train writes a new `run_<ts>/` and moves the previous live run into `archive/`. Current: `run_20261008_030606`.
 
 | File | Role |
 |------|------|
@@ -33,11 +33,11 @@ Latest live run `experiments/detect-train/run_*/` (via `resolve_model_dir()`). A
 | `model_comparison_<ts>.csv` | metric table |
 | `model_comparison_report_<ts>.txt` | human-readable report |
 
-Predict **must not** train. It only reads this folder (`python scripts/pipeline.py detect-predict` → `experiments/detect-predict/`).
+Predict **must not** train. It only reads this folder (`python scripts/pipeline.py detect-predict` → latest `experiments/detect-predict/run_*/`; current `run_20261008_030634`).
 
 ## Comparison matrix file
 
-`experiments/detect-train/model_comparison_<timestamp>.json` must include, for **VFL** and **Standard_NN** on the same held-out test split:
+`experiments/detect-train/run_*/model_comparison_<timestamp>.json` must include, for **VFL** and **Standard_NN** on the same held-out test split:
 
 - accuracy, macro-recall, macro-F1
 - per-class precision / recall / F1
@@ -50,7 +50,7 @@ CSV/txt are projections of the same numbers. Predict-time label vs truth (if the
 
 - Dataset: `datasets/*.csv` (present: `undersampled_CIC2017_dataset.csv`)
 - Catalog: `backend/storage/agentic_features.json`
-- Sample predict CSV: `backend/run/data/sample.csv`
+- Sample predict CSV: `experiments/fixtures/reason_ablation_9/` (`resolve_sample_csv()`), then `backend/run/data/sample.csv`
 
 ## Out of scope
 

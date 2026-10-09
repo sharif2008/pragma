@@ -45,7 +45,7 @@
 \maketitle
 
 \begin{abstract}
-Agentic AI can automate network defense, but allowing AI agents to modify live enterprise networks introduces a critical trust problem: generated actions may be incorrect, altered, or inconsistent with security policy. We propose a unified end-to-end architecture that integrates intrusion detection, explainable attribution, policy-grounded mitigation generation, and blockchain-based action enforcement across distributed enterprise network domains. Vertical Federated Learning enables Access, Perimeter, and Endpoint domains to collaboratively detect attacks without sharing raw features, preserving data locality while maintaining performance comparable to centralized learning. SHAP identifies the domain contribution to each alert and guides a retrieval-augmented generation pipeline grounded in ten authoritative cybersecurity frameworks to produce domain-specific mitigation plans.Before execution, security actions are validated against a blockchain-stored whitelist derived from industry standards and established cybersecurity knowledge. Each generated action is deterministically checked against the detected attack type and the corresponding authorized action policy. Only actions that satisfy both checks are released for execution, while their outcomes are recorded on-chain to provide immutable and auditable enforcement. This design separates probabilistic AI reasoning from deterministic enforcement, preventing unapproved or modified actions from reaching the network even when the generated plan is unreliable or has been tampered with. The resulting architecture provides an accountable detection-to-action pipeline in which blockchain serves as the trust and enforcement layer for autonomous network defense.
+Agentic AI can automate network defense, but allowing AI agents to modify live enterprise networks introduces a critical trust problem: generated actions may be incorrect, altered, or inconsistent with security policy. We propose a unified end-to-end architecture that integrates intrusion detection, explainable attribution, policy-grounded mitigation generation, and blockchain-based action enforcement across distributed enterprise network domains. Vertical Federated Learning enables Access, Perimeter, and Endpoint domains to collaboratively detect attacks without sharing raw features, preserving data locality while maintaining performance comparable to centralized learning. SHAP identifies the domain contribution to each alert and guides a retrieval-augmented generation pipeline grounded in ten authoritative cybersecurity frameworks to produce domain-specific mitigation plans. Before execution, the contract writes a write-once on-chain plan for that detection cycle: the attack type, threat level, and each authorized action--tier unit, plus a SHA-256 hash of the free-form reasoning. The prompt, retrieved passages, and telemetry remain off-chain. Apply admits a unit only if it is on the per-attack whitelist, belongs to the stored plan, and has not already been applied. Outcomes are recorded on-chain. This design separates probabilistic AI reasoning from deterministic enforcement, preventing unapproved or modified actions from reaching the network even when the generated plan is unreliable or has been tampered with. The resulting architecture provides an accountable detection-to-action pipeline in which blockchain serves as the trust and enforcement layer for autonomous network defense.
 \end{abstract}
 
  
@@ -77,7 +77,7 @@ Motivated by these challenges, we propose a unified framework that integrates VF
 \begin{itemize}
   \item A unified end-to-end architecture from detection to mitigation for multi-domain enterprise intrusion response, in which VFL,  SHAP-conditioned RAG, and blockchain enforcement are coupled rather than stacked as optional modules.
   \item Empirical evidence that a three-party VFL detector can approach centralized accuracy on CIC-style traffic while keeping Access, Perimeter, and Endpoint features local.
-  \item An apply-time enforcement evaluation in which unauthorized actions and in-cycle plan substitutions are rejected, and accepted actions leave an on-chain audit record.
+  \item An apply-time enforcement evaluation in which unauthorized actions and in-cycle plan substitutions are rejected against a write-once on-chain plan, and accepted actions leave an on-chain audit record.
 \end{itemize}
 
 % ============================================================
@@ -257,7 +257,7 @@ Wu et al.~\cite{wu2023falcon}
 
 The comparison shows that existing approaches address important components of autonomous cyber defense, but no representative approach jointly connects privacy-preserving detection and explainability with grounded reasoning and blockchain-governed execution. Federated approaches primarily support collaborative intrusion detection, while RAG/LLM-based systems extend cybersecurity analysis with knowledge-grounded reasoning. Blockchain-based agentic systems, in contrast, focus mainly on coordination, trust, policy enforcement, provenance, or execution assurance. Consequently, the integration of these capabilities for autonomous intrusion response remains insufficiently addressed.
 
-A key challenge is ensuring that an autonomous security action is both authorized and faithful to the mitigation decision generated for the corresponding attack. A policy whitelist can verify that an action is generally permitted, but cannot ensure that a compromised agent has not substituted another permitted action. Conversely, an immutable commitment can verify that a mitigation plan has not been modified, but does not establish whether the executed action is authorized for the detected attack. This work addresses these limitations by jointly verifying action authorization against the detected attack class and binding the executed action to the mitigation plan committed for the corresponding detection event. Blockchain therefore serves as a pre-execution governance layer that provides both policy-based authorization and mitigation-plan integrity for trusted autonomous security enforcement.
+A key challenge is ensuring that an autonomous security action is both authorized and faithful to the mitigation decision generated for the corresponding attack. A policy whitelist can verify that an action is generally permitted, but cannot ensure that a compromised agent has not substituted another permitted action. A hash-only commitment can verify that a private blob has not been modified, but the contract cannot then test membership of a concrete action. This work stores the authorized action units on-chain and jointly verifies two facts at apply time: the action is on the whitelist for the detected attack class, and the action--tier pair belongs to the write-once plan stored for that detection event. Blockchain therefore serves as a pre-execution governance layer that provides both policy-based authorization and on-chain plan binding, not merely a digest of off-chain JSON.
 
 
 
@@ -335,14 +335,14 @@ Plan substitution
 &
 Replace an action across mitigation cycles
 &
-Per-event plan commitment
+Write-once \texttt{storePlan}; \texttt{isInPlan}
 \\
 
 Payload tampering
 &
 Modify a committed mitigation plan
 &
-SHA-256 commitment and re-hashing
+On-chain $\{u,\tau\}$ record; \texttt{reasoningHash} for prose
 \\
 
 Wrong-domain execution
@@ -379,20 +379,20 @@ The blockchain component is not intended to establish that an
 AI-generated mitigation plan is semantically correct. Instead, it
 provides an independently verifiable governance mechanism that requires
 an action admitted to execution to satisfy both policy authorization for
-the detected attack and binding to the mitigation plan committed for the
-corresponding detection event. This separation establishes a clear trust
+the detected attack and membership in the on-chain plan stored for the
+corresponding detection event (\texttt{isInPlan}). This separation establishes a clear trust
 boundary between probabilistic AI reasoning and deterministic security
 enforcement.
 
 
 \subsection{End-to-End System Design}
-The proposed system processes each network event through four sequential stages: \emph{Detect}, \emph{Reason}, \emph{Commit}, and \emph{Apply}. The stages have deliberately separated responsibilities. Detect produces the security event and its supporting evidence; Reason converts that evidence into a constrained mitigation plan; Commit establishes the policy and integrity boundary; and Apply performs deterministic validation before an action can reach an enforcement interface.
+The proposed system processes each network event through four sequential stages: \emph{Detect}, \emph{Reason}, \emph{Commit}, and \emph{Apply}. The stages have deliberately separated responsibilities. Detect produces the security event and its supporting evidence; Reason converts that evidence into a constrained mitigation plan; Commit writes the authorized action units and the per-attack whitelist onto the ledger; and Apply performs deterministic on-chain validation before an action can reach an enforcement interface.
 
 
 \begin{figure*}[htbp]
   \centering  
   \includegraphics[width=0.80\textwidth]{pragma_system_diagram_v3.png}
-  \caption[End-to-end architecture diagram.]{End-to-end architecture. Domain agents feed a privacy-preserving detector, which hands off to a policy-grounded reasoning layer that drafts a mitigation plan. The plan is anchored on-chain before execution, then admitted only if it passes both a policy whitelist and a plan-binding check; rejected actions go to operator review, approved ones are dispatched.}
+  \caption[End-to-end architecture diagram.]{End-to-end architecture. Domain agents feed a privacy-preserving detector, which hands off to a policy-grounded reasoning layer that drafts a mitigation plan. Commit writes the authorized $\{u,\tau\}$ units on-chain through \texttt{storePlan}; Apply admits a unit only if it is on the whitelist and in that stored plan (\texttt{isInPlan}). Rejected actions go to operator review via \texttt{revisePlan}; approved ones are receipted with \texttt{markApplied}.}
   \label{fig:system_diagram}
 \end{figure*}
 
@@ -570,7 +570,7 @@ The registry \texttt{AgenticTrustRegistry} uses the ledger for two jobs: an unpr
 \paragraph{Off-Chain Artifact versus On-Chain Record.}
 After Reason returns, the full Mitigation Plans object---prompt, RAG passages, and free-form reasoning---stays off-chain in MySQL and JSON. Commit writes only the fields an execution gate must check without reconstructing the prompt: identities ($\mathit{jobId}$, $\mathit{predictionId}$, $\mathit{rowIndex}$); $\mathit{attackType}$ and $\mathit{threatLevel}$; primary and supporting units, each $\{u,\tau\}$ with $\tau\in\{\text{Access~/~ISP},\ \text{Perimeter~/~IDS},\ \text{Endpoint~/~EDR}\}$; and
 \begin{equation}
-h=\mathrm{SHA256}(\texttt{overall\_reasoning}),
+\texttt{reasoningHash}=\operatorname{SHA256}(\texttt{overall\_reasoning}).
 \label{eq:reasoning-hash}
 \end{equation}
 the only digest on the ledger. Telemetry, the $192$-d fusion vector, SHAP tables, and LLM prose never enter the contract. Attack type, threat, and action units are stored as plain text, so Apply reads them with \texttt{getPlan} and \texttt{isInPlan}$(\mathit{planId},u,\tau)$ rather than re-hashing a private JSON blob. $\mathit{planId}$ is the agentic report identity, not the job identity: one agentic job can produce several plans.
@@ -762,13 +762,13 @@ network\_tier $\in \{\mathrm{Access},\mathrm{Perimeter},\mathrm{Endpoint}\}$ \\
 \hline
 
 \textbf{3 COMMIT} &
-Canonicalization &
-$P$ = identity + retrieval context + plan + assigned tiers \\
+On-chain plan &
+\texttt{storePlan}: identities, attack/threat, $\{u,\tau\}$ units, \texttt{reasoningHash} \\
 \hline
 
 &
 Smart Contract &
-AgenticTrustRegistry.sol, Solidity 0.8.20, write-once \texttt{anchor()} \\
+AgenticTrustRegistry.sol, Solidity 0.8.20, write-once \texttt{storePlan()} \\
 \hline
 
 &
@@ -778,19 +778,19 @@ $W[a,u]$, seeded per attack class from policy \\
 
 \textbf{4 APPLY} &
 Execution Gate &
-$W[\hat{y},u]{=}1 \;\wedge\; u \in \mathrm{plan}(P)
-\;\wedge\;$ on-chain digest $= \mathrm{rehash}(P)$ \\
+$W[a,u]{=}1 \;\wedge\; \{u,\tau\}\in\mathrm{plan}(\mathit{planId})
+\;\wedge\; \neg\mathrm{superseded}$ \\
 \hline
 
 &
 Dispatch &
-API / gRPC / MCP, signed gated call \\
+API / gRPC / MCP, signed gated call; receipt via \texttt{markApplied} \\
 \hline
 
 &
 Audit + Reject &
-Every hop logged; rejected $\rightarrow$ operator review;
-approval re-anchors \\
+Every hop logged; rejected $\rightarrow$ \texttt{revisePlan};
+parent superseded \\
 \hline
 
 \textbf{SETUP} &
@@ -844,13 +844,10 @@ After detection, KernelSHAP is applied to the fused $192$-dimensional representa
 The governance component is implemented through
 \texttt{AgenticTrustRegistry.sol} using Solidity~0.8.20. Experiments use a local Hardhat~2.22 Ethereum-compatible network with chain ID~$31337$. The contract is compiled using \texttt{solc}~0.8.24 with optimization enabled for $200$ runs, and the backend interacts with the ledger through Web3.py and JSON-RPC.
 
-After Reason produces a mitigation plan, the complete artifact remains off-chain in MySQL and JSON storage. The backend canonicalizes the corresponding payload $P$ and computes
-\[
-c=\mathrm{SHA256}(P).
-\]
-Only the resulting \texttt{bytes32} commitment is stored on-chain through \texttt{anchor}. Raw network features, SHAP evidence, retrieved policy passages, and human-readable LLM output are therefore not stored on the blockchain. The contract additionally maintains the per-attack action whitelist and the state of successfully applied actions.
+After Reason produces a mitigation plan, the complete artifact---prompt, RAG passages, SHAP evidence, and free-form reasoning---remains off-chain in MySQL and JSON storage. Commit does not write a digest of that blob. An authorized planner calls \texttt{storePlan} with the admission record: identities (\textit{jobId}, \textit{predictionId}, \textit{rowIndex}); \textit{attackType} and \textit{threatLevel}; primary and supporting units $\{u,\tau\}$; and $\texttt{reasoningHash}=\operatorname{SHA256}(\texttt{overall\_reasoning})$ as in~(\ref{eq:reasoning-hash}).
+A second write to the same \textit{planId} is rejected. Telemetry, SHAP tables, retrieved passages, and LLM prose never enter the contract. Attack type, threat, and action units are stored as plain text so Apply can read them with \texttt{getPlan} and test membership with \texttt{isInPlan}$(\mathit{planId},u,\tau)$.
 
-At Apply, \texttt{getCommitment} retrieves the stored commitment and the persisted payload is re-hashed before an action is admitted. The execution path then applies the two checks : the action must be permitted by the whitelist for the detected attack class and must belong to the plan committed for the current detection cycle. A successful unit is recorded through \texttt{applyAction}.
+At Apply, a unit is admitted only if it is on the whitelist for the stored attack type, the pair $\{u,\tau\}$ is in the live plan, the plan is not superseded, and the caller is the executor key for $\tau$. A successful unit is receipted through \texttt{markApplied}. A rejected unit may be corrected through \texttt{revisePlan}, which supersedes the parent and writes a new \textit{planId}.
 
 \begin{table}[t]
 \centering
@@ -874,7 +871,7 @@ Contract & \texttt{AgenticTrustRegistry}, Solidity 0.8.20 \\
 Compiler & \texttt{solc} 0.8.24; optimizer, 200 runs \\
 Blockchain & Hardhat 2.22; chain ID $31337$ \\
 Client & Web3.py; JSON-RPC \\
-Commitment & SHA-256 of canonical JSON; \texttt{bytes32} on-chain \\
+On-chain plan & \texttt{storePlan}: $\{u,\tau\}$ list + \texttt{reasoningHash} \\
 \hline
 \end{tabular}}
 \end{table}
@@ -883,7 +880,7 @@ Commitment & SHA-256 of canonical JSON; \texttt{bytes32} on-chain \\
 
 The system is evaluated end-to-end using $500$ CICIDS-style network flows submitted sequentially through the live backend API. Each flow passes through the Detect--Reason--Commit--Apply pipeline while the trained VFL model, FAISS index, MySQL database, and Hardhat blockchain remain active throughout the run.
 
-To test enforcement integrity, selected actions are modified after Commit but before Apply. The modifications include either actions that are invalid for the detected class or whitelist-valid actions that were not part of the committed plan. Apply then evaluates the whitelist and plan-binding gates to determine whether the modified actions are rejected.
+To test enforcement integrity, selected actions are modified after Commit but before Apply. The modifications include either actions that are invalid for the detected class or whitelist-valid actions that were not part of the stored plan. Apply then evaluates the whitelist and plan-binding gates to determine whether the modified actions are rejected.
 
 The current executor records execution receipts rather than invoking a live network device. A production deployment can replace this stub with an API, MCP interface, SOAR playbook, or SDN controller without changing the validation gates. The implementation is available at
 \url{https://github.com/sharif2008/pragma}.
@@ -915,9 +912,9 @@ Difference (VFL $-$ NN)             & +0.0014 & +0.0032 & +0.0016\\
 
 We ingested 500 network flows through the live API, drawn as a 5\% stratified sample per class from a pool of 1{,}000 records, ensuring proportional representation across all nine attack labels listed in Table~\ref{tab:enforce}. Before the first flow was processed, the API was initialized with the trained three-party VFL model, MySQL, FAISS, and a local Hardhat node (chain ID $31337$) with a seeded \texttt{AgenticTrustRegistry}. Each CICIDS-style feature vector was submitted over HTTP, one flow at a time, emulating how a monitoring component would ingest individual sensor events through \texttt{attack\_monitor.py}. The experiment therefore evaluates online, row-by-row processing of the deployed stack rather than packet capture from a live network interface.
 
-For each flow, Detect scores the input using the VFL model, applies KernelSHAP, and maps the predicted label to its corresponding policy in Table~\ref{tab:whitelist}. Reason retrieves the relevant RAG context, after which GPT-4o-mini generates a structured mitigation plan containing an average of $3.08$ action units per flow. Commit canonicalizes the resulting plan and stores its SHA-256 digest on-chain through \texttt{anchor}, creating a tamper-evident commitment to the proposed actions.
+For each flow, Detect scores the input using the VFL model, applies KernelSHAP, and maps the predicted label to its corresponding policy in Table~\ref{tab:whitelist}. Reason retrieves the relevant RAG context, after which GPT-4o-mini generates a structured mitigation plan containing an average of $3.08$ action units per flow. Commit writes that plan on-chain through \texttt{storePlan}: the attack type, threat level, each $\{u,\tau\}$ unit, and \texttt{reasoningHash}. The narrative artifact stays off-chain.
 
-For the enforcement experiment, the $500$-flow run was executed with \texttt{--tamper} enabled. Before Apply, the client modifies either one or two action units per flow, alternating according to row index while leaving the remaining actions unchanged. Each modification represents one of two threat cases derived from Table~\ref{tab:whitelist}: either an action permitted for another attack class but not for the current class, or an action that remains valid under the current class whitelist but was not part of the committed plan. Apply submits the resulting mixed action list, after which the two gates in Eq.~(\ref{eq:apply}) are evaluated sequentially: first the class-specific whitelist check and then the plan-binding check. An action unit that passes both gates is recorded through \texttt{applyAction}.
+For the enforcement experiment, the $500$-flow run was executed with \texttt{--tamper} enabled. Before Apply, the client modifies either one or two action units per flow, alternating according to row index while leaving the remaining actions unchanged. Each modification represents one of two threat cases derived from Table~\ref{tab:whitelist}: either an action permitted for another attack class but not for the current class, or an action that remains valid under the current class whitelist but was not part of the stored plan. Apply submits the resulting mixed action list, after which the gates in Eq.~(\ref{eq:apply-gate}) are evaluated sequentially: first the class-specific whitelist check and then \texttt{isInPlan}. An action unit that passes both gates is recorded through \texttt{markApplied}.
 
 Table~\ref{tab:enforce} reports the execution outcome for each attack class. Across the $500$ flows, the Reason stage generated $1538$ action units, of which $750$ were deliberately modified. Gate~1 rejected $352$ off-whitelist substitutions with \texttt{action\_not\_whitelisted}, while Gate~2 rejected the remaining $398$ substitutions with \texttt{action\_plan\_mismatch}. Thus, all $750$ modified units were rejected, while the $788$ unchanged units successfully received execution receipts. The results demonstrate the complementary roles of the two enforcement gates: Gate~1 prevents actions that violate class-specific policy, whereas Gate~2 detects substitutions that remain policy-valid but differ from the committed mitigation plan.
 
@@ -950,11 +947,11 @@ Total & 500 & 1538 & 750 & 352 & 398 & 788 & 100 \\
 
 In the testbed, the final executor is implemented as a stub that records only the execution receipt. In a production SOC environment, this component can be replaced by an operational interface such as an API call, MCP tool, SOAR playbook, or SDN enforcement hook, while the whitelist and plan-binding gates remain unchanged.
 
-Table~\ref{tab:latency} summarizes the blockchain processing overhead across the $500$ online flows, excluding Detect, RAG retrieval, and LLM reasoning. Commit stores the SHA-256 plan commitment using \texttt{anchor}, requiring an average of $45.08$\,ms per flow, while Apply retrieves and verifies the stored commitment using \texttt{getCommitment} in $33.83$\,ms. Together, these operations introduce an average blockchain overhead of $78.91$\,ms per flow. The higher Commit latency is consistent with the additional cost of an on-chain write compared with commitment retrieval and verification. Overall, the results show that the proposed system adds modest blockchain overhead while providing tamper-evident plan integrity, auditability, and controlled enforcement of agent-generated actions.
+Table~\ref{tab:latency} summarizes the blockchain processing overhead across the $500$ online flows, excluding Detect, RAG retrieval, and LLM reasoning. Commit writes the action plan using \texttt{storePlan}, requiring an average of $45.08$\,ms per flow, while Apply reads the stored record with \texttt{getPlan}/\texttt{isInPlan} in $33.83$\,ms. Together, these operations introduce an average blockchain overhead of $78.91$\,ms per flow. The higher Commit latency is consistent with the additional cost of an on-chain write compared with plan retrieval and membership checks. Overall, the results show that the proposed system adds modest blockchain overhead while providing an on-chain action list, auditability, and controlled enforcement of agent-generated actions.
 
 \begin{table}[t]
 \centering
-\caption{Blockchain time on 500 online flows. Store is Commit (\texttt{anchor}); Verify is Apply (\texttt{getCommitment}). LLM/RAG and Detect are omitted.}
+\caption{Blockchain time on 500 online flows. Store is Commit (\texttt{storePlan}); Verify is Apply (\texttt{getPlan}/\texttt{isInPlan}). LLM/RAG and Detect are omitted.}
 \label{tab:latency}
 \renewcommand{\arraystretch}{1.15}
 \begin{tabular}{@{}lrrrr@{}}
@@ -970,7 +967,7 @@ Store + verify   & 78.91 & 48.59 & 69.73 & 812.58\\
 
 %------------------------------------------------------------------
 \section{Discussion} \label{sec:discussion}
-Our proposed system processes each network flow through four stages: Detect, Reason, Commit, and Apply. Detect uses vertical federated learning, allowing each party to retain its local feature columns without sharing raw flow data. Reason grounds mitigation planning in RAG-retrieved guidance from public sources such as NIST, CIS, and MITRE ATT\&CK. Commit anchors a SHA-256 digest of the generated action plan, while Apply enforces two checks before execution: each action must be permitted by the class-specific whitelist and must match the committed plan. If an action is modified before Apply, either to one that is invalid for the predicted class or to a valid but previously uncommitted action, that unit is rejected, while unchanged valid units may still proceed.
+Our proposed system processes each network flow through four stages: Detect, Reason, Commit, and Apply. Detect uses vertical federated learning, allowing each party to retain its local feature columns without sharing raw flow data. Reason grounds mitigation planning in RAG-retrieved guidance from public sources such as NIST, CIS, and MITRE ATT\&CK. Commit writes the authorized action units on-chain through \texttt{storePlan} and hashes only the free-form reasoning; Apply then enforces two on-chain checks before execution: each action must be permitted by the class-specific whitelist and must appear in the stored plan (\texttt{isInPlan}). If an action is modified before Apply, either to one that is invalid for the predicted class or to a valid but previously unstored action, that unit is rejected, while unchanged valid units may still proceed.
 
 The current testbed has several limitations. All VFL parties are implemented as column partitions on a single machine, so WAN latency, communication failures, and network partitions are not evaluated. The blockchain component runs on a local Hardhat node rather than a production ledger, and the Apply stage records execution receipts without invoking a live firewall, SOAR platform, or SDN controller.Nevertheless, the testbed preserves the deployment structure required for a distributed implementation: locally retained features, policy-grounded mitigation planning, and blockchain-backed validation before execution. A production deployment could therefore retain the Detect and Reason components, replace the local ledger with a production blockchain, and connect the Apply stage to a real enforcement interface after both validation gates succeed.
 %------------------------------------------------------------------

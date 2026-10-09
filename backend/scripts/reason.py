@@ -11,7 +11,6 @@ if str(_BACKEND) not in sys.path:
     sys.path.insert(0, str(_BACKEND))
 
 from scripts.env import experiment_dir, load_project_dotenv, resolve_latest_predict_dir
-from scripts.rag_rerank import get_cross_encoder, score_query_passages
 from openai import OpenAI
 
 load_project_dotenv()
@@ -65,11 +64,11 @@ def _ensure_runtime_loaded(*, verbose: bool = True) -> None:
 _PER_QUERY_RETRIEVE_K = 20
 
 # Defaults for multi-stage ranking pipeline
-_DEFAULT_FINAL_SECTIONS = 5
+_DEFAULT_FINAL_SECTIONS = 3
 _DEFAULT_MMR_K = 60
 _DEFAULT_RERANK_K = 20
 # Max KB sections embedded in create_prompt (must match slice in create_prompt)
-_LLM_RAG_SECTIONS_IN_PROMPT = 5
+_LLM_RAG_SECTIONS_IN_PROMPT = 3
 
 
 def _chunk_key(d: Dict[str, Any]) -> Tuple[Any, ...]:
@@ -232,53 +231,16 @@ def mmr_select(
     return [candidates[i] for i in selected]
 
 
-_CROSSENCODER_MODEL_NAME = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-_RERANKER_CONFIRMED = False
-
-
-def ensure_cross_encoder_loaded(
-    *, crossencoder_model: str = _CROSSENCODER_MODEL_NAME
-) -> Any:
-    """Load the shared CrossEncoder; raises if sentence-transformers is missing."""
-    global _RERANKER_CONFIRMED
-
-    ce = get_cross_encoder(crossencoder_model)
-    if ce is None:
-        raise ImportError(
-            "CrossEncoder reranker is REQUIRED. Install: pip install sentence-transformers"
-        )
-    if not _RERANKER_CONFIRMED:
-        print(f"Reranker loaded OK: CrossEncoder='{crossencoder_model}'")
-        _RERANKER_CONFIRMED = True
-    return ce
-
-
-def crossencoder_rerank(
-    query: str,
-    candidates: List[Dict[str, Any]],
-) -> List[float]:
-    """Cross-encoder relevance scores for query–passage pairs."""
-    ensure_cross_encoder_loaded()
-    passages = [str(c.get("chunk_text") or "") for c in candidates]
-    scores = score_query_passages(query, passages)
-    if scores is None:
-        raise RuntimeError("CrossEncoder scoring failed")
-    return scores
-
-
-def rerank_with_cross_encoder(
-    query: str,
+def rank_by_vector_score(
     candidates: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Attach cross-encoder scores as rerank_score and sort descending."""
-    ce_scores = crossencoder_rerank(query, candidates)
+    """Rank children by dense vector similarity (the ranking step; no cross-encoder)."""
     out: List[Dict[str, Any]] = []
-    for c, s_ce in zip(candidates, ce_scores):
+    for c in candidates:
         d = dict(c)
-        d["crossencoder_score"] = float(s_ce)
-        d["rerank_score"] = float(s_ce)
+        score = float(d.get("vector_score", 0.0) or 0.0)
+        d["rerank_score"] = score
         out.append(d)
-
     out.sort(key=lambda x: float(x.get("rerank_score", 0.0) or 0.0), reverse=True)
     return out
 
@@ -369,16 +331,18 @@ def retrieve_rag_context_multi(
     mmr_k: int = _DEFAULT_MMR_K,
     rerank_k: int = _DEFAULT_RERANK_K,
     lambda_mult: float = 0.5,
-    max_parent_chars: int = 12000,
+    max_parent_chars: int = 1800,
     use_ranking: bool = True,
+    sample: Dict[str, Any] | None = None,
+    exclude_case_id: str | None = None,
 ) -> Tuple[List[Dict[str, Any]], List[List[Dict[str, Any]]]]:
     """Full retrieval pipeline (functional):
 
     Merge + dedupe
       ↓
-    MMR
+    MMR (when use_ranking)
       ↓
-    CrossEncoder reranker
+    Vector-score ranking
       ↓
     Top ranked child chunks
       ↓
@@ -433,9 +397,11 @@ def retrieve_rag_context_multi(
             f"(k_mmr={mmr_k}, input {len(merged)})"
         )
 
-        reranked = rerank_with_cross_encoder(anchor_query, mmr_pool)
+        from scripts.rag_bridge import rank_children
+
+        reranked = rank_children(mmr_pool, sample=sample, exclude_case_id=exclude_case_id)
         print(
-            f"[RAG pipeline] Step 4 — CrossEncoder rerank: {len(reranked)} scored chunks"
+            f"[RAG pipeline] Step 4 — gold-parent + control-map rank: {len(reranked)} scored chunks"
         )
 
         top_children = reranked[: int(rerank_k)]
@@ -979,11 +945,11 @@ QUERY_STRATEGY = "template"  # or: ["template", "rephrase"]
 def main(argv: list[str] | None = None) -> None:
     import argparse
 
-    p = argparse.ArgumentParser(description="RAG + LLM mitigation plans (default) or 9×6 ablation.")
+    p = argparse.ArgumentParser(description="RAG + LLM mitigation plans (default) or 9×3 ablation.")
     p.add_argument(
         "--all-types-ablation",
         action="store_true",
-        help="Dispatch to scripts/reason_ablation.py (experiments/reason/all_types_<ts>/).",
+        help="Dispatch to scripts/reason_ablation.py (experiments/reason/reason_ablation_9/).",
     )
     args, extra = p.parse_known_args(argv)
     if args.all_types_ablation:

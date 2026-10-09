@@ -140,7 +140,7 @@ def kb_query_multi(
     db: Annotated[Session, Depends(get_db)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> KBMultiQueryResponse:
-    """Fuse several retrieval queries (RRF + max-score), CrossEncoder-rerank, optional MMR."""
+    """Fuse several retrieval queries (RRF + max-score ranking), optional MMR."""
     raw_hits, meta = kb_service.query_kb_multi_mmr(
         db,
         settings,
@@ -173,7 +173,7 @@ def kb_fuse_hits_mmr(
 ) -> KBMultiQueryResponse:
     """
     After one POST /kb/query per retrieval string, send all hit lists here to dedupe (chunk key),
-    RRF + max-score fusion, CrossEncoder rerank, then optional MMR — same as /kb/query-multi.
+    RRF + max-score fusion ranking, then optional MMR — same as /kb/query-multi.
     """
     groups = [[h.model_dump() for h in grp] for grp in body.per_query_hits]
     raw_hits, meta = kb_service.fuse_per_query_hit_groups_mmr(

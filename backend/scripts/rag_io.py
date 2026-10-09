@@ -420,7 +420,7 @@ def get_dominant_party_info(sample: Dict[str, Any]) -> Tuple[str, str, float]:
 
 
 def _rag_result_score_fields(r: Dict[str, Any]) -> Dict[str, Any]:
-    """Split ranking (CrossEncoder logit, can be negative) vs vector similarity (typically [0, 1])."""
+    """Split ranking score vs vector similarity (typically [0, 1])."""
     rank = float(r.get("score", 0.0) or 0.0)
     vs = r.get("vector_similarity")
     out: Dict[str, Any] = {"ranking_score": rank}

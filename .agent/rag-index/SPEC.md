@@ -37,7 +37,7 @@ An empty `experiments/rag-index/knowledge/` created by `mkdir` must not win.
 
 ## Index write (this task only)
 
-`rag_build.py` writes only under `experiments/rag-index/vector_store/`:
+`rag_build.py` writes only under `experiments/rag-index/vector_store/` (the **current** index; rebuild overwrites in place):
 
 | File | Role |
 |------|------|

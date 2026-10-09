@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.config import Settings
 from app.models.domain import FileKind, JobStatus, KnowledgeBaseFile, ManagedFile
 from scripts.rag_chunking import chunk_text, load_document_text
-from scripts.rag_rerank import normalize_scores, score_queries_passages_max, score_query_passages
 from scripts.rag_store import FaissKnowledgeIndex, _normalize
 from app.services import file_service, prediction_service
 from scripts.rag_templates import (
@@ -32,9 +31,9 @@ _PIPELINE_ARTIFACT_PREFIXES = ("traffic_run_", "customer_message_")
 _PIPELINE_ARTIFACT_MARKERS = ("_traffic_run_", "_customer_message_")
 
 _RRF_K = 60
-# Oversample FAISS hits before CrossEncoder so CE can pick better than bi-encoder top-k.
-_CE_OVERSAMPLE = 4
-_CE_POOL_CAP = 48
+# Oversample FAISS hits so fusion/MMR can pick better than raw bi-encoder top-k.
+_POOL_OVERSAMPLE = 4
+_POOL_CAP = 48
 
 
 def is_pipeline_run_artifact_name(name: str | None) -> bool:
@@ -259,7 +258,7 @@ def query_kb(
     if not rows:
         return []
 
-    fetch_k = min(max(top_k * _CE_OVERSAMPLE, top_k), 40) if settings.rag_use_cross_encoder else top_k
+    fetch_k = min(max(top_k * _POOL_OVERSAMPLE, top_k), 40)
     hits: list[tuple[float, dict, str]] = []
     stores = [(_open_store(settings, kb), kb) for kb in rows]
     for store, kb in stores:
@@ -276,23 +275,7 @@ def query_kb(
             continue
         seen.add(fk)
         deduped.append((score, chunk, kb_id))
-    pool = deduped[: min(_CE_POOL_CAP, len(deduped))]
-
-    if settings.rag_use_cross_encoder and pool:
-        passages = [str(c.get("text") or "") for _, c, _ in pool]
-        ce_raw = score_query_passages(
-            query,
-            passages,
-            model_name=settings.rag_cross_encoder_model,
-        )
-        if ce_raw is not None and len(ce_raw) == len(pool):
-            ranked = sorted(
-                zip(ce_raw, pool),
-                key=lambda x: x[0],
-                reverse=True,
-            )
-            return [(float(ce), chunk, kb_id) for ce, (_, chunk, kb_id) in ranked[:top_k]]
-
+    pool = deduped[: min(_POOL_CAP, len(deduped))]
     return pool[:top_k]
 
 
@@ -304,7 +287,7 @@ def query_kb_single(
     final_k: int = 10,
     kb_public_ids: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Single FAISS (+ optional CrossEncoder) retrieval for one query string."""
+    """Single FAISS retrieval for one query string; rank by vector similarity."""
     q = str(query or "").strip()
     if not q:
         return [], {"queries_used": [], "final_k": final_k, "fusion": "empty_query", "pipeline": "none"}
@@ -318,7 +301,7 @@ def query_kb_single(
                 "text": str(chunk.get("text") or ""),
                 "source": chunk.get("source"),
                 "kb_public_id": kb_id,
-                "rerank_score": sim if settings.rag_use_cross_encoder else None,
+                "rerank_score": sim,
                 "mmr_margin": None,
             }
         )
@@ -327,7 +310,7 @@ def query_kb_single(
         "final_k": final_k,
         "fusion": "single_templated_query",
         "use_mmr": False,
-        "pipeline": "templated_query_faiss_cross_encoder",
+        "pipeline": "templated_query_faiss_vector_rank",
     }
     return hits, meta
 
@@ -397,9 +380,9 @@ def _finalize_fused_pool_mmr(
     meta: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
-    Deduped fusion map → RRF/max pool → CrossEncoder (max over queries) → optional MMR → hit dicts.
+    Deduped fusion map → RRF/max pool (ranking) → optional MMR → hit dicts.
 
-    RRF+max only builds the candidate pool. Final order prefers raw CrossEncoder scores (CE-first).
+    Ranking is fusion_score = 0.55 * max_vector + 0.45 * RRF. MMR diversifies that ranked pool.
     """
     if not fused or not rows:
         return [], meta
@@ -413,36 +396,18 @@ def _finalize_fused_pool_mmr(
         it["fusion_score"] = 0.55 * n_max[i] + 0.45 * n_rrf[i]
         it["fusion_rerank"] = it["fusion_score"]  # back-compat alias
 
-    # Candidate pool by fusion only (retrieve stage).
+    # Candidate pool ranked by fusion (retrieve + rank stage).
     items.sort(key=lambda x: x["fusion_score"], reverse=True)
     pool_n = min(
-        max(final_k * max(pool_multiplier, _CE_OVERSAMPLE), final_k + 8, 24),
-        _CE_POOL_CAP,
+        max(final_k * max(pool_multiplier, _POOL_OVERSAMPLE), final_k + 8, 24),
+        _POOL_CAP,
         len(items),
     )
     pool = items[:pool_n]
 
     qs = [str(q).strip() for q in queries if str(q).strip()]
-    ce_used = False
-    if settings.rag_use_cross_encoder and pool and qs:
-        passages = [str(p["chunk"].get("text") or "") for p in pool]
-        ce_raw = score_queries_passages_max(
-            qs,
-            passages,
-            model_name=settings.rag_cross_encoder_model,
-        )
-        if ce_raw is not None and len(ce_raw) == len(pool):
-            ce_used = True
-            for i, it in enumerate(pool):
-                it["crossencoder_score"] = float(ce_raw[i])
-                # CE-first: final ranking key is raw CE logit (higher = better).
-                it["rerank_score"] = float(ce_raw[i])
-            pool.sort(key=lambda x: x["rerank_score"], reverse=True)
-
-    if not ce_used:
-        for it in pool:
-            it["rerank_score"] = float(it["fusion_score"])
-            it["crossencoder_score"] = None
+    for it in pool:
+        it["rerank_score"] = float(it["fusion_score"])
 
     store0 = _open_store(settings, rows[0])
     model = store0.model
@@ -455,14 +420,8 @@ def _finalize_fused_pool_mmr(
     q_centroid = _normalize(np.mean(q_vecs, axis=0, keepdims=True))
     sim_q = (emb @ q_centroid.T).flatten()
 
-    # MMR relevance: CE-first when available (normalize for stable λ scale), else bi-encoder sim.
-    if ce_used:
-        rel_scores = np.array(
-            normalize_scores([float(p["rerank_score"]) for p in pool]),
-            dtype="float32",
-        )
-    else:
-        rel_scores = sim_q.astype("float32")
+    # MMR relevance: bi-encoder similarity to the query centroid.
+    rel_scores = sim_q.astype("float32")
 
     selected: list[int] = []
     mmr_margins: list[float | None] = []
@@ -488,7 +447,7 @@ def _finalize_fused_pool_mmr(
             mmr_margins.append(best_mmr)
             remaining.remove(best_i)
     else:
-        # Pure CE-first (or fusion) top-k — no diversity pass.
+        # Fusion ranking top-k — no diversity pass.
         k = min(final_k, len(pool))
         selected = list(range(k))
         mmr_margins = [None] * k
@@ -510,19 +469,11 @@ def _finalize_fused_pool_mmr(
         )
     meta["pool_size"] = pool_n
     meta["candidates_fused"] = len(fused)
-    meta["cross_encoder"] = {
-        "enabled": bool(settings.rag_use_cross_encoder),
-        "used": ce_used,
-        "model": settings.rag_cross_encoder_model if ce_used else None,
-        "scoring": "max_over_queries" if ce_used else None,
-        "final_order": "cross_encoder_first" if ce_used else "fusion_only",
+    meta["ranking"] = {
+        "method": "rrf_plus_max_score",
+        "final_order": "fusion_then_mmr" if use_mmr else "fusion_only",
     }
-    fusion_label = "fusion_pool_ce_max_then_mmr" if (ce_used and use_mmr) else (
-        "fusion_pool_ce_max_topk" if ce_used else (
-            "rrf_plus_max_score_then_mmr" if use_mmr else "rrf_plus_max_score_topk"
-        )
-    )
-    meta["fusion"] = fusion_label
+    meta["fusion"] = "rrf_plus_max_score_then_mmr" if use_mmr else "rrf_plus_max_score_topk"
     return hits, meta
 
 
@@ -539,8 +490,8 @@ def query_kb_multi_mmr(
     use_mmr: bool = True,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
-    Multi-query retrieval: per-query FAISS hits, RRF + max-score fusion, CrossEncoder
-    rerank, then optional MMR diversification on the CE-ranked pool.
+    Multi-query retrieval: per-query FAISS hits, RRF + max-score fusion ranking,
+    then optional MMR diversification.
     """
     rows = _load_kb_rows_for_rag(db, kb_public_ids)
     meta: dict[str, Any] = {
@@ -550,7 +501,7 @@ def query_kb_multi_mmr(
         "mmr_lambda": mmr_lambda,
         "fusion": "pending",
         "use_mmr": use_mmr,
-        "pipeline": "faiss_rrf_cross_encoder_mmr",
+        "pipeline": "faiss_rrf_fusion_mmr",
     }
     if not rows or not queries:
         return [], meta
@@ -602,7 +553,7 @@ def fuse_per_query_hit_groups_mmr(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
     Each query was retrieved separately (e.g. repeated POST /kb/query). Merge hit lists with the same
-    dedupe + RRF/max fusion + CrossEncoder rerank + MMR as query_kb_multi_mmr.
+    dedupe + RRF/max fusion ranking + optional MMR as query_kb_multi_mmr.
     """
     rows = _load_kb_rows_for_rag(db, kb_public_ids)
     meta: dict[str, Any] = {
@@ -611,7 +562,7 @@ def fuse_per_query_hit_groups_mmr(
         "mmr_lambda": mmr_lambda,
         "fusion": "pending",
         "use_mmr": use_mmr,
-        "pipeline": "sequential_kb_query_then_fuse_cross_encoder_mmr",
+        "pipeline": "sequential_kb_query_then_fuse_mmr",
         "per_query_hits_received": [len(g) for g in per_query_hits],
     }
     if not rows or not queries:

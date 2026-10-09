@@ -159,8 +159,14 @@ except NameError:
     # agent_names doesn't exist, initialize it
     agent_names = get_agent_names()
 
-SAMPLE_CSV_PATH = resolve_sample_csv()
-OUTPUT_DIR = new_run_dir("detect-predict")
+_sample_override = os.environ.get("CHAINAGENT_SAMPLE_CSV", "").strip()
+_out_override = os.environ.get("CHAINAGENT_PREDICT_OUT", "").strip()
+SAMPLE_CSV_PATH = Path(_sample_override) if _sample_override else resolve_sample_csv()
+if _out_override:
+    # Caller owns another task folder; do not create or archive detect-predict runs.
+    OUTPUT_DIR = Path(_out_override)
+else:
+    OUTPUT_DIR = new_run_dir("detect-predict")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 print("="*80)
@@ -232,15 +238,15 @@ X1_sample, X2_sample, X3_sample = partition_and_preprocess_sample(
 x_sample_parts = [X1_sample, X2_sample, X3_sample]
 print(f"✓ Preprocessed {len(x_sample_parts[0])} samples")
 
-# Check for labels (optional)
+# Check for labels (optional). Prefer a pre-simplified column (gold fixture OTHERS).
 y_sample = None
-if "label" in sample_df.columns:
+rev_map = {v: k for k, v in label_mapping_dict.items()}
+if "label_simplified" in sample_df.columns or "label" in sample_df.columns:
     try:
-        sample_df['label_simplified'] = sample_df['label'].apply(simplify_label)
-        sample_df['label_numeric'] = sample_df['label_simplified'].map(
-            {v: k for k, v in label_mapping_dict.items()}
-        )
-        y_sample = torch.tensor(sample_df['label_numeric'].values, dtype=torch.long)
+        if "label_simplified" not in sample_df.columns:
+            sample_df["label_simplified"] = sample_df["label"].apply(simplify_label)
+        sample_df["label_numeric"] = sample_df["label_simplified"].map(rev_map)
+        y_sample = torch.tensor(sample_df["label_numeric"].values, dtype=torch.long)
         print(f"✓ Labels found: {len(y_sample)} samples with ground truth")
     except Exception as e:
         print(f"⚠ Could not process labels: {e}")
@@ -454,9 +460,10 @@ print(f"All results saved to: {OUTPUT_DIR}")
 print(f"  - Summary CSV: {summary_file.name}")
 print(f"  - Detailed JSON: {detailed_file.name}")
 print(f"  - Decision Summary: {decision_file.name}")
-archived = archive_older_runs("detect-predict", keep=OUTPUT_DIR)
-if archived:
-    print(f"Archived {len(archived)} prior predict run(s) under {OUTPUT_DIR.parent / 'archive'}")
+if not _out_override:
+    archived = archive_older_runs("detect-predict", keep=OUTPUT_DIR)
+    if archived:
+        print(f"Archived {len(archived)} prior predict run(s) under {OUTPUT_DIR.parent / 'archive'}")
 print("="*80)
 # -----------------------------
 

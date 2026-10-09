@@ -1,31 +1,22 @@
 # Validate: train-current-features
 
-Checked 2026-10-08 against code + `experiments/detect-train/model_metadata.json`.
+Checked 2026-10-08 after `pipeline.py detect-train` then `detect-predict`. Keep-last: one live run each.
 
-## Retrain is required
+## Train
 
-Copied metadata `agent1_features` starts with `udps.srcdst_rst_packet_count`, … (heuristic-era lists). Current JSON Access/ISP starts with `bidirectional_duration_ms`, `src2dst_duration_ms`, … **Mismatch confirmed.** Predict on the old `.pth` cannot be relabeled into the current partition.
+`experiments/detect-train/run_20261008_030606/`
 
-`detect_train.py` already calls `load_agent_definitions(AGENTIC_FEATURES_JSON)` then `split_features_by_agent_definitions`. A fresh `pipeline.py detect-train` **will** train current columns. No new trainer is needed.
+- `agent_names`: Access / ISP, Perimeter / IDS, Endpoint / EDR
+- Feature counts **23 / 32 / 42**, lists match `agentic_features.json` `logged_features`
+- `vfl_model_best.pth` (best epoch 99, val F1 0.8598)
+- Comparison + confusion matrices in `model_comparison_20261008_025340.json`
 
-## Model folder reuse already wired
+## Predict
 
-`resolve_model_dir()` prefers `experiments/detect-train/` when `vfl_model_best.pth` is there. After retrain, detect-predict will pick it up without a second path change.
+`experiments/detect-predict/run_20261008_030634/`
 
-## Comparison file gap
-
-`model_comparison_*.json` already stores Acc / macro-recall / macro-F1 for VFL vs Standard_NN. Confusion matrices are **printed** (`cm`, `cm_standard`) but **not** stored. Spec’s extra fields are a small edit in `detect_train.py` before the run, not a new script.
-
-## Display names
-
-`load_agent_definitions` still sets `agent_names` to `["RAN", "Edge", "Core"]`. `pragma_domain` exists on each agent. One-line mapping is enough for metadata and SHAP keys to match the paper domains. JSON **keys** in `agentic_features.json` stay RAN/Edge/Core (API compat). Pass.
-
-## Runtime constraints
-
-- Dataset `datasets/undersampled_CIC2017_dataset.csv` is present (~140 MB).
-- Train is CPU/GPU heavy (up to 100 epochs + KernelSHAP). Plan treats that as a **run** step, not a code gap.
-- Centralized NN is still evaluation-only (not saved). Matches paper: baseline is not the live detector.
+Loaded the live train folder (not `backend/storage/models`). Wrote `predictions_20261008_030634.csv` + detailed JSON.
 
 ## Verdict
 
-**Pass.** Code path for current features already exists; the old checkpoint is stale. Remaining work: domain names in metadata, persist confusion matrices in the comparison file, then run train → predict.
+**Pass.** Current partition trained; model folder reused; one live result per stage.

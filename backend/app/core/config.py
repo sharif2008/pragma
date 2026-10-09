@@ -53,12 +53,6 @@ class Settings(BaseSettings):
     rag_chunk_size: int = RAG_CHUNK_SIZE
     rag_chunk_overlap: int = RAG_CHUNK_OVERLAP
     rag_top_k: int = RAG_TOP_K
-    # Cross-encoder reranker for multi-query / RAG context chunk selection.
-    rag_use_cross_encoder: bool = Field(default=True, alias="RAG_USE_CROSS_ENCODER")
-    rag_cross_encoder_model: str = Field(
-        default="cross-encoder/ms-marco-MiniLM-L-6-v2",
-        alias="RAG_CROSS_ENCODER_MODEL",
-    )
 
     # Training / prediction
     default_test_size: float = 0.2

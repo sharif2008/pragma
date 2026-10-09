@@ -27,7 +27,20 @@ EXPERIMENT_TASKS = (
     "reason",
     "evaluate",
     "e2e",
+    "gold-100",
+    "rag",
 )
+
+# Purpose-named live folders under a task (empty string = write at the task root).
+LIVE_REASON_ABLATION_9 = "reason_ablation_9"
+LIVE_RAG_REASON_500 = "rag_reason_500"
+LIVE_GOLD_100 = ""
+LIVE_RAG_EVAL = "rag_eval100"
+LIVE_NAMED_DIRS: dict[str, str] = {
+    "reason": LIVE_REASON_ABLATION_9,
+    "gold-100": LIVE_GOLD_100,
+    "rag": LIVE_RAG_EVAL,
+}
 
 # Legacy alias; console predict writes go to experiment_dir("detect-predict").
 PAPER_OUTPUT_DIR = REPO_ROOT / "outputs"
@@ -35,17 +48,30 @@ PAPER_OUTPUT_DIR = REPO_ROOT / "outputs"
 RUN_DIR_PREFIX = "run_"
 ARCHIVE_DIRNAME = "archive"
 _RUN_STAMP_RE = re.compile(r"(?<!\d)(\d{8}_\d{6})(?!\d)")
-# Stay at the task root across runs (fixtures / indexes / placeholders).
+# Stay at the task root across runs (indexes / placeholders). Flow CSVs live in experiments/fixtures/.
 _TASK_ROOT_KEEP = frozenset(
     {
         ".gitkeep",
         ARCHIVE_DIRNAME,
-        "inputs",
         "knowledge",
         "vector_store",
         "action_plans",
+        LIVE_REASON_ABLATION_9,
+        LIVE_RAG_REASON_500,
+        "gold_100",
+        LIVE_RAG_EVAL,
     }
 )
+
+# Shared inputs under experiments/fixtures/<owner-task>/ (other tasks may read, not write).
+FIXTURE_REASON_ABLATION_9 = "reason_ablation_9"
+FIXTURE_GOLD_100 = "gold-100"
+FIXTURE_RAG_GROUND_100 = FIXTURE_GOLD_100  # alias; prefer FIXTURE_GOLD_100
+FIXTURE_RAG_REASON_500 = "rag_reason_500"
+FIXTURE_RAG_REASON_1000 = "rag_reason_1000"  # pointer; use FIXTURE_RAG_REASON_500
+FIXTURE_RAG_RETRIEVAL_TEST_50 = "rag_retrieval_test_50"
+FIXTURE_BLOCKCHAIN_ALL_1000 = "blockchain_all_1000"
+FIXTURE_E2E_DETECT_TO_BLOCKCHAIN_1000 = "e2e_detect_to_blockchain_1000"
 TRAIN_CHECKPOINT = "vfl_model_best.pth"
 PREDICT_DETAIL_GLOB = "predictions_detailed_*.json"
 
@@ -55,6 +81,40 @@ def experiments_root() -> Path:
     if raw:
         return Path(raw).expanduser().resolve()
     return (REPO_ROOT / "experiments").resolve()
+
+
+def fixtures_dir(*, mkdir: bool = True) -> Path:
+    """``experiments/fixtures/<owner-task>/`` — shared input CSVs. Results stay in ``experiments/<task>/``."""
+    path = experiments_root() / "fixtures"
+    if mkdir:
+        path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def fixture_set_dir(name: str, *, mkdir: bool = False) -> Path:
+    path = fixtures_dir(mkdir=mkdir) / name
+    if mkdir:
+        path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def resolve_fixture_csv(name: str) -> Path:
+    """First CSV in ``experiments/fixtures/<name>/``: ``flows.csv``, ``<name>.csv``, then any ``*.csv``."""
+    folder = fixture_set_dir(name, mkdir=False)
+    for cand in (
+        folder / "flows.csv",
+        folder / f"{name}.csv",
+        folder / "all_attack_types.csv",
+    ):
+        if cand.is_file():
+            return cand
+    if folder.is_dir():
+        csvs = sorted(folder.glob("*.csv"))
+        if csvs:
+            return csvs[0]
+    raise FileNotFoundError(
+        f"Fixture CSV not found under {folder}. Expected flows.csv or {name}.csv"
+    )
 
 
 def experiment_dir(task: str, *, mkdir: bool = True) -> Path:
@@ -156,6 +216,68 @@ def new_run_dir(task: str) -> Path:
     return path
 
 
+def archive_named_live(task: str, live_name: str | None = None) -> Path | None:
+    """Move ``experiments/<task>/<live_name>/`` into ``archive/<live_name>_<stamp>/`` if it exists."""
+    name = LIVE_NAMED_DIRS.get(task) if live_name is None else live_name
+    if name is None:
+        raise ValueError(f"No live named dir for task {task!r}")
+    if not name:
+        return None
+    task_dir = experiment_dir(task, mkdir=True)
+    live = task_dir / name
+    if not live.is_dir():
+        return None
+    archive = task_dir / ARCHIVE_DIRNAME
+    archive.mkdir(parents=True, exist_ok=True)
+    dest = archive / f"{name}_{run_stamp()}"
+    if dest.exists():
+        dest = archive / f"{name}_{run_stamp()}_dup"
+    shutil.move(str(live), str(dest))
+    return dest
+
+
+def named_live_dir(task: str, live_name: str | None = None, *, mkdir: bool = True) -> Path:
+    """Live result folder for a task. Empty live name → task root. Does not archive or delete files."""
+    name = LIVE_NAMED_DIRS.get(task) if live_name is None else live_name
+    if name is None:
+        raise ValueError(f"No live named dir for task {task!r}")
+    path = experiment_dir(task, mkdir=mkdir)
+    if name:
+        path = path / name
+    if mkdir:
+        path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def new_named_live_dir(task: str, live_name: str | None = None) -> Path:
+    """Archive the previous purpose-named live folder, then recreate it empty."""
+    name = LIVE_NAMED_DIRS.get(task) if live_name is None else live_name
+    if name is None:
+        raise ValueError(f"No live named dir for task {task!r}")
+    if not name:
+        return named_live_dir(task, "", mkdir=True)
+    if task == "reason":
+        _archive_stray_reason_runs(keep_name=name)
+    archive_named_live(task, name)
+    return named_live_dir(task, name, mkdir=True)
+
+
+def _archive_stray_reason_runs(*, keep_name: str) -> None:
+    """Move leftover ``all_types_*`` trees under ``experiments/reason/archive/``."""
+    task_dir = experiment_dir("reason", mkdir=True)
+    archive = task_dir / ARCHIVE_DIRNAME
+    for p in list(task_dir.iterdir()):
+        if not p.is_dir() or p.name in {ARCHIVE_DIRNAME, keep_name} or p.name.startswith("."):
+            continue
+        if not p.name.startswith("all_types_"):
+            continue
+        archive.mkdir(parents=True, exist_ok=True)
+        dest = archive / p.name
+        if dest.exists():
+            dest = archive / f"{p.name}_{run_stamp()}"
+        shutil.move(str(p), str(dest))
+
+
 def archive_older_runs(task: str, *, keep: Path) -> list[Path]:
     """Move every other live ``run_*`` into ``experiments/<task>/archive/`` (complete folder)."""
     task_dir = experiment_dir(task, mkdir=True)
@@ -222,9 +344,12 @@ def resolve_latest_predict_dir(*, require: bool = False) -> Path:
 
 
 def resolve_sample_csv() -> Path:
-    """Prediction CSV: one-row-per-class fixture, then ``backend/run/data/sample.csv``."""
+    """Prediction CSV: 9-class fixture, then ``backend/run/data/sample.csv``."""
+    try:
+        return resolve_fixture_csv(FIXTURE_REASON_ABLATION_9)
+    except FileNotFoundError:
+        pass
     candidates = (
-        experiments_root() / "detect-predict" / "inputs" / "all_attack_types.csv",
         BACKEND_ROOT / "run" / "data" / "sample_all_attack_types.csv",
         SAMPLE_CSV,
         REPO_ROOT / "inputs" / "sample.csv",
@@ -246,15 +371,13 @@ def _dir_has_rag_sources(path: Path) -> bool:
 
 
 def resolve_rag_knowledge_dir() -> Path:
-    """CLI corpus: rag-index/knowledge, else experiments/knowledge, else storage/base_docs."""
-    override = experiment_dir("rag-index") / "knowledge"
-    override.mkdir(parents=True, exist_ok=True)
+    """CLI corpus: ``experiments/knowledge``, else ``storage/base_docs``."""
     staged = experiments_root() / "knowledge"
     base = STORAGE_DIR / "base_docs"
-    for cand in (override, staged, base):
+    for cand in (staged, base):
         if _dir_has_rag_sources(cand):
             return cand
-    return override
+    return staged
 
 
 def find_backend_root() -> Path:

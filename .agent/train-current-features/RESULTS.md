@@ -2,7 +2,7 @@
 
 Validated 2026-10-08 after `pipeline.py detect-train` then `detect-predict`.
 
-## Train (`experiments/detect-train/`)
+## Train (`experiments/detect-train/run_20261008_030606/`)
 
 - `model_metadata.json` `agent_names`: Access / ISP, Perimeter / IDS, Endpoint / EDR
 - Feature counts **23 / 32 / 42**, lists **match** `agentic_features.json` `logged_features`
@@ -20,7 +20,7 @@ Confusion matrices and per-class reports are in that JSON plus `confusion_vfl_*.
 
 ## Predict reuse
 
-`detect-predict` loaded **`experiments/detect-train`** (not `backend/storage/models`). Wrote `experiments/detect-predict/predictions_20261008_030634.csv`.
+`detect-predict` loaded **`experiments/detect-train/run_20261008_030606`** (not `backend/storage/models`). Wrote `experiments/detect-predict/run_20261008_030634/predictions_20261008_030634.csv`.
 
 ## Verdict
 

@@ -2840,7 +2840,7 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
                   {Math.min(30, Math.max(1, finalDocCount))} · per_query_k={Math.min(50, Math.max(4, perQueryK))} ·{' '}
                   {retrievalPipeline === 'fusion_mmr'
                     ? `MMR on (λ=${MMR_PRESETS[mmrPreset]})`
-                    : 'MMR off (CrossEncoder / fusion only)'}
+                    : 'MMR off (fusion ranking only)'}
                 </Typography>
                 <Box component="ol" sx={{ m: 0, pl: 2.5, typography: 'body2', color: 'text.secondary' }}>
                   {resolvedRetrievalQueries.length === 0 ? (
@@ -2907,8 +2907,8 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
                   sx={{ minWidth: 220 }}
                   helperText="Rerank fusion; enable MMR for diverse top chunks."
                 >
-                  <MenuItem value="fusion_mmr">CrossEncoder + MMR</MenuItem>
-                  <MenuItem value="fusion_only">CrossEncoder only (no MMR)</MenuItem>
+                  <MenuItem value="fusion_mmr">Fusion + MMR</MenuItem>
+                  <MenuItem value="fusion_only">Fusion only (no MMR)</MenuItem>
                 </TextField>
                 <TextField
                   select
@@ -3104,7 +3104,7 @@ function RagLlmPrepPanel({ onNotify }: PanelProps) {
           <Box sx={{ width: 1 }}>
             <Typography variant="subtitle2" gutterBottom>
               Top {topHitsForLlm.length} document(s) (cap {finalDocCount}) —{' '}
-              {retrievalPipeline === 'fusion_mmr' ? 'CrossEncoder + MMR' : 'CrossEncoder only'}
+              {retrievalPipeline === 'fusion_mmr' ? 'Fusion + MMR' : 'Fusion only'}
             </Typography>
             {multiMetaLine && (
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>

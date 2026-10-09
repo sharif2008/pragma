@@ -111,6 +111,7 @@ backend/storage/hf_home/
 # Console paper stages (detect-train, detect-predict, rag-index, reason, evaluate, e2e)
 experiments/**
 !experiments/.gitkeep
+!experiments/README.md
 !experiments/detect-train/
 !experiments/detect-train/.gitkeep
 !experiments/detect-predict/
@@ -123,3 +124,7 @@ experiments/**
 !experiments/evaluate/.gitkeep
 !experiments/e2e/
 !experiments/e2e/.gitkeep
+!experiments/fixtures/
+!experiments/fixtures/**
+!experiments/gold-100/
+!experiments/gold-100/.gitkeep

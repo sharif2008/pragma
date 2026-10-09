@@ -25,26 +25,34 @@ Keep using `Settings.storage_root`. Console dumps do not go here.
 
 ## Experiments (`experiments/<task>/`) — console
 
-One **task folder** per `pipeline.py` stage. A script **writes only inside its own folder**. It may **read** another task folder (train → predict, index → reason).
+One **task folder** per `pipeline.py` stage. A script **writes only inside its own folder** and may only overwrite files in that folder. It may **read** another task folder (train → predict, index → reason). It must not archive or replace a different task’s directory.
+
+**One live result per case.** Timestamped `run_*` (train/predict) or purpose-named live folders (reason/rag). A new run of the *same* task may overwrite that task’s current files in place (gold-100 at the task root) or archive a prior `run_*` under that task’s `archive/`. Shared inputs live in `experiments/fixtures/<owner-task>/` (other tasks may read). Results live in `experiments/<task>/` and must not overwrite another task’s folder.
 
 ```
 experiments/
-  detect-train/       # VFL + centralized NN training
-  detect-predict/     # inference + SHAP details
-  rag-index/          # CLI knowledge corpus + FAISS
-  reason/             # mitigation plans
-  evaluate/           # scoring tables vs centralized NN
-  e2e/                # attack_monitor / network_monitor console ledgers
+  detect-train/run_<ts>/          # latest VFL + NN comparison; older → archive/
+  detect-predict/run_<ts>/        # latest inference + SHAP; older → archive/
+  rag-index/vector_store/         # current FAISS (overwrite in place)
+  reason/reason_ablation_9/       # latest 9×3 plans; older → archive/
+  gold-100/                       # gold detect + freeze (task root)
+  rag/rag_eval100/                # gold-core RAG eval (when run)
+  reason/rag_reason_1000/         # 1000-row reason set (when run)
+  evaluate/
+  e2e/
+  fixtures/<owner-task>/          # shared inputs (read by other tasks)
 ```
 
-| Task | Script | Writes |
-|------|--------|--------|
-| `detect-train` | `detect_train.py` | `run_<ts>/` (checkpoint + reports); prior live runs moved to `archive/` |
-| `detect-predict` | `detect_predict.py` | `run_<ts>/` (prediction CSV/JSON); `inputs/` stays; prior runs → `archive/` |
+| Task | Script | Live write |
+|------|--------|------------|
+| `detect-train` | `detect_train.py` | `run_<ts>/` (checkpoint + reports); prior live → `archive/` |
+| `detect-predict` | `detect_predict.py` | `run_<ts>/`; prior → `archive/` |
 | `rag-index` | `rag_build.py` | `knowledge/`, `vector_store/` |
-| `reason` | `reason.py` | `action_plans/` |
+| `reason` | `reason_ablation.py` | `reason_ablation_9/` (`reason.py` still uses `action_plans/`) |
+| `gold-100` | gold freeze | task root (`experiments/gold-100/`) |
+| `rag` | rag eval | `rag_eval/` |
 | `evaluate` | `evaluate.py` | metric tables / plots |
-| `e2e` | `attack_monitor.py` | run ledgers (`report.json`, `ledger.json`, …) |
+| `e2e` | `attack_monitor.py` | run ledgers |
 
 Cross-task reads (not copies):
 
@@ -52,12 +60,13 @@ Cross-task reads (not copies):
 - `reason` reads `experiments/rag-index/vector_store/` and the **latest** `experiments/detect-predict/run_*/` (`resolve_latest_predict_dir()`)
 - `evaluate` reads train/predict/reason outputs as needed
 
-Helper: `experiment_dir("detect-train")` → `REPO/experiments/detect-train`.
+Helper: `experiment_dir("detect-train")` → `REPO/experiments/detect-train`. Purpose lives: `LIVE_NAMED_DIRS` in `env.py`.
 
 ## Shared inputs (not generated)
 
 - `datasets/` — training CSVs
-- `backend/run/data/sample.csv` — fixture CSV
+- `experiments/fixtures/<owner-task>/` — `gold-100`, `reason_ablation_9`, `rag_reason_1000`, `rag_retrieval_test_50` (pointers: `blockchain_all_1000`, `e2e_detect_to_blockchain_1000`)
+- `backend/run/data/sample.csv` — API fixture fallback
 - catalogs under `backend/storage/*.json`
 
 ## Context rule

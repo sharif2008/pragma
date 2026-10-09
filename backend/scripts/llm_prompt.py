@@ -30,7 +30,8 @@ from scripts.network_domains import (
 from scripts.shap_payload import limit_shap_per_feature_by_abs
 from scripts.rag_templates import top_shap_features_by_agent
 
-_LLM_RAG_SECTIONS_IN_PROMPT = 10
+_LLM_RAG_SECTIONS_IN_PROMPT = 5
+_RAG_BODY_CHARS = 1200
 # Top |attribution| features included in orchestration LLM ``sample_data.prediction_row.shap.per_feature``.
 LLM_ORCHESTRATION_TOP_SHAP_FEATURES = 5
 
@@ -501,10 +502,27 @@ def create_agentic_orchestration_prompt(
     if include_knowledge_base:
         top_results = rag_results[:_LLM_RAG_SECTIONS_IN_PROMPT]
         if top_results:
+            hints: list[str] = []
+            seen_h: set[str] = set()
+            for result in top_results:
+                for a in list(result.get("suggested_actions") or []) + list(result.get("mapped_actions") or []):
+                    key = str(a).strip()
+                    if key and key not in seen_h:
+                        seen_h.add(key)
+                        hints.append(key)
             rag_context = "\n\nKnowledge Base Context (from RAG search):\n"
+            if hints:
+                rag_context += (
+                    "Mapped catalog actions suggested by retrieved controls "
+                    "(still pick ONLY from Allowed actions): "
+                    + ", ".join(hints)
+                    + "\n"
+                )
             for idx, result in enumerate(top_results, 1):
                 title = result.get("title", "Unknown")
-                body = result.get("text") or result.get("chunk_text") or ""
+                body = str(result.get("text") or result.get("chunk_text") or "")
+                if len(body) > _RAG_BODY_CHARS:
+                    body = body[:_RAG_BODY_CHARS] + "\n[truncated]"
                 rag_context += f"\n[{idx}] {title}\n"
                 rag_context += f"{body}\n"
         else:
