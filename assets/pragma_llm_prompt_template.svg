@@ -1,50 +1,78 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="720" viewBox="0 0 1600 720" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="660" viewBox="0 0 1600 660" role="img" aria-labelledby="title desc">
   <title id="title">Prompt construction format</title>
-  <desc id="desc">Horizontal construction of the LLM user prompt. Gray = Role (fixed). Blue = Construction (eight runtime slots). Green = Response format (strict JSON).</desc>
+  <desc id="desc">Horizontal construction of the LLM user prompt: Role (fixed) plus Construction (eight runtime slots) plus Response format (strict JSON).</desc>
 
   <defs>
     <style><![CDATA[
       .sans { font-family: Arial, Helvetica, sans-serif; }
       .mono { font-family: Consolas, "Courier New", monospace; }
-      .title { font-size: 22px; font-weight: 700; fill: #000000; }
-      .sub { font-size: 13px; font-weight: 400; fill: #333333; }
       .hdr { font-size: 14px; font-weight: 700; fill: #FFFFFF; }
-      .lab { font-size: 13px; font-weight: 700; fill: #000000; }
-      .hint { font-size: 12px; font-weight: 400; fill: #333333; }
-      .slot { font-size: 13px; font-weight: 600; fill: #000000; }
-      .ph { font-size: 12px; font-weight: 400; fill: #444444; }
-      .json { font-size: 12px; font-weight: 600; fill: #000000; }
-      .leg { font-size: 12px; font-weight: 600; fill: #000000; }
-      .chip { font-size: 13px; font-weight: 700; fill: #000000; }
+      .lab { font-size: 13px; font-weight: 700; fill: #18181B; }
+      .hint { font-size: 12px; font-weight: 400; fill: #3F3F46; }
+      .slot { font-size: 13px; font-weight: 600; fill: #1E3A8A; }
+      .ph { font-size: 12px; font-weight: 400; fill: #3F3F46; }
+      .json { font-size: 12px; font-weight: 600; fill: #115E59; }
+      .chip { font-size: 13px; font-weight: 700; fill: #18181B; }
       .chipOn { font-size: 13px; font-weight: 700; fill: #FFFFFF; }
-      .op { font-size: 28px; font-weight: 700; fill: #000000; }
-      .body { font-size: 13px; font-weight: 400; fill: #000000; }
+      .op { font-size: 28px; font-weight: 700; fill: #3B5BDB; }
+      .body { font-size: 13px; font-weight: 400; fill: #18181B; }
     ]]></style>
+
+    <filter id="lift" x="-10%" y="-6%" width="130%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="7" flood-color="#18181B" flood-opacity="0.18"/>
+    </filter>
+    <filter id="liftSoft" x="-8%" y="-8%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="1.6" flood-color="#18181B" flood-opacity="0.16"/>
+    </filter>
+
+    <linearGradient id="gRole" x1="0" y1="0" x2="0.18" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E4E4E7"/>
+    </linearGradient>
+    <linearGradient id="gRoleHead" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#52525B"/>
+      <stop offset="1" stop-color="#27272A"/>
+    </linearGradient>
+    <linearGradient id="gCons" x1="0" y1="0" x2="0.12" y2="1">
+      <stop offset="0" stop-color="#F8FAFF"/>
+      <stop offset="1" stop-color="#DCE4FF"/>
+    </linearGradient>
+    <linearGradient id="gConsHead" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5C7CFF"/>
+      <stop offset="1" stop-color="#2B4FD4"/>
+    </linearGradient>
+    <linearGradient id="gResp" x1="0" y1="0" x2="0.12" y2="1">
+      <stop offset="0" stop-color="#F6FFFB"/>
+      <stop offset="1" stop-color="#CFF5E8"/>
+    </linearGradient>
+    <linearGradient id="gRespHead" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0F9B8A"/>
+      <stop offset="1" stop-color="#0B5F56"/>
+    </linearGradient>
+    <linearGradient id="gTask" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EEF2FF"/>
+      <stop offset="1" stop-color="#C7D2FE"/>
+    </linearGradient>
+    <linearGradient id="gAction" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ECFDF5"/>
+      <stop offset="1" stop-color="#A7F3D0"/>
+    </linearGradient>
+
     <clipPath id="clipRole"><rect x="24" y="96" width="340" height="40" rx="8"/></clipPath>
     <clipPath id="clipCons"><rect x="424" y="96" width="700" height="40" rx="8"/></clipPath>
     <clipPath id="clipResp"><rect x="1184" y="96" width="392" height="40" rx="8"/></clipPath>
-    <marker id="arrBlk" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto">
-      <path d="M0,0 L9,4 L0,8 z" fill="#000000"/>
-    </marker>
   </defs>
 
-  <rect width="1600" height="720" fill="#FFFFFF"/>
-
-  <text class="sans title" x="800" y="32" text-anchor="middle">Prompt construction format</text>
-  <text class="sans sub" x="800" y="52" text-anchor="middle">user prompt  =  Role  +  Construction  +  Response format     &#x00B7;     GPT-4o-mini  T = 0.3     &#x00B7;     JSON only</text>
-
-  <rect x="430" y="64" width="18" height="14" rx="2" fill="#E8E8E8" stroke="#000000"/>
-  <text class="sans leg" x="454" y="76">Role  (fixed)</text>
-  <rect x="580" y="64" width="18" height="14" rx="2" fill="#D6E4F0" stroke="#000000"/>
-  <text class="sans leg" x="604" y="76">Construction  (runtime slots)</text>
-  <rect x="830" y="64" width="18" height="14" rx="2" fill="#DCE8DC" stroke="#000000"/>
-  <text class="sans leg" x="854" y="76">Response format  (JSON)</text>
+  <rect width="1600" height="660" fill="#FFFFFF"/>
 
   <!-- ROLE -->
-  <g id="role">
-    <rect x="24" y="96" width="340" height="592" rx="8" fill="#E8E8E8" stroke="#000000" stroke-width="2"/>
-    <rect x="24" y="96" width="340" height="40" clip-path="url(#clipRole)" fill="#4A4A4A"/>
+  <g id="role" transform="translate(0,-72)">
+    <rect x="38" y="110" width="340" height="592" rx="8" fill="#3F3F46"/>
+    <rect x="31" y="103" width="340" height="592" rx="8" fill="#71717A"/>
+    <rect x="24" y="96" width="340" height="592" rx="8" fill="url(#gRole)" stroke="#52525B" stroke-width="1.2" filter="url(#lift)"/>
+    <rect x="28" y="100" width="332" height="10" rx="5" fill="#FFFFFF" opacity="0.35"/>
+    <rect x="24" y="96" width="340" height="40" clip-path="url(#clipRole)" fill="url(#gRoleHead)"/>
     <text class="sans hdr" x="194" y="122" text-anchor="middle">1  Role  (fixed)</text>
 
     <text class="sans body" x="44" y="168">You are a cybersecurity</text>
@@ -55,74 +83,87 @@
 
     <text class="sans lab" x="44" y="304">network_tier  is exactly one of</text>
 
-    <rect x="44" y="320" width="300" height="44" rx="4" fill="#000000"/>
+    <rect x="48" y="324" width="300" height="44" rx="4" fill="#27272A"/>
+    <rect x="44" y="320" width="300" height="44" rx="4" fill="#3F3F46" filter="url(#liftSoft)"/>
     <text class="sans chipOn" x="194" y="348" text-anchor="middle">Access / ISP</text>
 
-    <rect x="44" y="376" width="300" height="44" rx="4" fill="#FFFFFF" stroke="#000000"/>
+    <rect x="48" y="380" width="300" height="44" rx="4" fill="#D4D4D8"/>
+    <rect x="44" y="376" width="300" height="44" rx="4" fill="#FFFFFF" stroke="#A1A1AA" filter="url(#liftSoft)"/>
     <text class="sans chip" x="194" y="404" text-anchor="middle">Perimeter / IDS</text>
 
-    <rect x="44" y="432" width="300" height="44" rx="4" fill="#FFFFFF" stroke="#000000"/>
+    <rect x="48" y="436" width="300" height="44" rx="4" fill="#D4D4D8"/>
+    <rect x="44" y="432" width="300" height="44" rx="4" fill="#FFFFFF" stroke="#A1A1AA" filter="url(#liftSoft)"/>
     <text class="sans chip" x="194" y="460" text-anchor="middle">Endpoint / EDR</text>
 
     <text class="sans hint" x="44" y="512">Access / ISP  &#x2014;  volume and rate</text>
     <text class="sans hint" x="44" y="532">Perimeter / IDS  &#x2014;  ports, WAF, scan</text>
     <text class="sans hint" x="44" y="552">Endpoint / EDR  &#x2014;  host forensics</text>
-
-    <text class="sans hint" x="194" y="656" text-anchor="middle">static text  &#x00B7;  not a slot</text>
   </g>
 
-  <text class="sans op" x="394" y="400" text-anchor="middle">+</text>
+  <text class="sans op" x="394" y="328" text-anchor="middle">+</text>
 
   <!-- CONSTRUCTION -->
-  <g id="construction">
-    <rect x="424" y="96" width="700" height="592" rx="8" fill="#D6E4F0" stroke="#000000" stroke-width="2"/>
-    <rect x="424" y="96" width="700" height="40" clip-path="url(#clipCons)" fill="#2F5F8A"/>
+  <g id="construction" transform="translate(0,-72)">
+    <rect x="438" y="110" width="700" height="592" rx="8" fill="#1E3A8A"/>
+    <rect x="431" y="103" width="700" height="592" rx="8" fill="#6366F1"/>
+    <rect x="424" y="96" width="700" height="592" rx="8" fill="url(#gCons)" stroke="#3B5BDB" stroke-width="1.2" filter="url(#lift)"/>
+    <rect x="428" y="100" width="692" height="10" rx="5" fill="#FFFFFF" opacity="0.32"/>
+    <rect x="424" y="96" width="700" height="40" clip-path="url(#clipCons)" fill="url(#gConsHead)"/>
     <text class="sans hdr" x="774" y="122" text-anchor="middle">2  Construction  (eight .format() slots)</text>
 
     <g id="fields">
       <text class="sans lab" x="444" y="168">sample_id</text>
       <text class="sans hint" x="444" y="184">row id</text>
-      <rect x="620" y="152" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#000000" stroke-width="2"/>
+      <rect x="624" y="156" width="484" height="36" rx="3" fill="#A5B4FC"/>
+      <rect x="620" y="152" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#3B5BDB" stroke-width="1.6" filter="url(#liftSoft)"/>
       <text class="mono slot" x="636" y="175">{sample_id}</text>
-      <rect x="748" y="160" width="2" height="20" fill="#000000"/>
+      <rect x="748" y="160" width="2" height="20" fill="#3B5BDB"/>
 
       <text class="sans lab" x="444" y="216">predicted_label</text>
       <text class="sans hint" x="444" y="232">y-hat</text>
-      <rect x="620" y="200" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#000000"/>
+      <rect x="624" y="204" width="484" height="36" rx="3" fill="#C7D2FE"/>
+      <rect x="620" y="200" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#818CF8" filter="url(#liftSoft)"/>
       <text class="mono ph" x="636" y="223">{predicted_label}</text>
 
       <text class="sans lab" x="444" y="264">confidence</text>
       <text class="sans hint" x="444" y="280">0&#x2013;1  as  .1%</text>
-      <rect x="620" y="248" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#000000"/>
+      <rect x="624" y="252" width="484" height="36" rx="3" fill="#C7D2FE"/>
+      <rect x="620" y="248" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#818CF8" filter="url(#liftSoft)"/>
       <text class="mono ph" x="636" y="271">{confidence}</text>
 
       <text class="sans lab" x="444" y="312">network_tier_info</text>
       <text class="sans hint" x="444" y="328">dominant domain p*</text>
-      <rect x="620" y="296" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#000000"/>
+      <rect x="624" y="300" width="484" height="36" rx="3" fill="#C7D2FE"/>
+      <rect x="620" y="296" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#818CF8" filter="url(#liftSoft)"/>
       <text class="mono ph" x="636" y="319">{network_tier_info}</text>
 
       <text class="sans lab" x="444" y="360">sample_data</text>
       <text class="sans hint" x="444" y="376">top-5 |phi| JSON</text>
-      <rect x="620" y="344" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#000000"/>
+      <rect x="624" y="348" width="484" height="36" rx="3" fill="#C7D2FE"/>
+      <rect x="620" y="344" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#818CF8" filter="url(#liftSoft)"/>
       <text class="mono ph" x="636" y="367">{sample_data}</text>
 
       <text class="sans lab" x="444" y="408">attack_actions_context</text>
       <text class="sans hint" x="444" y="424">catalog W[y-hat]</text>
-      <rect x="620" y="392" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#000000"/>
+      <rect x="624" y="396" width="484" height="36" rx="3" fill="#C7D2FE"/>
+      <rect x="620" y="392" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#818CF8" filter="url(#liftSoft)"/>
       <text class="mono ph" x="636" y="415">{attack_actions_context}</text>
 
       <text class="sans lab" x="444" y="456">agentic_context</text>
       <text class="sans hint" x="444" y="472">per-domain cards</text>
-      <rect x="620" y="440" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#000000"/>
+      <rect x="624" y="444" width="484" height="36" rx="3" fill="#C7D2FE"/>
+      <rect x="620" y="440" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#818CF8" filter="url(#liftSoft)"/>
       <text class="mono ph" x="636" y="463">{agentic_context}</text>
 
       <text class="sans lab" x="444" y="504">rag_context</text>
       <text class="sans hint" x="444" y="520">or empty-KB line</text>
-      <rect x="620" y="488" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#000000"/>
+      <rect x="624" y="492" width="484" height="36" rx="3" fill="#C7D2FE"/>
+      <rect x="620" y="488" width="484" height="36" rx="3" fill="#FFFFFF" stroke="#818CF8" filter="url(#liftSoft)"/>
       <text class="mono ph" x="636" y="511">{rag_context}</text>
     </g>
 
-    <rect x="444" y="544" width="660" height="124" rx="4" fill="#C5D4E4" stroke="#000000"/>
+    <rect x="448" y="548" width="660" height="124" rx="4" fill="#4338CA"/>
+    <rect x="444" y="544" width="660" height="124" rx="4" fill="url(#gTask)" stroke="#3B5BDB" filter="url(#liftSoft)"/>
     <text class="sans lab" x="460" y="568">TASK  (fixed)</text>
     <text class="sans hint" x="460" y="590">1  interpret y-hat on the three domains</text>
     <text class="sans hint" x="460" y="608">2  name which domain must act first</text>
@@ -130,43 +171,53 @@
     <text class="sans hint" x="460" y="644">5  evidence per action     6  scale by confidence     7  else empty lists</text>
   </g>
 
-  <text class="sans op" x="1154" y="400" text-anchor="middle">=</text>
+  <text class="sans op" x="1154" y="328" text-anchor="middle">=</text>
 
   <!-- RESPONSE FORMAT -->
-  <g id="response">
-    <rect x="1184" y="96" width="392" height="592" rx="8" fill="#DCE8DC" stroke="#000000" stroke-width="2"/>
-    <rect x="1184" y="96" width="392" height="40" clip-path="url(#clipResp)" fill="#3D5C3D"/>
+  <g id="response" transform="translate(0,-72)">
+    <rect x="1198" y="110" width="392" height="592" rx="8" fill="#115E59"/>
+    <rect x="1191" y="103" width="392" height="592" rx="8" fill="#2DD4BF"/>
+    <rect x="1184" y="96" width="392" height="592" rx="8" fill="url(#gResp)" stroke="#0F766E" stroke-width="1.2" filter="url(#lift)"/>
+    <rect x="1188" y="100" width="384" height="10" rx="5" fill="#FFFFFF" opacity="0.32"/>
+    <rect x="1184" y="96" width="392" height="40" clip-path="url(#clipResp)" fill="url(#gRespHead)"/>
     <text class="sans hdr" x="1380" y="122" text-anchor="middle">3  Response format</text>
 
     <text class="sans hint" x="1380" y="160" text-anchor="middle">strict JSON  &#x00B7;  first &#123;  through  last &#125;</text>
 
-    <rect x="1204" y="176" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#000000" stroke-dasharray="5 4"/>
+    <rect x="1208" y="180" width="352" height="36" rx="3" fill="#99F6E4"/>
+    <rect x="1204" y="176" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#0F766E" stroke-dasharray="5 4" filter="url(#liftSoft)"/>
     <text class="mono json" x="1380" y="199" text-anchor="middle">threat_level</text>
 
-    <rect x="1204" y="224" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#000000" stroke-dasharray="5 4"/>
+    <rect x="1208" y="228" width="352" height="36" rx="3" fill="#99F6E4"/>
+    <rect x="1204" y="224" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#0F766E" stroke-dasharray="5 4" filter="url(#liftSoft)"/>
     <text class="mono json" x="1380" y="247" text-anchor="middle">primary_actions[]</text>
 
-    <rect x="1204" y="272" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#000000" stroke-dasharray="5 4"/>
+    <rect x="1208" y="276" width="352" height="36" rx="3" fill="#99F6E4"/>
+    <rect x="1204" y="272" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#0F766E" stroke-dasharray="5 4" filter="url(#liftSoft)"/>
     <text class="mono json" x="1380" y="295" text-anchor="middle">supporting_actions[]</text>
 
-    <rect x="1204" y="320" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#000000" stroke-dasharray="5 4"/>
+    <rect x="1208" y="324" width="352" height="36" rx="3" fill="#99F6E4"/>
+    <rect x="1204" y="320" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#0F766E" stroke-dasharray="5 4" filter="url(#liftSoft)"/>
     <text class="mono json" x="1380" y="343" text-anchor="middle">all_actions[]</text>
 
-    <rect x="1204" y="368" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#000000" stroke-dasharray="5 4"/>
+    <rect x="1208" y="372" width="352" height="36" rx="3" fill="#99F6E4"/>
+    <rect x="1204" y="368" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#0F766E" stroke-dasharray="5 4" filter="url(#liftSoft)"/>
     <text class="mono json" x="1380" y="391" text-anchor="middle">overall_reasoning</text>
 
-    <rect x="1204" y="416" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#000000" stroke-dasharray="5 4"/>
+    <rect x="1208" y="420" width="352" height="36" rx="3" fill="#99F6E4"/>
+    <rect x="1204" y="416" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#0F766E" stroke-dasharray="5 4" filter="url(#liftSoft)"/>
     <text class="mono json" x="1380" y="439" text-anchor="middle">execution_priority</text>
 
-    <rect x="1204" y="464" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#000000" stroke-dasharray="5 4"/>
+    <rect x="1208" y="468" width="352" height="36" rx="3" fill="#99F6E4"/>
+    <rect x="1204" y="464" width="352" height="36" rx="3" fill="#FFFFFF" stroke="#0F766E" stroke-dasharray="5 4" filter="url(#liftSoft)"/>
     <text class="mono json" x="1380" y="487" text-anchor="middle">knowledge_sources_used[]</text>
 
-    <rect x="1204" y="520" width="352" height="148" rx="4" fill="#C9D6C9" stroke="#000000"/>
+    <rect x="1208" y="524" width="352" height="128" rx="4" fill="#0F766E"/>
+    <rect x="1204" y="520" width="352" height="128" rx="4" fill="url(#gAction)" stroke="#0F766E" filter="url(#liftSoft)"/>
     <text class="sans lab" x="1220" y="544">each action object</text>
     <text class="sans hint" x="1220" y="566">action  &#x2014;  exact catalog token</text>
     <text class="sans hint" x="1220" y="584">network_tier  &#x2014;  one of three names</text>
     <text class="sans hint" x="1220" y="602">party_evidence_type</text>
     <text class="sans hint" x="1220" y="620">reasoning  &#x2014;  evidence-grounded</text>
-    <text class="sans hint" x="1220" y="648">JSON only  &#x00B7;  no extra text</text>
   </g>
 </svg>

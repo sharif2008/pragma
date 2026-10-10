@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="340" viewBox="0 0 1180 340" role="img" aria-labelledby="title desc">
+  <title id="title">Hybrid RAG retrieve-then-rank</title>
+  <desc id="desc">Left-to-right: Query → FAISS + BM25 → RRF → MMR → Parents → Prompt. Policy index feeds both retrievers.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M2 2 L10 6 L2 10 Z" fill="#111"/>
+    </marker>
+    <marker id="arrowGray" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M2 2 L10 6 L2 10 Z" fill="#555"/>
+    </marker>
+    <style><![CDATA[
+      .box { fill:#fff; stroke:#111; stroke-width:2.2; }
+      .start { fill:#fff; stroke:#185FA5; stroke-width:2.6; }
+      .end { fill:#fff; stroke:#2F7D32; stroke-width:2.6; }
+      .kb { fill:#FAFAFA; stroke:#555; stroke-width:1.8; stroke-dasharray:6 4; }
+      .h { font: 700 13px Arial, Helvetica, sans-serif; fill:#111; }
+      .s { font: 400 11px Arial, Helvetica, sans-serif; fill:#444; }
+      .t { font: 700 10.5px Arial, Helvetica, sans-serif; fill:#111; }
+      .cap { font: 400 11px Arial, Helvetica, sans-serif; fill:#444; }
+      .note { font: 700 11px Arial, Helvetica, sans-serif; fill:#111; }
+      .ico { fill:none; stroke:#111; stroke-width:2.1; stroke-linecap:round; stroke-linejoin:round; }
+      .dot { fill:#111; stroke:none; }
+      .arr { fill:none; stroke:#111; stroke-width:2; marker-end:url(#arrow); }
+      .line { fill:none; stroke:#111; stroke-width:2; }
+      .kbArr { fill:none; stroke:#555; stroke-width:1.8; stroke-dasharray:5 3; marker-end:url(#arrowGray); }
+      .kbLine { fill:none; stroke:#555; stroke-width:1.8; stroke-dasharray:5 3; }
+    ]]></style>
+  </defs>
+
+  <rect width="1180" height="340" fill="#fff"/>
+
+  <!-- Policy index spans FAISS + BM25; symmetric fork into both -->
+  <rect class="kb" x="196" y="8" width="304" height="50" rx="9"/>
+  <rect class="ico" x="210" y="18" width="11" height="28" rx="1.5"/>
+  <rect class="ico" x="223" y="22" width="11" height="24" rx="1.5"/>
+  <rect class="ico" x="236" y="16" width="11" height="30" rx="1.5"/>
+  <text class="h" x="258" y="30">Policy index</text>
+  <text class="s" x="258" y="46">NIST · CIS · ATT&amp;CK · MiniLM</text>
+  <path class="kbLine" d="M348 58 V74"/>
+  <path class="kbLine" d="M266 74 H430"/>
+  <path class="kbArr" d="M266 74 V110"/>
+  <path class="kbArr" d="M430 74 V110"/>
+  <text class="s" x="348" y="70" text-anchor="middle">searches</text>
+
+  <!-- 1 Query -->
+  <rect class="start" x="20" y="112" width="120" height="136" rx="12"/>
+  <circle class="ico" cx="80" cy="142" r="15"/>
+  <line class="ico" x1="91" y1="153" x2="104" y2="166"/>
+  <text class="h" x="80" y="186" text-anchor="middle">1. Query</text>
+  <text class="s" x="80" y="206" text-anchor="middle">Detect template</text>
+  <text class="s" x="80" y="224" text-anchor="middle">ŷ · conf · SHAP</text>
+  <text class="t" x="80" y="242" text-anchor="middle">fixed string</text>
+
+  <!-- Query → FAISS (direct) and BM25 (from below) -->
+  <path class="line" d="M140 180 H168"/>
+  <path class="arr" d="M168 180 H196"/>
+  <path class="line" d="M168 180 V268"/>
+  <path class="line" d="M168 268 H430"/>
+  <path class="arr" d="M430 268 V250"/>
+
+  <!-- 2 FAISS -->
+  <rect class="box" x="196" y="112" width="140" height="136" rx="11"/>
+  <circle class="dot" cx="218" cy="140" r="2.8"/>
+  <circle class="dot" cx="232" cy="148" r="2.8"/>
+  <circle class="dot" cx="224" cy="160" r="2.8"/>
+  <circle class="dot" cx="240" cy="138" r="2.8"/>
+  <circle class="dot" cx="246" cy="158" r="2.8"/>
+  <path class="ico" d="M218 140 L232 148 L224 160 M232 148 L240 138 M224 160 L246 158" opacity="0.5"/>
+  <text class="h" x="266" y="148">2. FAISS</text>
+  <text class="s" x="266" y="168">Dense N=80</text>
+  <text class="t" x="266" y="188">children</text>
+
+  <!-- 3 BM25 (beside FAISS) -->
+  <rect class="box" x="360" y="112" width="140" height="136" rx="11"/>
+  <line class="ico" x1="378" y1="140" x2="410" y2="140"/>
+  <line class="ico" x1="378" y1="152" x2="404" y2="152"/>
+  <line class="ico" x1="378" y1="164" x2="414" y2="164"/>
+  <line class="ico" x1="378" y1="176" x2="398" y2="176"/>
+  <text class="h" x="426" y="148">3. BM25</text>
+  <text class="s" x="426" y="168">Lexical N=80</text>
+  <text class="t" x="426" y="188">same ids</text>
+
+  <!-- FAISS + BM25 → RRF (FAISS routes under BM25) -->
+  <path class="line" d="M336 200 V268"/>
+  <path class="line" d="M336 268 H518"/>
+  <path class="line" d="M518 268 V180"/>
+  <path class="line" d="M500 180 H518"/>
+  <path class="arr" d="M518 180 H530"/>
+
+  <!-- 4 RRF -->
+  <rect class="box" x="530" y="112" width="112" height="136" rx="11"/>
+  <path class="ico" d="M552 132 H620 L604 164 V194 H568 V164 Z"/>
+  <text class="h" x="586" y="218" text-anchor="middle">4. RRF</text>
+  <text class="s" x="586" y="236" text-anchor="middle">1/(60+rank)</text>
+
+  <path class="arr" d="M642 180 H666"/>
+
+  <!-- 5 MMR -->
+  <rect class="box" x="666" y="112" width="120" height="136" rx="11"/>
+  <circle class="dot" cx="692" cy="140" r="3.5"/>
+  <circle class="dot" cx="712" cy="134" r="3.5"/>
+  <circle class="dot" cx="730" cy="142" r="3.5"/>
+  <circle class="dot" cx="700" cy="158" r="3.5"/>
+  <circle class="dot" cx="722" cy="164" r="3.5"/>
+  <text class="h" x="726" y="198" text-anchor="middle">5. MMR</text>
+  <text class="s" x="726" y="218" text-anchor="middle">λ=0.5 → 20</text>
+  <text class="t" x="726" y="236" text-anchor="middle">diversity</text>
+
+  <path class="arr" d="M786 180 H810"/>
+
+  <!-- 6 Parents -->
+  <rect class="box" x="810" y="112" width="120" height="136" rx="11"/>
+  <rect class="ico" x="832" y="132" width="20" height="26" rx="1.5"/>
+  <line class="ico" x1="836" y1="140" x2="846" y2="140"/>
+  <line class="ico" x1="836" y1="148" x2="844" y2="148"/>
+  <rect class="ico" x="858" y="138" width="20" height="26" rx="1.5"/>
+  <line class="ico" x1="862" y1="146" x2="872" y2="146"/>
+  <text class="h" x="870" y="198" text-anchor="middle">6. Parents</text>
+  <text class="s" x="870" y="218" text-anchor="middle">20 → 5 secs</text>
+  <text class="t" x="870" y="236" text-anchor="middle">expand</text>
+
+  <path class="arr" d="M930 180 H954"/>
+
+  <!-- 7 Prompt -->
+  <rect class="end" x="954" y="112" width="120" height="136" rx="11"/>
+  <path class="ico" d="M978 138 H1050 V180 H1018 L1004 196 V180 H978 Z"/>
+  <text class="h" x="1014" y="218" text-anchor="middle">7. Prompt</text>
+  <text class="s" x="1014" y="236" text-anchor="middle">5 + SHAP</text>
+
+  <text class="cap" x="590" y="310" text-anchor="middle">FAISS N=80 + BM25 N=80 → RRF → MMR (λ=0.5) → 5 parents + SHAP + W[ŷ]</text>
+  <text class="note" x="590" y="328" text-anchor="middle">No cross-encoder on the evaluated path</text>
+</svg>

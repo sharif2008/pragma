@@ -1,158 +1,339 @@
-<svg width="100%" viewBox="0 0 680 710" role="img" style="" xmlns="http://www.w3.org/2000/svg" xmlns:c2pa="http://c2pa.org/manifest"><metadata><c2pa:manifest>AAAWkGp1bWIAAAAeanVtZGMycGEAEQAQgAAAqgA4m3EDYzJwYQAAABZqanVtYgAAAEdqdW1kYzJtYQARABCAAACqADibcQN1cm46YzJwYTo1ZTI3NWExZi0wNDMxLTRiMzYtYjJhZC0xZmU3NjFiYTllYWUAAAADf2p1bWIAAAApanVtZGMyYXMAEQAQgAAAqgA4m3EDYzJwYS5hc3NlcnRpb25zAAAAALxqdW1iAAAARGp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuaW5ncmVkaWVudC52MwAAAAAYYzJzaMoppuE+XFzeoA6z/DL8c30AAABwY2JvcqNscmVsYXRpb25zaGlwaHBhcmVudE9maWRjOmZvcm1hdG1pbWFnZS9zdmcreG1samluc3RhbmNlSUR4LHhtcDppaWQ6MGI1MDI4MWEtMjQ0ZC00ZDI2LWE5OTItZmFmMWEyZTkwMjIwAAABzmp1bWIAAABBanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5hY3Rpb25zLnYyAAAAABhjMnNoS28poNG9gboopQHaTenBEQAAAYVjYm9yoWdhY3Rpb25zgqJmYWN0aW9ua2MycGEub3BlbmVkanBhcmFtZXRlcnOha2luZ3JlZGllbnRzgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFggn8jVhMF/XgcE0/33Ie//9oXOaottxYGmZDu4yzYDMd+kZmFjdGlvbngdY29tLmFudGhyb3BpYy5jbGF1ZGUucHJvdmlkZWRtc29mdHdhcmVBZ2VudKFkbmFtZWZDbGF1ZGVqcGFyYW1ldGVyc6F4H2NvbS5hbnRocm9waWMub3JpZ2luLWNvbmZpZGVuY2VndW5rbm93bmtkZXNjcmlwdGlvbnhmQ2xhdWRlIHByb3ZpZGVkIHRoaXMgZmlsZSBhdCB0aGUgcmVxdWVzdCBvZiBhIHVzZXIgYW5kIG1heSBoYXZlIGNyZWF0ZWQgb3IgbW9kaWZpZWQgdGhlIGZpbGUgY29udGVudHMuAAAAxGp1bWIAAABAanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5oYXNoLmRhdGEAAAAAGGMyc2gYTe6Dpr5mqj0MqMrXoC6zAAAAfGNib3KlamV4Y2x1c2lvbnOBomVzdGFydBieZmxlbmd0aBkeGGRuYW1lbmp1bWJmIG1hbmlmZXN0Y2FsZ2ZzaGEyNTZkaGFzaFgg6zDj09sP3f+Qu0+MFW9VCpTp9CEarbmhl9apA2SQ3PNjcGFkSQAAAAAAAAAAAAAAAmRqdW1iAAAAJ2p1bWRjMmNsABEAEIAAAKoAOJtxA2MycGEuY2xhaW0udjIAAAACNWNib3Kmamluc3RhbmNlSUR4LHhtcDppaWQ6ZmM3NDFmZDItNDYwYy00NzA2LTljZTEtMDQxOGE2ZDIxYzA5dGNsYWltX2dlbmVyYXRvcl9pbmZvo2RuYW1lc0FudGhyb3BpYyBDbGF1ZGUuYWlndmVyc2lvbmUxLjAuMHdvcmcuY29udGVudGF1dGguYzJwYV9yc2YwLjkwLjBpc2lnbmF0dXJleE1zZWxmI2p1bWJmPS9jMnBhL3VybjpjMnBhOjVlMjc1YTFmLTA0MzEtNGIzNi1iMmFkLTFmZTc2MWJhOWVhZS9jMnBhLnNpZ25hdHVyZXJjcmVhdGVkX2Fzc2VydGlvbnOComN1cmx4KnNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuYWN0aW9ucy52MmRoYXNoWCCpZM/T8mCG7na1fXmDd+9+05v7D6Y2KuxEAx+8Abme/qJjdXJseClzZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmhhc2guZGF0YWRoYXNoWCCKzQLDCyV68ObI+BN09jnduguNE4BCZYNQPPQkOQEDqXNnYXRoZXJlZF9hc3NlcnRpb25zgaJjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFggn8jVhMF/XgcE0/33Ie//9oXOaottxYGmZDu4yzYDMd9jYWxnZnNoYTI1NgAAEDhqdW1iAAAAKGp1bWRjMmNzABEAEIAAAKoAOJtxA2MycGEuc2lnbmF0dXJlAAAAEAhjYm9y0oRZAhKiASYYIVkCCjCCAgYwggGNoAMCAQICFEDloAruwjnQvriD+gZCBT1nVRMAMAoGCCqGSM49BAMDMEkxFzAVBgNVBAoTDkFudGhyb3BpYywgUEJDMS4wLAYDVQQDEyVBbnRocm9waWMgQ29udGVudCBDcmVkZW50aWFscyBSb290IENBMB4XDTI2MDgwNzE4NDM1NloXDTI4MDgwNjE5NDM1NlowRDEXMBUGA1UEChMOQW50aHJvcGljLCBQQkMxKTAnBgNVBAMTIEFudGhyb3BpYyBDbGF1ZGUgQ29udGVudCBTaWduaW5nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmHoKa8tQGAUU1TS9QqU5W0Tp2N3XsvlK7BfQt6YWKwEzd2R3/dzKPEUDdCjlLjp9fT+KFjRVnuZ9v0oXvTe3k6NYMFYwDgYDVR0PAQH/BAQDAgeAMBUGA1UdJQQOMAwGCisGAQQBg+heAgEwDAYDVR0TAQH/BAIwADAfBgNVHSMEGDAWgBTOUeIEgU5kWyP448TPmj6cwddcwjAKBggqhkjOPQQDAwNnADBkAjAxcx0UngF60stVjs5G4T2eiptsBk5mf9oCtfJPAUBl8qs/PEXa8+gk1/X5QJ2DVcYCMHBfXN31YapiSqYvlIWrDVDJKOvXMl+kkz37Wt0PBI8sw486Mq6JeOhT+lRR4b1HCaFjcGFkWQ2eAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA9lhAbTUq8xkPYeZ1J6slQl6zMm/fDzds53efX2KC1hundEsduRT7+wVCgxh8Z4tlr++doNDHsjAYt4081w3Ue6MflQ==</c2pa:manifest></metadata>
-<title style="fill:rgb(0, 0, 0);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Pragma circular blockchain architecture, orchestrator calls detection agents</title>
-<desc style="fill:rgb(0, 0, 0);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">Five agents sit on a ring around the central blockchain layer: detection agents D1 to D3, VFL agent, LLM agent, governance agent and execution agent. After verifying on the chain the execution agent calls the detection agents via API, gRPC or MCP, and at the same time notifies the event listener. Detection agents notify the event listener when done. The event listener reads the chain and feeds the log and audit system. The LLM agent gets policies from a RAG store. Numbers 1 to 12 show the order.</desc>
-<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker><mask id="imagine-text-gaps-dm995c" maskUnits="userSpaceOnUse"><rect x="0" y="0" width="680" height="710" fill="white"/><rect x="349.3203125" y="152.5" width="21.359375" height="19" fill="black" rx="2"/><rect x="348.0625" y="180.5" width="24.90399169921875" height="19" fill="black" rx="2"/><rect x="348.203125" y="208.5" width="24.90399169921875" height="19" fill="black" rx="2"/><rect x="319.59375" y="364" width="81.32992553710938" height="22" fill="black" rx="2"/><rect x="339.7265625" y="384" width="41.781982421875" height="22" fill="black" rx="2"/><rect x="426" y="132" width="123.44989013671875" height="22" fill="black" rx="2"/><rect x="426" y="152" width="121.01385498046875" height="19" fill="black" rx="2"/><rect x="425" y="170" width="154.94976806640625" height="19" fill="black" rx="2"/><rect x="583" y="299" width="77.90093994140625" height="22" fill="black" rx="2"/><rect x="584" y="321" width="81.26788330078125" height="19" fill="black" rx="2"/><rect x="516" y="509" width="79.490966796875" height="22" fill="black" rx="2"/><rect x="516" y="529" width="97.94586181640625" height="19" fill="black" rx="2"/><rect x="72.5625" y="512" width="132.45188903808594" height="22" fill="black" rx="2"/><rect x="131.21875" y="532" width="73.94990539550781" height="19" fill="black" rx="2"/><rect x="18.671875" y="299" width="117.3328857421875" height="22" fill="black" rx="2"/><rect x="23.84375" y="321" width="111.98785400390625" height="19" fill="black" rx="2"/><rect x="120.0703125" y="6" width="101.09988403320312" height="22" fill="black" rx="2"/><rect x="96.7109375" y="26" width="147.39979553222656" height="19" fill="black" rx="2"/><rect x="9.3515625" y="114" width="82.29792785644531" height="22" fill="black" rx="2"/><rect x="0.0390625" y="134" width="100.07586669921875" height="19" fill="black" rx="2"/><rect x="533.7890625" y="638" width="129.14788818359375" height="22" fill="black" rx="2"/><rect x="546.3828125" y="658" width="103.06585693359375" height="19" fill="black" rx="2"/><rect x="492" y="200" width="113.7518310546875" height="19" fill="black" rx="2"/><rect x="555" y="428" width="117.2398681640625" height="19" fill="black" rx="2"/><rect x="473.5" y="578" width="51.3359375" height="19" fill="black" rx="2"/><rect x="313.9140625" y="583" width="92.99786376953125" height="19" fill="black" rx="2"/><rect x="209.03125" y="465" width="67.7958984375" height="19" fill="black" rx="2"/><rect x="74.125" y="428" width="92.7078857421875" height="19" fill="black" rx="2"/><rect x="227" y="354" width="44.58197021484375" height="19" fill="black" rx="2"/><rect x="221" y="278" width="74.8779296875" height="19" fill="black" rx="2"/><rect x="220" y="294" width="97.39187622070312" height="19" fill="black" rx="2"/><rect x="81.75" y="190" width="83.29586791992188" height="19" fill="black" rx="2"/><rect x="240.703125" y="86" width="119.63180541992188" height="19" fill="black" rx="2"/><rect x="288" y="239" width="37.30596923828125" height="19" fill="black" rx="2"/><rect x="74.734375" y="90" width="60.67393493652344" height="19" fill="black" rx="2"/><rect x="372" y="261" width="74.27191162109375" height="19" fill="black" rx="2"/><rect x="472.3734436035156" y="222.8000030517578" width="13.453125" height="19" fill="black" rx="2"/><rect x="285.046875" y="129" width="22.451995849609375" height="19" fill="black" rx="2"/><rect x="532.2156372070312" y="429.20001220703125" width="17" height="19" fill="black" rx="2"/><rect x="531.65625" y="565.5" width="17" height="19" fill="black" rx="2"/><rect x="351.3203125" y="560.5" width="18" height="19" fill="black" rx="2"/><rect x="281.625" y="466.5" width="17" height="19" fill="black" rx="2"/><rect x="170.8859405517578" y="429.20001220703125" width="17" height="19" fill="black" rx="2"/><rect x="238.8046875" y="333.8999938964844" width="16" height="19" fill="black" rx="2"/><rect x="201.9328155517578" y="253.5" width="17" height="19" fill="black" rx="2"/><rect x="162.4140625" y="190.5" width="24.725997924804688" height="19" fill="black" rx="2"/><rect x="213.5859375" y="97.69999694824219" width="17" height="19" fill="black" rx="2"/><rect x="265.44842529296875" y="240.5" width="21.451995849609375" height="19" fill="black" rx="2"/><rect x="95.546875" y="56.5" width="17.90625" height="19" fill="black" rx="2"/><rect x="349.2890625" y="262" width="21.451995849609375" height="19" fill="black" rx="2"/><rect x="240.4140625" y="666.5" width="16" height="19" fill="black" rx="2"/><rect x="62" y="640.5" width="127.17584228515625" height="19" fill="black" rx="2"/><rect x="271" y="640.5" width="145.29779052734375" height="19" fill="black" rx="2"/><rect x="62" y="666.5" width="131.12181091308594" height="19" fill="black" rx="2"/><rect x="258" y="666.5" width="157.423828125" height="19" fill="black" rx="2"/></mask></defs>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="-80 0 840 850" role="img" aria-labelledby="title desc">
+<title id="title">Pragma circular blockchain architecture with retry and human-in-the-loop</title>
+<desc id="desc">Five agents sit on a perfect ring around the blockchain layer, each in its own color. The event listener sits on the left. The human loop sits on the outer arc between the orchestrator and the governance agent. Verify-fail follows that arc; the human updates governance only.</desc>
 
-<g fill="none" stroke="#3B5BDB" stroke-width="1.5" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-<path d="M419.3 199.5A190 190 0 0 1 524.2 284.4" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<path d="M549 360.5A190 190 0 0 1 501.4 506.9" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<path d="M436.8 553.8A190 190 0 0 1 283.2 553.8" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<path d="M218.6 506.9A190 190 0 0 1 171 360.5" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<path d="M195.8 284.4A190 190 0 0 1 300.7 199.5" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="360" cy="380" r="90" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="360" cy="190" r="60" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="540.7" cy="321.3" r="40" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="471.7" cy="533.7" r="40" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="248.3" cy="533.7" r="40" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="179.3" cy="321.3" r="40" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="170" cy="85" r="36" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="50" cy="85" r="26" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="598" cy="610" r="28" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="360" cy="162" r="10" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="360" cy="190" r="10" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="360" cy="218" r="10" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<g stroke-width="1" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-<line x1="368.4" y1="167.3" x2="419.3" y2="199.5" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="369.9" y1="191.6" x2="419.3" y2="199.5" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="369.5" y1="215" x2="419.3" y2="199.5" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="350.5" y1="158.8" x2="317.6" y2="147.6" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="352.9" y1="182.9" x2="317.6" y2="147.6" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="354.8" y1="209.4" x2="317.6" y2="147.6" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-</g>
-<circle cx="396" cy="317.6" r="5" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="432" cy="380" r="5" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="396" cy="442.4" r="5" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="324" cy="442.4" r="5" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="288" cy="380" r="5" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="324" cy="317.6" r="5" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="398.5" y1="321.9" x2="429.5" y2="375.7" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="429.5" y1="384.3" x2="398.5" y2="438.1" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="391" y1="442.4" x2="329" y2="442.4" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="321.5" y1="438.1" x2="290.5" y2="384.3" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="290.5" y1="375.7" x2="321.5" y2="321.9" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="329" y1="317.6" x2="391" y2="317.6" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="342" cy="337" r="3.5" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="332" cy="353" r="3.5" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="352" cy="353" r="3.5" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="340.1" y1="340" x2="333.9" y2="349.9" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="335.5" y1="353" x2="348.5" y2="353" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="350.1" y1="350" x2="343.9" y2="340" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="317.6" y1="147.6" x2="205" y2="100" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="177.7" y1="281.3" x2="171.4" y2="123" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="133" y1="85" x2="78" y2="85" marker-end="url(#arrow)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="574" y1="595.5" x2="505.9" y2="554.4" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-</g>
+<defs>
+  <style><![CDATA[
+    .sans { font-family: Arial, Helvetica, sans-serif; }
+    .h { font-size: 13px; font-weight: 700; fill: #0B0B0B; text-decoration: underline; }
+    .s { font-size: 11px; font-weight: 400; fill: #52514E; }
+    .d { font-size: 11px; font-weight: 700; fill: #3B5BDB; }
+    .n { font-size: 11px; font-weight: 700; fill: #FFFFFF; }
+    .icon { fill: none; stroke: inherit; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  ]]></style>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <g id="ic-vfl">
+    <circle class="icon" cx="-7.2" cy="-6.4" r="1.8"/>
+    <circle class="icon" cx="0" cy="-6.4" r="1.8"/>
+    <circle class="icon" cx="7.2" cy="-6.4" r="1.8"/>
+    <circle class="icon" cx="0" cy="0" r="2.1"/>
+    <circle class="icon" cx="-7.2" cy="6.4" r="1.8"/>
+    <circle class="icon" cx="0" cy="6.4" r="1.8"/>
+    <circle class="icon" cx="7.2" cy="6.4" r="1.8"/>
+    <path class="icon" d="M-7.2-4.6 L0-2.1 L7.2-4.6 M0 2.1 L-7.2 4.6 M0 2.1 L0 4.6 M0 2.1 L7.2 4.6"/>
+  </g>
+  <g id="ic-brain">
+    <path class="icon" d="M-1.2-8.2 C-6.4-8.2-9.2-5-9.2-1.6 C-10.6-1.2-11.2.8-10.4 2.4 C-11.2 3.8-10.6 5.8-8.8 6.4 C-8.2 8.4-6 9.2-3.6 8.4 C-2.2 9.6-.4 9.6 1.2 8.4 C3.6 9.2 5.8 8.4 6.4 6.4 C8.2 5.8 8.8 3.8 8 2.4 C8.8.8 8.2-1.2 6.8-1.6 C6.8-5 4-8.2-1.2-8.2 Z"/>
+    <path class="icon" d="M-1.2-8.2 V8.2"/>
+    <path class="icon" d="M-6.4-1.6 C-4.8-2.8-3.2-2.2-1.2-1.2"/>
+    <path class="icon" d="M6.4-1.6 C4.8-2.8 3.2-2.2 1.2-1.2"/>
+    <path class="icon" d="M-6.8 3.2 C-5 2.2-3.4 2.6-1.2 3.6"/>
+    <path class="icon" d="M6.8 3.2 C5 2.2 3.4 2.6 1.2 3.6"/>
+  </g>
+  <g id="ic-clipboard">
+    <rect class="icon" x="-6.4" y="-5.2" width="12.8" height="14.8" rx="1.6"/>
+    <rect class="icon" x="-3.6" y="-8.2" width="7.2" height="4.4" rx="1.2"/>
+    <path class="icon" d="M-3.2-0.4 L-1.2 1.6 L3.4-2.6"/>
+    <path class="icon" d="M-3.2 4.4 H3.2"/>
+    <path class="icon" d="M-3.2 7.2 H1.6"/>
+  </g>
+  <g id="ic-gear">
+    <circle class="icon" cx="0" cy="0" r="3.2"/>
+    <circle class="icon" cx="0" cy="0" r="6.4"/>
+    <rect class="icon" x="-1.9" y="-10.2" width="3.8" height="4" rx="0.7"/>
+    <rect class="icon" x="-1.9" y="-10.2" width="3.8" height="4" rx="0.7" transform="rotate(60)"/>
+    <rect class="icon" x="-1.9" y="-10.2" width="3.8" height="4" rx="0.7" transform="rotate(120)"/>
+    <rect class="icon" x="-1.9" y="-10.2" width="3.8" height="4" rx="0.7" transform="rotate(180)"/>
+    <rect class="icon" x="-1.9" y="-10.2" width="3.8" height="4" rx="0.7" transform="rotate(240)"/>
+    <rect class="icon" x="-1.9" y="-10.2" width="3.8" height="4" rx="0.7" transform="rotate(300)"/>
+  </g>
+  <g id="ic-listen">
+    <path class="icon" d="M-7.2 2 V-1.2 A7.2 7.2 0 0 1 7.2 -1.2 V2"/>
+    <rect class="icon" x="-9.6" y="1.4" width="5" height="7.4" rx="2"/>
+    <rect class="icon" x="4.6" y="1.4" width="5" height="7.4" rx="2"/>
+    <path class="icon" d="M-1.8 4.6 V8.2 M0 3 V8.2 M1.8 4.6 V8.2"/>
+  </g>
+  <g id="ic-audit">
+    <path class="icon" d="M-5.2-7.2 H2.4 L6.4-3.2 V7.6 H-5.2 Z"/>
+    <path class="icon" d="M2.4-7.2 V-3.2 H6.4"/>
+    <path class="icon" d="M-2.8-0.4 H3.2 M-2.8 2.4 H3.2 M-2.8 5.2 H1.2"/>
+  </g>
+  <g id="ic-db">
+    <ellipse class="icon" cx="0" cy="-5.2" rx="7.2" ry="2.6"/>
+    <path class="icon" d="M-7.2-5.2 V5.2"/>
+    <path class="icon" d="M7.2-5.2 V5.2"/>
+    <ellipse class="icon" cx="0" cy="5.2" rx="7.2" ry="2.6"/>
+    <path class="icon" d="M-7.2 0 C-7.2 1.4-4 2.6 0 2.6 S7.2 1.4 7.2 0"/>
+  </g>
+  <g id="ic-human">
+    <circle class="icon" cx="0" cy="-5.6" r="2.5"/>
+    <circle class="icon" cx="-6.4" cy="-3.8" r="2.1"/>
+    <circle class="icon" cx="6.4" cy="-3.8" r="2.1"/>
+    <path class="icon" d="M-3.8 0.4 Q0-1.8 3.8 0.4 V6.8 H-3.8 Z"/>
+    <path class="icon" d="M-9.6 1.4 Q-6.4-0.2-3.6 1.6 V6.8 H-9.6 Z"/>
+    <path class="icon" d="M3.6 1.6 Q6.4-0.2 9.6 1.4 V6.8 H3.6 Z"/>
+  </g>
+  <g id="ic-chain">
+    <rect class="icon" x="-15.2" y="-3.4" width="11.2" height="6.8" rx="3.3"/>
+    <rect class="icon" x="-5.6" y="-3.4" width="11.2" height="6.8" rx="3.3"/>
+    <rect class="icon" x="4" y="-3.4" width="11.2" height="6.8" rx="3.3"/>
+  </g>
+  <g id="ic-contract">
+    <path class="icon" d="M-6.4-8 H2 L6.6-3.4 V8.4 H-6.4 Z"/>
+    <path class="icon" d="M2-8 V-3.4 H6.6"/>
+    <path class="icon" d="M-3.4-1.4 C-4.6-1.4-5.2-0.6-5.2 0.2 V0.8 C-5.2 1.2-5.4 1.6-5.8 1.6 C-5.4 1.6-5.2 2-5.2 2.4 V3 C-5.2 3.8-4.6 4.6-3.4 4.6"/>
+    <path class="icon" d="M3.4-1.4 C4.6-1.4 5.2-0.6 5.2 0.2 V0.8 C5.2 1.2 5.4 1.6 5.8 1.6 C5.4 1.6 5.2 2 5.2 2.4 V3 C5.2 3.8 4.6 4.6 3.4 4.6"/>
+  </g>
+  <path id="arc-exec-out" d="M268 292 A 203 203 0 0 1 364 212" fill="none"/>
+  <path id="arc-exec-in" d="M285 317 A 176 176 0 0 1 378 236" fill="none"/>
+</defs>
 
-<line x1="271.8" y1="501.3" x2="307.5" y2="453.5" stroke="#1D9E75" stroke-width="2" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:rgb(0, 0, 0);stroke:rgb(29, 158, 117);color:rgb(11, 11, 11);stroke-width:2px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<g stroke="#7F77DD" stroke-width="1.5" stroke-dasharray="5 4" fill="none" style="fill:none;stroke:rgb(127, 119, 221);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-dasharray:5px, 4px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-<line x1="360" y1="290" x2="360" y2="253" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(127, 119, 221);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-dasharray:5px, 4px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="274.4" y1="352.2" x2="219.5" y2="334.5" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(127, 119, 221);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-dasharray:5px, 4px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<line x1="311.3" y1="304.3" x2="189.5" y2="115.3" marker-end="url(#arrow)" mask="url(#imagine-text-gaps-dm995c)" style="fill:none;stroke:rgb(127, 119, 221);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-dasharray:5px, 4px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-</g>
+<rect x="-80" width="840" height="850" fill="#FFFFFF"/>
 
-<g style="color:#3B5BDB;font-size:30px;fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-<foreignObject x="520.7" y="301.3" width="40" height="40" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"><div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"><i aria-hidden="true" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:tabler-icons;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"></i></div></foreignObject>
-<foreignObject x="451.7" y="513.7" width="40" height="40" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"><div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"><i aria-hidden="true" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:tabler-icons;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"></i></div></foreignObject>
-<foreignObject x="228.3" y="513.7" width="40" height="40" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"><div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"><i aria-hidden="true" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:tabler-icons;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"></i></div></foreignObject>
-<foreignObject x="159.3" y="301.3" width="40" height="40" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"><div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"><i aria-hidden="true" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:tabler-icons;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"></i></div></foreignObject>
-<foreignObject x="150" y="65" width="40" height="40" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"><div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"><i aria-hidden="true" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:tabler-icons;font-size:30px;font-weight:400;text-anchor:start;dominant-baseline:auto"></i></div></foreignObject>
-</g>
-<g style="color:#3B5BDB;font-size:24px;fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:24px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-<foreignObject x="34" y="69" width="32" height="32" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:24px;font-weight:400;text-anchor:start;dominant-baseline:auto"><div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:24px;font-weight:400;text-anchor:start;dominant-baseline:auto"><i aria-hidden="true" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:tabler-icons;font-size:24px;font-weight:400;text-anchor:start;dominant-baseline:auto"></i></div></foreignObject>
-<foreignObject x="582" y="594" width="32" height="32" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:24px;font-weight:400;text-anchor:start;dominant-baseline:auto"><div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:24px;font-weight:400;text-anchor:start;dominant-baseline:auto"><i aria-hidden="true" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:tabler-icons;font-size:24px;font-weight:400;text-anchor:start;dominant-baseline:auto"></i></div></foreignObject>
-<foreignObject x="366" y="337" width="32" height="32" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:24px;font-weight:400;text-anchor:start;dominant-baseline:auto"><div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:24px;font-weight:400;text-anchor:start;dominant-baseline:auto"><i aria-hidden="true" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(59, 91, 219);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:tabler-icons;font-size:24px;font-weight:400;text-anchor:start;dominant-baseline:auto"></i></div></foreignObject>
-</g>
-
-<text x="360" y="162" text-anchor="middle" dominant-baseline="central" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">D1</text>
-<text x="360" y="190" text-anchor="middle" dominant-baseline="central" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">D2</text>
-<text x="360" y="218" text-anchor="middle" dominant-baseline="central" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central">D3</text>
-
-<text x="360" y="380" text-anchor="middle" text-decoration="underline" style="fill:rgb(11, 11, 11);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:auto">Blockchain</text>
-<text x="360" y="400" text-anchor="middle" text-decoration="underline" style="fill:rgb(11, 11, 11);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:auto">layer</text>
-
-<text x="430" y="148" text-decoration="underline" style="fill:rgb(11, 11, 11);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:start;dominant-baseline:auto">Detection agents</text>
-<text x="430" y="166" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">Each pushes events</text>
-<text x="430" y="184" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">Called via API/gRPC/MCP</text>
-<text x="588" y="315" text-decoration="underline" style="fill:rgb(11, 11, 11);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:start;dominant-baseline:auto">VFL agent</text>
-<text x="588" y="335" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">No chain link</text>
-<text x="520" y="525" text-decoration="underline" style="fill:rgb(11, 11, 11);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:start;dominant-baseline:auto">LLM agent</text>
-<text x="520" y="543" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">Reasoning layer</text>
-<text x="200" y="528" text-anchor="end" text-decoration="underline" style="fill:rgb(11, 11, 11);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:end;dominant-baseline:auto">Governance agent</text>
-<text x="200" y="546" text-anchor="end" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:end;dominant-baseline:auto">Only writer</text>
-<text x="131" y="315" text-anchor="end" text-decoration="underline" style="fill:rgb(11, 11, 11);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:end;dominant-baseline:auto">Execution agent</text>
-<text x="131" y="335" text-anchor="end" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:end;dominant-baseline:auto">Verifies, then acts</text>
-<text x="170" y="22" text-anchor="middle" text-decoration="underline" style="fill:rgb(11, 11, 11);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:auto">Event listener</text>
-<text x="170" y="40" text-anchor="middle" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:auto">Notified, reads the chain</text>
-<text x="50" y="130" text-anchor="middle" text-decoration="underline" style="fill:rgb(11, 11, 11);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:auto">Log + audit</text>
-<text x="50" y="148" text-anchor="middle" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:auto">SOC monitoring</text>
-<text x="598" y="654" text-anchor="middle" text-decoration="underline" style="fill:rgb(11, 11, 11);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:14px;font-weight:500;text-anchor:middle;dominant-baseline:auto">RAG + policy docs</text>
-<text x="598" y="672" text-anchor="middle" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:auto">Security policies</text>
-
-<text x="496" y="214" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">Push network flow</text>
-<text x="560" y="442" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">Attack class, SHAP</text>
-<text x="520" y="592" text-anchor="end" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:end;dominant-baseline:auto">Policies</text>
-<text x="360" y="597" text-anchor="middle" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:auto">Mitigation plan</text>
-<text x="272" y="479" text-anchor="end" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:end;dominant-baseline:auto">Write plan</text>
-<text x="162" y="442" text-anchor="end" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:end;dominant-baseline:auto">Approved plan</text>
-<text x="232" y="368" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">Verify</text>
-<text x="225" y="292" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">Execute via</text>
-<text x="225" y="308" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">API/gRPC/MCP</text>
-<text x="160" y="204" text-anchor="end" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:end;dominant-baseline:auto">Result notice</text>
-<text x="300" y="100" text-anchor="middle" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:auto">Events, done notice</text>
-<text x="292" y="253" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">Read</text>
-<text x="105" y="104" text-anchor="middle" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:auto">Audit log</text>
-<text x="376" y="275" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:auto">Read policy</text>
-
-<g fill="#3B5BDB" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto">
-<circle cx="479.6" cy="232.3" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="296" cy="138.5" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="540.7" cy="438.7" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="540" cy="575" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="360" cy="570" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="290" cy="476" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="179.3" cy="438.7" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="247" cy="343.4" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="210.3" cy="263" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="174.5" cy="200" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="222" cy="107.2" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="276.3" cy="250" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="105" cy="66" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="360" cy="271.5" r="10" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<circle cx="248" cy="676" r="8" style="fill:rgb(59, 91, 219);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-</g>
-<g text-anchor="middle" dominant-baseline="central" style="fill:rgb(0, 0, 0);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:middle;dominant-baseline:central">
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="479.6" y="232.3">1</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="296" y="138.5">1b</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="540.7" y="438.7">2</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="540" y="575">3</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="360" y="570">4</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="290" y="476">5</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="179.3" y="438.7">6</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="247" y="343.4">7</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="210.3" y="263">8</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="174.5" y="200">8b</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="222" y="107.2">9</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="276.3" y="250">10</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="105" y="66">11</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="360" y="271.5">12</text>
-<text style="fill:#fff;fill:rgb(255, 255, 255);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:middle;dominant-baseline:central" x="248" y="676">n</text>
+<!-- Perfect outer ring -->
+<circle cx="440" cy="400" r="190" fill="none" stroke="#3B5BDB" stroke-width="1" opacity="0.22"/>
+<g fill="none" stroke="#3B5BDB" stroke-width="1.5">
+  <path d="M499.3 219.5A190 190 0 0 1 604.2 304.4" marker-end="url(#arrow)"/>
+  <path d="M629 380.5A190 190 0 0 1 581.4 526.9" marker-end="url(#arrow)"/>
+  <path d="M516.8 573.8A190 190 0 0 1 363.2 573.8" marker-end="url(#arrow)"/>
+  <path d="M298.6 526.9A190 190 0 0 1 251 380.5" marker-end="url(#arrow)"/>
+  <path d="M275.8 304.4A190 190 0 0 1 380.7 219.5" marker-end="url(#arrow)"/>
 </g>
 
-<line x1="20" y1="650" x2="56" y2="650" stroke="#3B5BDB" stroke-width="1.5" marker-end="url(#arrow)" style="fill:rgb(0, 0, 0);stroke:rgb(59, 91, 219);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<text x="66" y="650" dominant-baseline="central" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:central">Data flow and events</text>
-<line x1="230" y1="650" x2="266" y2="650" stroke="#1D9E75" stroke-width="2" marker-end="url(#arrow)" style="fill:rgb(0, 0, 0);stroke:rgb(29, 158, 117);color:rgb(11, 11, 11);stroke-width:2px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<text x="276" y="650" dominant-baseline="central" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:central">Write (governance only)</text>
-<line x1="20" y1="676" x2="56" y2="676" stroke="#7F77DD" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)" style="fill:rgb(0, 0, 0);stroke:rgb(127, 119, 221);color:rgb(11, 11, 11);stroke-width:1.5px;stroke-dasharray:5px, 4px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:16px;font-weight:400;text-anchor:start;dominant-baseline:auto"/>
-<text x="66" y="676" dominant-baseline="central" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:central">Read (verify, monitor)</text>
-<text x="262" y="676" dominant-baseline="central" style="fill:rgb(82, 81, 78);stroke:none;color:rgb(11, 11, 11);stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;opacity:1;font-family:anthropic-sans, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, sans-serif;font-size:12px;font-weight:400;text-anchor:start;dominant-baseline:central">Number = execution order</text>
+<!-- Agent nodes on the ring: one color per agent -->
+<circle cx="440" cy="210" r="56" fill="#EEF2FF" stroke="#3B5BDB" stroke-width="1.5"/>
+<circle cx="440" cy="188" r="11" fill="#EEF2FF" stroke="#3B5BDB" stroke-width="1.5"/>
+<circle cx="440" cy="210" r="11" fill="#EEF2FF" stroke="#3B5BDB" stroke-width="1.5"/>
+<circle cx="440" cy="232" r="11" fill="#EEF2FF" stroke="#3B5BDB" stroke-width="1.5"/>
+<circle cx="620.7" cy="341.3" r="40" fill="#E6FCF5" stroke="#099268" stroke-width="1.5"/>
+<circle cx="551.7" cy="553.7" r="40" fill="#F8F0FC" stroke="#9C36B5" stroke-width="1.5"/>
+<circle cx="328.3" cy="553.7" r="40" fill="#FFF4E6" stroke="#E67700" stroke-width="1.5"/>
+<circle cx="259.3" cy="341.3" r="40" fill="#F3F0FF" stroke="#5F3DC4" stroke-width="1.5"/>
+
+<!-- Blockchain -->
+<circle cx="440" cy="400" r="88" fill="#F0FDF8" stroke="#0F766E" stroke-width="1.8"/>
+<g fill="#F0FDF8" stroke="#0F766E" stroke-width="1.6">
+  <rect x="470" y="331.6" width="12" height="12" rx="2.4"/>
+  <rect x="506" y="394" width="12" height="12" rx="2.4"/>
+  <rect x="470" y="456.4" width="12" height="12" rx="2.4"/>
+  <rect x="398" y="456.4" width="12" height="12" rx="2.4"/>
+  <rect x="362" y="394" width="12" height="12" rx="2.4"/>
+  <rect x="398" y="331.6" width="12" height="12" rx="2.4"/>
+  <line x1="480" y1="343.6" x2="508" y2="396"/>
+  <line x1="508" y1="406" x2="480" y2="456.4"/>
+  <line x1="470" y1="462.4" x2="410" y2="462.4"/>
+  <line x1="400" y1="456.4" x2="372" y2="406"/>
+  <line x1="372" y1="394" x2="400" y2="343.6"/>
+  <line x1="410" y1="337.6" x2="470" y2="337.6"/>
+</g>
+<g fill="none" stroke="#0F766E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="417" y="346" width="15" height="8.5" rx="4.2"/>
+  <rect x="428" y="346" width="15" height="8.5" rx="4.2"/>
+  <rect x="439" y="346" width="15" height="8.5" rx="4.2"/>
+  <use href="#ic-contract" transform="translate(440,446) scale(1.05)"/>
+</g>
+
+<!-- Event listener + audit (left corridor) -->
+<g fill="#FFF4ED" stroke="#D45522" stroke-width="1.5">
+  <circle cx="78" cy="400" r="32"/>
+  <circle cx="78" cy="530" r="24"/>
+</g>
+
+<!-- Knowledge -->
+<circle cx="680" cy="640" r="26" fill="#F5F0FF" stroke="#6A2DBF" stroke-width="1.5"/>
+
+<!-- Human loop on the outer arc between Orchestrator and Governance -->
+<circle cx="207" cy="476" r="26" fill="#FFF1F1" stroke="#C42020" stroke-width="1.8" stroke-dasharray="5 4"/>
+
+<!-- Detection fan to VFL -->
+<g fill="none" stroke="#3B5BDB" stroke-width="1">
+  <line x1="451" y1="192" x2="499.3" y2="219.5"/>
+  <line x1="451" y1="210" x2="499.3" y2="219.5"/>
+  <line x1="451" y1="228" x2="499.3" y2="219.5"/>
+</g>
+
+<!-- Event listener: orthogonal left-corridor links only -->
+<g fill="none" stroke="#D45522" stroke-width="1.5">
+  <line x1="429" y1="192" x2="380" y2="200"/>
+  <line x1="429" y1="210" x2="380" y2="200"/>
+  <line x1="429" y1="228" x2="380" y2="200"/>
+  <path d="M380 200 H 78 V 368" marker-end="url(#arrow)"/>
+  <path d="M219 341 H 110 V 372" marker-end="url(#arrow)"/>
+  <line x1="78" y1="432" x2="78" y2="506" marker-end="url(#arrow)"/>
+</g>
+<line x1="656" y1="628" x2="586" y2="584" fill="none" stroke="#6A2DBF" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- Writes: plan from governance, verify/apply from orchestrator -->
+<g fill="none" stroke="#1D9E75" stroke-width="2">
+  <line x1="351.8" y1="531.3" x2="387.5" y2="483.5" marker-end="url(#arrow)"/>
+  <line x1="300" y1="352" x2="360" y2="368" marker-end="url(#arrow)"/>
+</g>
+
+<!-- Reads: policy up; listener across -->
+<g stroke="#7F77DD" stroke-width="1.5" stroke-dasharray="5 4" fill="none">
+  <line x1="440" y1="312" x2="440" y2="268" marker-end="url(#arrow)"/>
+  <line x1="110" y1="400" x2="352" y2="400" marker-end="url(#arrow)"/>
+</g>
+
+<!-- Fail 4b: governance → reason again, under the ring only -->
+<path d="M368 598 C 420 620 480 620 532 598" fill="none" stroke="#C42020" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+
+<!-- Fail 6b / 6c: circular outer arc orchestrator → human → governance -->
+<path d="M245 378 A 240 240 0 0 0 199 448" fill="none" stroke="#C42020" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+<path d="M229 490 A 240 240 0 0 0 295 532" fill="none" stroke="#C42020" stroke-width="2" marker-end="url(#arrow)"/>
+
+<!-- Icons sit inside nodes; labels stay outside so they never cover an icon -->
+<g stroke="#099268">
+  <use href="#ic-vfl" transform="translate(620.7,341.3) scale(1.35)"/>
+</g>
+<g stroke="#9C36B5">
+  <use href="#ic-brain" transform="translate(551.7,553.7) scale(1.25)"/>
+</g>
+<g stroke="#E67700">
+  <use href="#ic-clipboard" transform="translate(328.3,553.7) scale(1.3)"/>
+</g>
+<g stroke="#5F3DC4">
+  <use href="#ic-gear" transform="translate(259.3,341.3) scale(1.2)"/>
+</g>
+<g stroke="#D45522">
+  <use href="#ic-listen" transform="translate(78,399) scale(1.2)"/>
+  <use href="#ic-audit" transform="translate(78,530) scale(0.88)"/>
+</g>
+<g stroke="#6A2DBF">
+  <use href="#ic-db" transform="translate(680,640) scale(1.0)"/>
+</g>
+<g stroke="#C42020">
+  <use href="#ic-human" transform="translate(207,476) scale(1.05)"/>
+</g>
+
+<text class="sans d" x="440" y="188" text-anchor="middle" dominant-baseline="central">D1</text>
+<text class="sans d" x="440" y="210" text-anchor="middle" dominant-baseline="central">D2</text>
+<text class="sans d" x="440" y="232" text-anchor="middle" dominant-baseline="central">D3</text>
+
+<text class="sans h" x="440" y="398" text-anchor="middle" fill="#0F766E">Blockchain</text>
+<text class="sans h" x="440" y="416" text-anchor="middle" fill="#0F766E">layer</text>
+
+<text class="sans h" x="510" y="152">Detection agents</text>
+<text class="sans s" x="510" y="168">High-level sensors</text>
+<text class="sans s" x="510" y="184">Called via API/gRPC/MCP</text>
+<text class="sans h" x="668" y="335">VFL agent</text>
+<text class="sans s" x="668" y="351">No chain link</text>
+<text class="sans h" x="600" y="545">LLM agent</text>
+<text class="sans s" x="600" y="561">Reasoning layer</text>
+<rect x="270" y="606" width="118" height="36" rx="16" fill="#FFF4E6" stroke="#E67700" stroke-width="1.5"/>
+<text class="sans h" x="329" y="620" text-anchor="middle">Governance agent</text>
+<text class="sans s" x="329" y="634" text-anchor="middle">Commits the plan</text>
+<rect x="120" y="254" width="132" height="40" rx="16" fill="#F3F0FF" stroke="#5F3DC4" stroke-width="1.5"/>
+<text class="sans h" x="186" y="270" text-anchor="middle">Orchestrator</text>
+<text class="sans s" x="186" y="286" text-anchor="middle">Verifies, then acts</text>
+
+<text class="sans h" x="42" y="396" text-anchor="end" fill="#D45522">Event listener</text>
+<text class="sans s" x="42" y="412" text-anchor="end">Reads the chain</text>
+<text class="sans h" x="50" y="526" text-anchor="end" fill="#D45522">Log + audit</text>
+<text class="sans s" x="50" y="542" text-anchor="end">SOC monitoring</text>
+<text class="sans h" x="680" y="680" text-anchor="middle" fill="#6A2DBF">RAG + policy docs</text>
+<text class="sans s" x="680" y="696" text-anchor="middle">Knowledge store</text>
+<text class="sans h" x="172" y="472" text-anchor="end" fill="#C42020">Human loop</text>
+<text class="sans s" x="172" y="488" text-anchor="end">Reviewer</text>
+
+<text class="sans s" x="575" y="232">Push network flow</text>
+<text class="sans s" x="648" y="468">Attack class, SHAP</text>
+<text class="sans s" x="610" y="612" text-anchor="end">Policies</text>
+<text class="sans s" x="440" y="582" text-anchor="middle">Mitigation plan</text>
+<text class="sans s" x="450" y="632" fill="#C42020">Reject, reason again</text>
+<text class="sans s" x="348" y="516" text-anchor="end">Write plan</text>
+  <text class="sans s" x="154" y="336" text-anchor="end" fill="#C42020">Verify fail</text>
+<text class="sans s" x="236" y="548" text-anchor="middle" fill="#C42020">Update governance</text>
+<text class="sans s" fill="#52514E">
+  <textPath href="#arc-exec-out" startOffset="22%">Execute</textPath>
+</text>
+<text class="sans s" fill="#52514E">
+  <textPath href="#arc-exec-in" startOffset="4%">via API / gRPC / MCP</textPath>
+</text>
+<text class="sans s" x="259" y="318" text-anchor="middle">Result</text>
+<text class="sans s" x="200" y="186">Events, done notice</text>
+<text class="sans s" x="456" y="262">Read policy</text>
+  <text class="sans s" x="158" y="418">Read</text>
+<text class="sans s" x="42" y="470" text-anchor="end">Audit log</text>
+<text class="sans s" x="340" y="336">Verify</text>
+
+<!-- Step badges -->
+<g fill="#3B5BDB">
+  <circle cx="530" cy="248" r="11"/>
+  <circle cx="620.7" cy="458.7" r="9"/>
+  <circle cx="620" cy="605" r="9"/>
+  <circle cx="440" cy="568" r="11"/>
+  <circle cx="370" cy="506" r="9"/>
+  <circle cx="328" cy="360" r="11"/>
+  <circle cx="369" cy="224" r="11"/>
+  <circle cx="168" cy="352" r="11"/>
+  <circle cx="200" cy="400" r="9"/>
+  <circle cx="168" cy="200" r="11"/>
+  <circle cx="440" cy="274" r="11"/>
+</g>
+<g fill="#C42020">
+  <circle cx="450" cy="616" r="11"/>
+  <circle cx="236" cy="368" r="11"/>
+  <circle cx="258" cy="524" r="11"/>
+</g>
+<g class="sans n" text-anchor="middle" dominant-baseline="central">
+  <text x="530" y="248">1</text>
+  <text x="620.7" y="458.7">2</text>
+  <text x="620" y="605">3</text>
+  <text x="440" y="568">4a</text>
+  <text x="370" y="506">5</text>
+  <text x="328" y="360">6</text>
+  <text x="369" y="224">8</text>
+  <text x="168" y="352">7a</text>
+  <text x="200" y="400">11</text>
+  <text x="168" y="200">10</text>
+  <text x="440" y="274">9</text>
+  <text x="450" y="616">4b</text>
+  <text x="236" y="368">7b</text>
+  <text x="258" y="524">7c</text>
+</g>
+
+<!-- Legend: three groups -->
+<line x1="228" y1="736" x2="228" y2="818" stroke="#E5E5E5" stroke-width="1"/>
+<line x1="500" y1="736" x2="500" y2="818" stroke="#E5E5E5" stroke-width="1"/>
+
+<text class="sans s" x="20" y="742" font-weight="700" fill="#0B0B0B">Flow</text>
+<g fill="none">
+  <line x1="20" y1="762" x2="46" y2="762" stroke="#3B5BDB" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="20" y1="782" x2="46" y2="782" stroke="#1D9E75" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="20" y1="802" x2="46" y2="802" stroke="#7F77DD" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <line x1="110" y1="762" x2="136" y2="762" stroke="#C42020" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+</g>
+<text class="sans s" x="50" y="762" dominant-baseline="central">Data</text>
+<text class="sans s" x="50" y="782" dominant-baseline="central">Write</text>
+<text class="sans s" x="50" y="802" dominant-baseline="central">Read</text>
+<text class="sans s" x="140" y="762" dominant-baseline="central">Fail / retry</text>
+
+<text class="sans s" x="244" y="742" font-weight="700" fill="#0B0B0B">Agents</text>
+<circle cx="250" cy="762" r="6" fill="#EEF2FF" stroke="#3B5BDB"/>
+<circle cx="250" cy="782" r="6" fill="#E6FCF5" stroke="#099268"/>
+<circle cx="250" cy="802" r="6" fill="#F8F0FC" stroke="#9C36B5"/>
+<circle cx="360" cy="762" r="6" fill="#FFF4E6" stroke="#E67700"/>
+<circle cx="360" cy="782" r="6" fill="#F3F0FF" stroke="#5F3DC4"/>
+<text class="sans s" x="262" y="762" dominant-baseline="central">Detection</text>
+<text class="sans s" x="262" y="782" dominant-baseline="central">VFL</text>
+<text class="sans s" x="262" y="802" dominant-baseline="central">LLM</text>
+<text class="sans s" x="372" y="762" dominant-baseline="central">Governance</text>
+<text class="sans s" x="372" y="782" dominant-baseline="central">Orchestrator</text>
+
+<text class="sans s" x="516" y="742" font-weight="700" fill="#0B0B0B">Other</text>
+<circle cx="522" cy="762" r="6" fill="#FFF4ED" stroke="#D45522"/>
+<circle cx="522" cy="782" r="6" fill="#F5F0FF" stroke="#6A2DBF"/>
+<circle cx="522" cy="802" r="6" fill="#FFF1F1" stroke="#C42020" stroke-dasharray="3 2"/>
+<circle cx="640" cy="762" r="6" fill="#F0FDF8" stroke="#0F766E"/>
+<text class="sans s" x="534" y="762" dominant-baseline="central">Event listener</text>
+<text class="sans s" x="534" y="782" dominant-baseline="central">Knowledge</text>
+<text class="sans s" x="534" y="802" dominant-baseline="central">Human loop</text>
+<text class="sans s" x="652" y="762" dominant-baseline="central">Blockchain</text>
+
+<text class="sans s" x="-4" y="762" text-anchor="end" dominant-baseline="central">a = main</text>
+<text class="sans s" x="-4" y="782" text-anchor="end" dominant-baseline="central">b = later</text>
 </svg>

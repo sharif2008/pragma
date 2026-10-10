@@ -1,119 +1,148 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1020" height="1280" viewBox="0 0 1020 1280">
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="1240" viewBox="0 0 1220 1240">
   <defs>
     <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
       <path d="M0,0 L9,3 L0,6 Z" fill="#000"/>
     </marker>
     <style>
-      .title { font: 700 34px Arial, sans-serif; fill:#000; }
-      .subtitle { font: italic 16px Arial, sans-serif; fill:#000; }
-      .head { font: 700 22px Arial, sans-serif; fill:#000; }
-      .body { font: 16px Arial, sans-serif; fill:#000; }
-      .small { font: 700 15px Arial, sans-serif; fill:#000; }
+      .head { font: 700 22px Arial, Helvetica, sans-serif; fill:#000; }
+      .body { font: 16px Arial, Helvetica, sans-serif; fill:#000; }
+      .small { font: 700 14px Arial, Helvetica, sans-serif; fill:#000; }
       .box { fill:#fff; stroke:#000; stroke-width:3; rx:18; }
       .hitl { fill:#fff; stroke:#000; stroke-width:3; stroke-dasharray:11 7; rx:18; }
       .arrow { stroke:#000; stroke-width:3; fill:none; marker-end:url(#arrow); }
       .loop { stroke:#000; stroke-width:3; fill:none; stroke-dasharray:11 7; marker-end:url(#arrow); }
-      .icon { stroke:#000; stroke-width:4; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+      .icon { stroke:#000; stroke-width:3.5; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+      .iconf { fill:#000; stroke:none; }
+      .blockfill { fill:#fff; stroke:#000; stroke-width:3; stroke-linejoin:round; }
     </style>
   </defs>
 
-  <rect width="1020" height="1280" fill="#fff"/>
+  <rect x="0" y="0" width="1220" height="1240" fill="#fff"/>
 
-  <text x="400" y="48" text-anchor="middle" class="title">PRAGMA — Flowchart View</text>
-  <text x="400" y="76" text-anchor="middle" class="subtitle">
-    Gate is the only branch. A human loop re-enters — it never skips.
-  </text>
+  <!-- Main column centered at x=560; left gutter ~260px for loop labels -->
 
   <!-- Start -->
-  <rect x="210" y="100" width="380" height="90" class="box"/>
-  <path d="M245 125 h35 l15 15 v42 h-50 z M280 125 v18 h15 M257 158 h25 M257 172 h25"
+  <rect x="370" y="28" width="380" height="90" class="box"/>
+  <path d="M405 53 h35 l15 15 v42 h-50 z M440 53 v18 h15 M417 86 h25 M417 100 h25"
         class="icon"/>
-  <text x="430" y="154" text-anchor="middle" class="head">Network Flow Arrives</text>
+  <text x="590" y="82" text-anchor="middle" class="head">Network Flow Arrives</text>
 
-  <path d="M400 190 V235" class="arrow"/>
+  <path d="M560 118 V163" class="arrow"/>
 
   <!-- 1 Detect -->
-  <rect x="150" y="235" width="500" height="118" class="box"/>
-  <path d="M195 322 V288 M215 322 V274 M235 322 V260 M185 322 H250"
+  <rect x="310" y="163" width="500" height="118" class="box"/>
+  <path d="M355 250 V216 M375 250 V202 M395 250 V188 M345 250 H410"
         class="icon"/>
-  <text x="400" y="280" text-anchor="middle" class="head">1. Detect</text>
-  <text x="400" y="308" text-anchor="middle" class="body">VFL classifies the flow</text>
-  <text x="400" y="330" text-anchor="middle" class="body">SHAP attributes evidence</text>
+  <text x="560" y="208" text-anchor="middle" class="head">1. Detect</text>
+  <text x="560" y="236" text-anchor="middle" class="body">VFL classifies the flow</text>
+  <text x="560" y="258" text-anchor="middle" class="body">SHAP attributes evidence</text>
 
-  <path d="M400 353 V398" class="arrow"/>
+  <path d="M560 281 V326" class="arrow"/>
 
   <!-- 2 Reason -->
-  <rect x="150" y="398" width="500" height="118" class="box"/>
-  <path d="M195 428 h45 v60 h-45 z M205 444 h25 M205 459 h25 M205 474 h17"
+  <rect x="310" y="326" width="500" height="118" class="box"/>
+  <path d="M355 356 h45 v60 h-45 z M365 372 h25 M365 387 h25 M365 402 h17"
         class="icon"/>
-  <text x="400" y="443" text-anchor="middle" class="head">2. Reason</text>
-  <text x="400" y="471" text-anchor="middle" class="body">RAG + LLM drafts</text>
-  <text x="400" y="493" text-anchor="middle" class="body">mitigation plan</text>
+  <text x="560" y="371" text-anchor="middle" class="head">2. Reason</text>
+  <text x="560" y="399" text-anchor="middle" class="body">RAG + LLM drafts</text>
+  <text x="560" y="421" text-anchor="middle" class="body">mitigation plan</text>
 
-  <path d="M400 516 V561" class="arrow"/>
+  <path d="M560 444 V489" class="arrow"/>
 
   <!-- 3 Commit -->
-  <rect x="150" y="561" width="500" height="128" class="box"/>
-  <path d="M188 635 l28-28 c9-9 22-9 31 0 l5 5 c9 9 9 22 0 31 l-14 14
-           M243 610 l-28 28 c-9 9-22 9-31 0 l-5-5 c-9-9-9-22 0-31 l14-14"
-        class="icon"/>
-  <text x="400" y="605" text-anchor="middle" class="head">3. Commit</text>
-  <text x="400" y="633" text-anchor="middle" class="body">storePlan</text>
-  <text x="400" y="656" text-anchor="middle" class="body">on the blockchain</text>
+  <rect x="310" y="489" width="500" height="128" class="box"/>
+  <!-- blockchain: block — chain link — block — chain link — block -->
+  <g transform="translate(330,522)">
+    <!-- block 1 -->
+    <rect x="0" y="14" width="28" height="34" rx="3" class="blockfill"/>
+    <path d="M6 24 h16 M6 33 h16 M6 42 h10" class="icon" stroke-width="2.2"/>
+    <!-- chain link 1 (two interleaved rings) -->
+    <ellipse cx="42" cy="31" rx="9" ry="12" class="icon" stroke-width="3" transform="rotate(-35 42 31)"/>
+    <ellipse cx="54" cy="31" rx="9" ry="12" class="icon" stroke-width="3" transform="rotate(35 54 31)"/>
+    <!-- block 2 -->
+    <rect x="66" y="14" width="28" height="34" rx="3" class="blockfill"/>
+    <path d="M72 24 h16 M72 33 h16 M72 42 h10" class="icon" stroke-width="2.2"/>
+    <!-- chain link 2 -->
+    <ellipse cx="108" cy="31" rx="9" ry="12" class="icon" stroke-width="3" transform="rotate(-35 108 31)"/>
+    <ellipse cx="120" cy="31" rx="9" ry="12" class="icon" stroke-width="3" transform="rotate(35 120 31)"/>
+    <!-- block 3 -->
+    <rect x="132" y="14" width="28" height="34" rx="3" class="blockfill"/>
+    <path d="M138 24 h16 M138 33 h16 M138 42 h10" class="icon" stroke-width="2.2"/>
+  </g>
+  <text x="580" y="533" text-anchor="middle" class="head">3. Commit</text>
+  <text x="580" y="561" text-anchor="middle" class="body">storePlan</text>
+  <text x="580" y="584" text-anchor="middle" class="body">on the blockchain</text>
 
-  <path d="M400 689 V734" class="arrow"/>
+  <path d="M560 617 V662" class="arrow"/>
 
   <!-- Gate -->
-  <polygon points="400,734 545,839 400,944 255,839"
+  <polygon points="560,662 705,767 560,872 415,767"
            fill="#fff" stroke="#000" stroke-width="3"/>
-  <path d="M382 796 q18-18 36 0 v27 q-18 18-36 0 z" class="icon"/>
-  <text x="400" y="848" text-anchor="middle" class="head">Gate</text>
-  <text x="400" y="872" text-anchor="middle" class="body">whitelist +</text>
-  <text x="400" y="894" text-anchor="middle" class="body">action match?</text>
+  <path d="M542 724
+           C542 724, 560 714, 578 724
+           V752
+           C578 764, 560 776, 560 776
+           C560 776, 542 764, 542 752 Z" class="icon"/>
+  <path d="M550 746 l8 8 16-16" class="icon" stroke-width="3"/>
+  <text x="560" y="796" text-anchor="middle" class="head">Gate</text>
+  <text x="560" y="824" text-anchor="middle" class="body">Whitelist + plan?</text>
 
-  <!-- Yes -->
-  <text x="418" y="966" class="small">Yes</text>
-  <path d="M400 944 V989" class="arrow"/>
+  <text x="578" y="894" class="small">All good</text>
+  <path d="M560 872 V917" class="arrow"/>
 
   <!-- 4 Apply -->
-  <rect x="150" y="989" width="500" height="112" class="box"/>
-  <circle cx="215" cy="1045" r="26" class="icon"/>
-  <circle cx="215" cy="1045" r="9" class="icon"/>
-  <path d="M215 1010 v11 M215 1069 v11 M181 1045 h11 M238 1045 h11
-           M191 1021 l8 8 M231 1061 l8 8 M239 1021 l-8 8 M199 1061 l-8 8"
+  <rect x="310" y="917" width="500" height="112" class="box"/>
+  <circle cx="375" cy="973" r="26" class="icon"/>
+  <circle cx="375" cy="973" r="9" class="icon"/>
+  <path d="M375 938 v11 M375 997 v11 M341 973 h11 M398 973 h11
+           M351 949 l8 8 M391 989 l8 8 M399 949 l-8 8 M359 989 l-8 8"
         class="icon"/>
-  <text x="430" y="1032" text-anchor="middle" class="head">4. Apply</text>
-  <text x="430" y="1060" text-anchor="middle" class="body">Execute action via</text>
-  <text x="430" y="1082" text-anchor="middle" class="body">API / gRPC / MCP</text>
+  <text x="590" y="960" text-anchor="middle" class="head">4. Apply</text>
+  <text x="590" y="988" text-anchor="middle" class="body">Execute action via</text>
+  <text x="590" y="1010" text-anchor="middle" class="body">API / gRPC / MCP</text>
 
-  <path d="M400 1101 V1144" class="arrow"/>
+  <path d="M560 1029 V1072" class="arrow"/>
 
   <!-- Executed -->
-  <rect x="210" y="1144" width="380" height="88" class="box"/>
-  <path d="M245 1165 h35 l15 15 v40 h-50 z M280 1165 v18 h15
-           M255 1200 l10 10 20-22" class="icon"/>
-  <text x="430" y="1186" text-anchor="middle" class="head">Action Executed</text>
-  <text x="430" y="1212" text-anchor="middle" class="head">&amp; Logged</text>
+  <rect x="370" y="1072" width="380" height="88" class="box"/>
+  <path d="M405 1093 h35 l15 15 v40 h-50 z M440 1093 v18 h15
+           M415 1128 l10 10 20-22" class="icon"/>
+  <text x="590" y="1114" text-anchor="middle" class="head">Action Executed</text>
+  <text x="590" y="1140" text-anchor="middle" class="head">&amp; Logged</text>
 
-  <!-- No: Gate → Human-in-the-Loop -->
-  <text x="560" y="824" class="small">No</text>
-  <path d="M545 839 H690" class="arrow"/>
+  <!-- Left loop: wide gutter so labels never clip -->
+  <text x="285" y="752" text-anchor="end" class="small">Whitelist failed</text>
+  <path d="M415 767 H140 V385 H308" class="loop"/>
+  <text x="128" y="560" text-anchor="end" class="small">Re-ask</text>
+  <text x="128" y="580" text-anchor="end" class="small">Reason</text>
+
+  <!-- Action mismatch → Human -->
+  <text x="778" y="752" text-anchor="middle" class="small">Action mismatch</text>
+  <path d="M705 767 H850" class="arrow"/>
 
   <!-- Human-in-the-Loop -->
-  <rect x="690" y="742" width="300" height="194" class="hitl"/>
-  <circle cx="840" cy="772" r="11" fill="#000"/>
-  <circle cx="814" cy="780" r="9" fill="#000"/>
-  <circle cx="866" cy="780" r="9" fill="#000"/>
-  <path d="M823 802 q17-18 34 0 v18 h-34 z
-           M800 806 q12-14 24 0 v14 h-24 z
-           M856 806 q12-14 24 0 v14 h-24 z" fill="#000"/>
-  <text x="840" y="848" text-anchor="middle" class="head">Human-in-the-Loop</text>
-  <text x="840" y="874" text-anchor="middle" class="body">Operator Review</text>
-  <text x="840" y="898" text-anchor="middle" class="body">Approve, then re-enter</text>
-  <text x="840" y="920" text-anchor="middle" class="body">(never skips the gate)</text>
+  <rect x="850" y="670" width="330" height="194" class="hitl"/>
+  <!-- three clear people: head + shoulders + torso -->
+  <g transform="translate(930,692)">
+    <!-- left -->
+    <circle cx="22" cy="16" r="11" class="iconf"/>
+    <path d="M2 54 C2 36 10 30 22 30 C34 30 42 36 42 54
+             L42 58 L2 58 Z" class="iconf"/>
+    <!-- center (front / larger) -->
+    <circle cx="80" cy="12" r="13" class="iconf"/>
+    <path d="M56 58 C56 36 66 28 80 28 C94 28 104 36 104 58
+             L104 62 L56 62 Z" class="iconf"/>
+    <!-- right -->
+    <circle cx="138" cy="16" r="11" class="iconf"/>
+    <path d="M118 54 C118 36 126 30 138 30 C150 30 158 36 158 54
+             L158 58 L118 58 Z" class="iconf"/>
+  </g>
+  <text x="1015" y="780" text-anchor="middle" class="head">Human review</text>
+  <text x="1015" y="810" text-anchor="middle" class="body">Operator revisePlan</text>
+  <text x="1015" y="836" text-anchor="middle" class="body">Does not skip the gate</text>
 
   <!-- Loop back to Commit -->
-  <path d="M840 742 V625 H650" class="loop"/>
-  <text x="848" y="680" class="small">re-enter</text>
+  <path d="M1015 670 V553 H810" class="loop"/>
+  <text x="1030" y="606" class="small">Re-enter Commit</text>
 </svg>
