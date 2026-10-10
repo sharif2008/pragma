@@ -80,6 +80,18 @@ Motivated by these challenges, we propose a unified framework that integrates VF
   \item An apply-time enforcement evaluation in which unauthorized actions and in-cycle plan substitutions are rejected, and accepted actions leave an on-chain audit record.
 \end{itemize}
 
+\subsection{Research Questions}
+\label{sec:rqs}
+We evaluate the proposed system against the following research questions, answered in Section~\ref{sec:results}:
+\begin{itemize}
+  \item \textbf{RQ1 --- Detection.} Can PRAGMA's VFL detector achieve detection performance comparable to centralized learning while keeping raw feature data distributed?
+  \item \textbf{RQ2 --- Explainability.} Can SHAP provide faithful and actionable attribution of security decisions across distributed parties?
+  \item \textbf{RQ3 --- Grounded reasoning.} Does the proposed RAG pipeline improve the correctness and policy grounding of security recommendations compared with an LLM without retrieval?
+  \item \textbf{RQ4 --- Agentic response.} Can the agent reliably transform detected threats and retrieved security knowledge into appropriate enforcement actions?
+  \item \textbf{RQ5 --- Trusted enforcement.} Can blockchain-based commitments provide verifiable enforcement with acceptable latency overhead?
+  \item \textbf{RQ6 --- End-to-end.} Can PRAGMA integrate detection, explanation, reasoning, commitment, and enforcement into a reliable end-to-end security pipeline?
+\end{itemize}
+
 % ============================================================
 \section{Related Work}
 \label{sec:related}
